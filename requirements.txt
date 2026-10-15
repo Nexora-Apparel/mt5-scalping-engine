@@ -1,0 +1,3 @@
+metaapi-cloud-sdk
+pydantic-settings>=2.2,<3
+pytest>=8,<9
