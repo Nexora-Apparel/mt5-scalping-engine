@@ -2,11 +2,6 @@ name: Linux MT5 bootstrap validation
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "scripts/bootstrap_mt5_linux.sh"
-      - ".github/workflows/linux-mt5-bootstrap.yml"
 
 permissions:
   contents: read
