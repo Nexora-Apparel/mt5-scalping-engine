@@ -99,7 +99,7 @@ jobs:
           $source = (Resolve-Path "MQL5\Experts\NexoraScalper.mq5").Path
           $log = Join-Path (Split-Path $source) "NexoraScalper.log"
           if (Test-Path $log) { Remove-Item $log -Force }
-          $arguments = @("/compile:$source", "/include:$env:MQL5_INCLUDE", "/log")
+          $arguments = @("/compile:$source", "/inc:$env:MQL5_INCLUDE", "/log")
           Write-Host "Compiling EA with MetaEditor; no terminal account is configured and no orders can be submitted."
           $process = Start-Process -FilePath $env:METAEDITOR -ArgumentList $arguments -Wait -PassThru
           Start-Sleep -Seconds 2
