@@ -33,7 +33,7 @@ chmod +x scripts/bootstrap_mt5_linux.sh
 ./scripts/bootstrap_mt5_linux.sh
 ```
 
-The script installs Wine and Xvfb, creates a swap file if the VM has under 2 GB RAM and no swap, downloads the official MetaTrader installer, waits for the desktop terminal files, places the current EA source in the portable terminal folder, and compiles it. Logs are saved to `~/mt5-setup-logs/`.
+The script installs Xvfb and a lightweight window manager, creates a 2 GB swap file if the VM has under 2 GB RAM and no active swap, then runs MetaQuotes' official Linux installer (which handles the Wine/platform setup). It waits for the terminal and MetaEditor, places the current EA source in the terminal's Experts folder, and compiles it. Logs are saved to `~/mt5-setup-logs/`. The installer-dialog automation is experimental.
 
 The script may take several minutes. It is experimental and has not yet been executed on an Oracle VM. If it fails, preserve the logs and stop rather than switching to a paid instance.
 
