@@ -43,7 +43,7 @@ while [[ -S "/tmp/.X11-unix/X${display_num}" ]]; do
     exit 2
   fi
 done
-Xvfb ":${display_num}" -screen 0 1280x800x24 -ac >"$HOME/mt5-setup-logs/xvfb.log" 2>&1 &
+Xvfb ":${display_num}" -screen 0 1280x800x24 -nolisten tcp -ac >"$HOME/mt5-setup-logs/xvfb.log" 2>&1 &
 xvfb_pid=$!
 cleanup() {
   kill "$xvfb_pid" >/dev/null 2>&1 || true
