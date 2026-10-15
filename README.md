@@ -15,7 +15,8 @@ A safety-first experimental trading project for an Exness MT5 demo account.
 ## Choose a connection route
 
 1. **MetaApi Cloud:** requires an account deployment and may incur balance/usage charges.
-2. **Direct MT5 desktop EA:** avoids MetaApi, but requires a Windows computer with MT5 desktop installed and online. Android alone cannot run the desktop EA continuously.
+2. **Direct MT5 desktop EA:** avoids MetaApi, but requires a desktop terminal to remain online. Android alone cannot run the desktop EA.
+3. **Experimental Oracle Always Free route:** [docs/ORACLE_CLOUD_SETUP.md](docs/ORACLE_CLOUD_SETUP.md) and [scripts/bootstrap_mt5_linux.sh](scripts/bootstrap_mt5_linux.sh) describe an unverified x86_64 Linux/Wine setup. It requires manual Oracle account/VM provisioning and is not guaranteed to be stable or available.
 
 See [docs/NO_COST_MT5_ROUTE.md](docs/NO_COST_MT5_ROUTE.md) for limitations and the validation sequence.
 
