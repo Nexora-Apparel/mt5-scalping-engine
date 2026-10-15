@@ -35,22 +35,23 @@ jobs:
         run: |
           $installer = Join-Path $env:RUNNER_TEMP "mt5setup.exe"
           $installPath = "C:\MT5"
-          $process = Start-Process -FilePath $installer -ArgumentList @("/auto", "/path:$installPath") -Wait -PassThru
+          $process = Start-Process -FilePath $installer -ArgumentList @("/auto", "/path:`"$installPath`"") -Wait -PassThru
           Write-Host "Installer process exit code: $($process.ExitCode)"
           # Installer exit codes can vary; determine success from the actual installed files.
           $searchRoots = @(
             $installPath,
-            "$env:APPDATA\MetaQuotes\Terminal",
-            "$env:LOCALAPPDATA\Programs",
-            "C:\Program Files",
-            "C:\Program Files (x86)"
+            "C:\Program Files\MetaTrader 5",
+            "C:\Program Files\Exness MetaTrader 5",
+            "C:\Program Files (x86)\MetaTrader 5",
+            "C:\Program Files (x86)\Exness MetaTrader 5"
           ) | Where-Object { Test-Path $_ }
-          $editorFound = Get-ChildItem -Path $searchRoots -Filter "metaeditor64.exe" -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          $editorFound = Get-ChildItem -Path $searchRoots -Filter "metaeditor64.exe" -File -Recurse -Depth 5 -ErrorAction SilentlyContinue | Select-Object -First 1
           if (!$editorFound) {
             foreach ($root in $searchRoots) {
               Write-Host "Inspecting install root: $root"
               Get-ChildItem -Path $root -Force -ErrorAction SilentlyContinue | Select-Object -First 20 FullName
             }
+            Write-Host "MetaEditor not found in the expected bounded search roots; refusing an unbounded drive scan."
             throw "MetaEditor was not found after installer exit code $($process.ExitCode)."
           }
           $editor = $editorFound.FullName
@@ -98,3 +99,12 @@ jobs:
             throw "Compiler reported no errors but did not create the EX5 output."
           }
           Write-Host "MQL5 compilation succeeded. This verifies compilation only, not strategy performance."
+
+      - name: Upload compiled EA artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: NexoraScalper-compiled
+          path: MQL5/Experts/NexoraScalper.ex5
+          if-no-files-found: error
+          retention-days: 14
