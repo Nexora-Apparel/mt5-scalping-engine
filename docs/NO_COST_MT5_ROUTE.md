@@ -15,12 +15,13 @@ The standard MetaTrader 5 desktop terminal and MetaEditor are Windows applicatio
 - Order submission is disabled by default (`EnableDemoOrders=false`) and the emergency stop defaults to ON (`EmergencyStop=true`).
 - The EA blocks non-demo accounts, enforces a spread ceiling, a single-position-per-symbol rule, a cooldown, risk-based volume sizing, SL/TP, and a persistent start-of-day equity baseline with a daily equity-loss lockout.
 - Symbol point sizes and spreads differ by broker and instrument. Inputs must be calibrated for the exact Exness symbol (including suffix) before any demo order test.
-- The EA has not yet been compiled in MetaEditor or run in MT5 Strategy Tester. Do not enable order submission or use it on a live account.
+- The EA compiled in MetaEditor via Windows GitHub Actions on 2026-10-15 with 0 errors and 0 warnings. The compiled artifact is stored temporarily in the successful workflow run. Compilation does not prove the strategy is profitable or safe.
+- The EA has not yet been run in MT5 Strategy Tester or demo-forward-tested. Do not enable order submission or use it on a live account.
 
 ## Safe validation sequence
 
 1. Install MT5 desktop from Exness on a Windows computer and log into the demo account.
-2. Open MetaEditor, copy the EA into `MQL5/Experts/`, compile it, and resolve any compiler warnings/errors.
+2. The current source has already passed a MetaEditor compile check. When a full MT5 terminal is available, place the compiled `.ex5` (or source `.mq5`) in `MQL5/Experts/`.
 3. Run Strategy Tester first with visual mode and historical data; inspect entry timing, spread behavior, SL/TP placement, volume, and drawdown.
 4. Keep `EnableDemoOrders=false` and `EmergencyStop=true` until compilation and backtesting have been reviewed.
 5. For a controlled demo execution test only, use `EnableDemoOrders=true`, `EmergencyStop=false`, confirm the terminal account is DEMO, and watch every trade. Never test on a live account.
