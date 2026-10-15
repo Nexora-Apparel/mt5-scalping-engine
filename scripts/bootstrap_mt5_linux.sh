@@ -90,6 +90,11 @@ wine "$terminal" /portable >"$HOME/mt5-setup-logs/terminal-init.log" 2>&1 &
 terminal_init_pid=$!
 sleep 15
 kill "$terminal_init_pid" >/dev/null 2>&1 || true
+# The Wine wrapper may leave the Windows terminal child running; reset Wine cleanly
+# before compiling so the headless terminal does not hold the display open.
+wineserver -k >/dev/null 2>&1 || true
+sleep 2
+wineboot --init || true
 mkdir -p "$mt5_root/MQL5/Experts"
 
 source_url="https://raw.githubusercontent.com/Nexora-Apparel/mt5-scalping-engine/main/MQL5/Experts/NexoraScalper.mq5"
