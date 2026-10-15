@@ -5,11 +5,12 @@ A safety-first experimental trading project for an Exness MT5 demo account.
 ## Current status
 
 - A read-only MetaApi diagnostic exists, but its first run failed because the MetaApi account was undeployed and the dashboard requested a balance top-up.
-- A direct MT5 Expert Advisor has been added as a potential route that does not require MetaApi.
+- A direct MT5 Expert Advisor has been added as a potential route that does not require MetaApi. It uses native MQL5 order requests and compiles without an external Trade.mqh dependency.
 - The EA uses a provisional 9/21 EMA crossover for controlled research only. This is not a validated profitable strategy.
 - Order submission is disabled by default and the emergency stop defaults to ON.
-- The EA has **not** yet been compiled in MetaEditor or tested in MT5 Strategy Tester.
-- Live trading is not approved.
+- The EA compiled successfully in MetaEditor on 2026-10-15: **0 errors, 0 warnings**. The compiled `.ex5` is available as a temporary GitHub Actions artifact (14-day retention).
+- The EA has **not** yet been run in MT5 Strategy Tester or demo-forward-tested.
+- No persistent cloud terminal has been provisioned yet. Live trading is not approved.
 
 ## Choose a connection route
 
