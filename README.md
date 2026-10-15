@@ -8,7 +8,8 @@ A safety-first experimental trading project for an Exness MT5 demo account.
 - A direct MT5 Expert Advisor has been added as a potential route that does not require MetaApi. It uses native MQL5 order requests and compiles without an external Trade.mqh dependency.
 - The EA uses a provisional 9/21 EMA crossover for controlled research only. This is not a validated profitable strategy.
 - Order submission is disabled by default and the emergency stop defaults to ON.
-- The EA compiled successfully in MetaEditor on 2026-10-15: **0 errors, 0 warnings**. The compiled `.ex5` is available as a temporary GitHub Actions artifact (14-day retention).
+- The current EA source compiled successfully in MetaEditor on 2026-10-15: **0 errors, 0 warnings**. The compiled `.ex5` is available for 14 days from the [latest successful compile run](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/38769757442); open the run and download the `NexoraScalper-compiled` artifact.
+- The daily equity-loss lockout now latches after a breach until the next broker-server day, including a separate in-memory lock in Strategy Tester.
 - The EA has **not** yet been run in MT5 Strategy Tester or demo-forward-tested.
 - No persistent cloud terminal has been provisioned yet. Live trading is not approved.
 
