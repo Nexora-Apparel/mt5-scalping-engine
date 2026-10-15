@@ -21,12 +21,12 @@ jobs:
       - name: Validate shell syntax
         run: bash -n scripts/bootstrap_mt5_linux.sh
       - name: Install MT5 under Wine and compile EA (no account configured)
-        run: ./scripts/bootstrap_mt5_linux.sh
+        run: bash scripts/bootstrap_mt5_linux.sh
       - name: Upload bootstrap logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: linux-mt5-bootstrap-logs
-          path: ~/mt5-setup-logs/**
+          path: /home/runner/mt5-setup-logs/**
           if-no-files-found: ignore
           retention-days: 7
