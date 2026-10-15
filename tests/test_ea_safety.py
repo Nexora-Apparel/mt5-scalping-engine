@@ -26,3 +26,11 @@ def test_expert_advisor_contains_required_risk_gates():
     ]
     for control in required_controls:
         assert control in source
+
+
+def test_daily_loss_baseline_uses_server_day_history_and_fails_closed():
+    source = EA_PATH.read_text(encoding="utf-8")
+    assert "HistorySelect(dayStart, now)" in source
+    assert "AccountInfoDouble(ACCOUNT_BALANCE) - netBalanceChanges" in source
+    assert 'Print("Nexora risk gate: cannot select today\'s account history.")' in source
+    assert "if(startBalance <= 0.0) return true;" in source
