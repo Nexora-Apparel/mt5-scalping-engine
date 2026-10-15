@@ -10,6 +10,7 @@
 
 input bool   EnableDemoOrders       = false; // Keep false until Strategy Tester review
 input bool   EmergencyStop          = true;  // True blocks all new entries
+input double MinimumEquityUSD       = 10.0;  // Minimum account equity for entries; no EA-imposed upper balance limit
 input double RiskPercentPerTrade    = 0.25;  // Normal profile: percent of current equity
 input double MaxDailyLossPercent    = 1.00;  // Includes floating equity loss
 input int    MaxSpreadPoints        = 80;    // Normal profile spread ceiling in broker points
@@ -305,6 +306,10 @@ bool SafetyGatesPass()
       return false;
    if(!MQLInfoInteger(MQL_TRADE_ALLOWED))
       return false;
+   // No configured maximum account balance: sizing remains percentage-based,
+   // while broker volume/margin limits still apply.
+   if(MinimumEquityUSD <= 0.0 || AccountInfoDouble(ACCOUNT_EQUITY) < MinimumEquityUSD)
+      return false;
    if(!inTester && (!TerminalInfoInteger(TERMINAL_CONNECTED) ||
                     !TerminalInfoInteger(TERMINAL_TRADE_ALLOWED)))
       return false;
@@ -455,7 +460,7 @@ void TryEntry()
 
 int OnInit()
 {
-   if(FastEmaPeriod <= 0 || SlowEmaPeriod <= FastEmaPeriod ||
+   if(MinimumEquityUSD <= 0.0 || FastEmaPeriod <= 0 || SlowEmaPeriod <= FastEmaPeriod ||
       RiskPercentPerTrade <= 0.0 || MaxDailyLossPercent <= 0.0 ||
       StopLossPoints <= 0 || TakeProfitPoints <= 0)
       return INIT_PARAMETERS_INCORRECT;
