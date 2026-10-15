@@ -2,6 +2,12 @@ name: MQL5 compile check
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "MQL5/**/*.mq5"
+      - "MQL5/**/*.mqh"
+      - ".github/workflows/mql5-compile.yml"
   push:
     branches: [main]
     paths:
