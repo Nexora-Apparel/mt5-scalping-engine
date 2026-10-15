@@ -41,3 +41,15 @@ Reject the strategy if results depend on a small number of trades, disappear aft
 - Verify stop-loss/target distances, volume steps, filling mode, spread limits, and duplicate-position behavior for the actual broker symbol.
 - After an acceptable backtest, run a demo forward test and inspect terminal/journal logs. Keep the emergency stop ON except during an explicitly supervised demo test.
 - Never use a real account as a test environment. Do not enable live trading based on compilation or a single backtest.
+
+## Small-balance compatibility test (Deriv XAUUSD)
+
+The EA has an experimental small-balance profile for **Strategy Tester/demo research only**:
+- It activates at or below the configured equity threshold (default USD 100).
+- It uses current equity for per-trade sizing so the risk budget adapts as equity changes.
+- Defaults are 4% risk, 40-point stop, 60-point target, and a 20-point spread ceiling. These are deliberately marked aggressive and are **not a live-trading recommendation**.
+- On the user's reported XAUUSD specification (2 digits, 0.01 minimum volume, 20-point spread shown, 20-point stop level), the stop is only eligible when the actual spread and stop-level checks pass. If spread rises above the profile ceiling, the EA must skip the entry.
+- The EA checks estimated loss with `OrderCalcProfit` after rounding volume. If minimum volume exceeds the configured monetary risk budget, it skips the trade. Margin/preflight checks can also reject it.
+- The profile does not promise trades or profitability. If broker spread, stop rules, or margin make the trade infeasible, skipping is the correct behaviour.
+
+Test with a **USD 10 test deposit** and the exact Deriv demo XAUUSD symbol, ideally using real ticks. Confirm actual tick value, spread, stops level, order rejection reasons, drawdown, and performance after costs. Keep source defaults `EnableDemoOrders=false` and `EmergencyStop=true`; only change those inputs inside a supervised Strategy Tester run. Live-account execution is blocked by the EA's account-mode gate.
