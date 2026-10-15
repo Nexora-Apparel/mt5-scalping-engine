@@ -1,0 +1,43 @@
+name: Read-only MetaApi diagnostic
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests-and-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: pytest -q
+
+      - name: Verify required secrets are configured
+        env:
+          METAAPI_TOKEN: ${{ secrets.METAAPI_TOKEN }}
+          METAAPI_ACCOUNT_ID: ${{ secrets.METAAPI_ACCOUNT_ID }}
+        run: |
+          test -n "$METAAPI_TOKEN" || (echo "Missing repository secret METAAPI_TOKEN" && exit 1)
+          test -n "$METAAPI_ACCOUNT_ID" || (echo "Missing repository secret METAAPI_ACCOUNT_ID" && exit 1)
+
+      - name: Check existing MetaApi account and market data (read-only)
+        env:
+          METAAPI_TOKEN: ${{ secrets.METAAPI_TOKEN }}
+          METAAPI_ACCOUNT_ID: ${{ secrets.METAAPI_ACCOUNT_ID }}
+          SYMBOL: ${{ vars.METAAPI_SYMBOL }}
+        run: python scripts/check_metaapi.py
