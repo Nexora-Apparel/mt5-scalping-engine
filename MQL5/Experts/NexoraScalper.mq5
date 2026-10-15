@@ -7,7 +7,6 @@
 #property version   "0.1.0"
 #property description "Experimental EMA-cross scalper with basic risk gates; disabled by default."
 
-#include <Trade/Trade.mqh>
 
 input bool   EnableDemoOrders       = false; // Keep false until Strategy Tester review
 input bool   EmergencyStop          = true;  // True blocks all new entries
@@ -22,7 +21,6 @@ input int    CooldownSeconds        = 60;
 input ulong  MagicNumber            = 26101501;
 input int    MaxDeviationPoints     = 20;
 
-CTrade trade;
 int fastHandle = INVALID_HANDLE;
 int slowHandle = INVALID_HANDLE;
 datetime lastBarTime = 0;
@@ -194,30 +192,64 @@ void TryEntry()
       return;
 
    double sl = 0.0, tp = 0.0;
-   bool sent = false;
    if(buySignal)
    {
       sl = NormalizeDouble(tick.ask - stopDistance, digits);
       tp = NormalizeDouble(tick.ask + TakeProfitPoints * point, digits);
-      sent = trade.Buy(volume, _Symbol, 0.0, sl, tp, "Nexora EMA cross demo");
    }
-   else if(sellSignal)
+   else
    {
       sl = NormalizeDouble(tick.bid + stopDistance, digits);
       tp = NormalizeDouble(tick.bid - TakeProfitPoints * point, digits);
-      sent = trade.Sell(volume, _Symbol, 0.0, sl, tp, "Nexora EMA cross demo");
    }
 
-   if(sent && (trade.ResultRetcode() == TRADE_RETCODE_DONE ||
-               trade.ResultRetcode() == TRADE_RETCODE_PLACED))
+   // Native MQL5 request API avoids a dependency on the standard Trade.mqh library.
+   long fillingFlags = 0;
+   long executionMode = 0;
+   if(!SymbolInfoInteger(_Symbol, SYMBOL_FILLING_MODE, fillingFlags) ||
+      !SymbolInfoInteger(_Symbol, SYMBOL_TRADE_EXEMODE, executionMode))
+      return;
+
+   ENUM_ORDER_TYPE_FILLING fillingMode;
+   if((fillingFlags & SYMBOL_FILLING_FOK) != 0)
+      fillingMode = ORDER_FILLING_FOK;
+   else if((fillingFlags & SYMBOL_FILLING_IOC) != 0)
+      fillingMode = ORDER_FILLING_IOC;
+   else if(executionMode != SYMBOL_TRADE_EXECUTION_MARKET)
+      fillingMode = ORDER_FILLING_RETURN;
+   else
+   {
+      Print("Nexora entry blocked: broker reports no compatible filling mode.");
+      return;
+   }
+
+   MqlTradeRequest request = {};
+   MqlTradeResult result = {};
+   request.action       = TRADE_ACTION_DEAL;
+   request.symbol       = _Symbol;
+   request.volume       = volume;
+   request.type         = buySignal ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
+   request.price        = buySignal ? tick.ask : tick.bid;
+   request.sl           = sl;
+   request.tp           = tp;
+   request.deviation    = (ulong)MaxDeviationPoints;
+   request.magic        = MagicNumber;
+   request.comment      = "Nexora EMA cross demo";
+   request.type_time    = ORDER_TIME_GTC;
+   request.type_filling = fillingMode;
+
+   bool sent = OrderSend(request, result);
+   if(sent && (result.retcode == TRADE_RETCODE_DONE ||
+               result.retcode == TRADE_RETCODE_PLACED ||
+               result.retcode == TRADE_RETCODE_DONE_PARTIAL))
    {
       lastEntryTime = TimeCurrent();
       if(lastEntryKey != "")
          GlobalVariableSet(lastEntryKey, (double)lastEntryTime);
    }
    else
-      Print("Nexora entry rejected; retcode=", trade.ResultRetcode(),
-            " description=", trade.ResultRetcodeDescription());
+      Print("Nexora entry rejected; retcode=", result.retcode,
+            " description=", result.comment);
 }
 
 int OnInit()
@@ -226,11 +258,6 @@ int OnInit()
       RiskPercentPerTrade <= 0.0 || MaxDailyLossPercent <= 0.0 ||
       StopLossPoints <= 0 || TakeProfitPoints <= 0)
       return INIT_PARAMETERS_INCORRECT;
-
-   trade.SetExpertMagicNumber(MagicNumber);
-   trade.SetAsyncMode(false); // Wait for broker response before recording entry state.
-   trade.SetDeviationInPoints(MaxDeviationPoints);
-   trade.SetTypeFillingBySymbol(_Symbol);
 
    fastHandle = iMA(_Symbol, PERIOD_CURRENT, FastEmaPeriod, 0, MODE_EMA, PRICE_CLOSE);
    slowHandle = iMA(_Symbol, PERIOD_CURRENT, SlowEmaPeriod, 0, MODE_EMA, PRICE_CLOSE);
