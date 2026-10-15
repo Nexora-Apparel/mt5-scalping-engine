@@ -206,9 +206,10 @@ bool SafetyGatesPass()
    bool inTester = (bool)MQLInfoInteger(MQL_TESTER);
    if(!inTester && !IsDemoAccount())
       return false;
-   if((!inTester && !TerminalInfoInteger(TERMINAL_CONNECTED)) ||
-      !MQLInfoInteger(MQL_TRADE_ALLOWED) ||
-      !TerminalInfoInteger(TERMINAL_TRADE_ALLOWED))
+   if(!MQLInfoInteger(MQL_TRADE_ALLOWED))
+      return false;
+   if(!inTester && (!TerminalInfoInteger(TERMINAL_CONNECTED) ||
+                    !TerminalInfoInteger(TERMINAL_TRADE_ALLOWED)))
       return false;
    if(RiskPercentPerTrade <= 0.0 || RiskPercentPerTrade > 0.5 ||
       MaxDailyLossPercent <= 0.0 || MaxDailyLossPercent > 2.0)
