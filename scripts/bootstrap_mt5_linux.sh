@@ -14,6 +14,7 @@ if ! command -v sudo >/dev/null 2>&1; then
 fi
 
 export DEBIAN_FRONTEND=noninteractive
+echo "[1/5] Installing Wine and Xvfb dependencies..."
 sudo apt-get update
 sudo apt-get install -y wine wine64 winbind xvfb xauth curl ca-certificates fonts-wine
 
@@ -50,9 +51,11 @@ cleanup() {
 trap cleanup EXIT
 export DISPLAY=":${display_num}"
 
-wineboot --init || true
+echo "[2/5] Initializing isolated Wine prefix..."
+timeout 60s wineboot --init || true
 sleep 3
 
+echo "[3/5] Downloading official MetaTrader installer..."
 installer="$HOME/mt5-setup-logs/mt5setup.exe"
 curl --fail --location --retry 3 --output "$installer" \
   "https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe"
@@ -62,17 +65,30 @@ if [[ "$(stat -c '%s' "$installer")" -lt 1000000 ]]; then
 fi
 
 # MetaQuotes' web installer may return before its spawned installation process finishes.
-# Keep the display alive and poll for the actual terminal executable instead of trusting
-# the setup process exit code alone.
+# Keep the display alive and poll common install paths rather than trusting the setup exit code.
+echo "[4/5] Installing MT5; waiting for terminal64.exe and MetaEditor..."
 wine "$installer" /auto '/path:C:\MT5' >"$HOME/mt5-setup-logs/installer.log" 2>&1 &
 installer_pid=$!
 
-mt5_root="$WINEPREFIX/drive_c/MT5"
-terminal="$mt5_root/terminal64.exe"
-editor="$mt5_root/metaeditor64.exe"
+mt5_root=""
+install_roots=(
+  "$WINEPREFIX/drive_c/MT5"
+  "$WINEPREFIX/drive_c/Program Files/MetaTrader 5"
+  "$WINEPREFIX/drive_c/Program Files (x86)/MetaTrader 5"
+)
+terminal=""
+editor=""
 for attempt in $(seq 1 120); do
-  if [[ -f "$terminal" && -f "$editor" ]]; then
-    break
+  for candidate_root in "${install_roots[@]}"; do
+    if [[ -f "$candidate_root/terminal64.exe" && -f "$candidate_root/metaeditor64.exe" ]]; then
+      mt5_root="$candidate_root"
+      terminal="$mt5_root/terminal64.exe"
+      editor="$mt5_root/metaeditor64.exe"
+      break 2
+    fi
+  done
+  if (( attempt % 12 == 0 )); then
+    echo "Still waiting for the MT5 terminal installation (attempt $attempt/120)..."
   fi
   sleep 5
 done
@@ -100,7 +116,11 @@ mkdir -p "$mt5_root/MQL5/Experts"
 source_url="https://raw.githubusercontent.com/Nexora-Apparel/mt5-scalping-engine/main/MQL5/Experts/NexoraScalper.mq5"
 curl --fail --location --retry 3 --output "$mt5_root/MQL5/Experts/NexoraScalper.mq5" "$source_url"
 
-wine "$editor" '/compile:C:\MT5\MQL5\Experts\NexoraScalper.mq5' /log \
+rel_root="${mt5_root#"$WINEPREFIX/drive_c/"}"
+win_root="C:\\${rel_root//\//\\}"
+source_win="${win_root}\\MQL5\\Experts\\NexoraScalper.mq5"
+echo "[5/5] Compiling NexoraScalper with MetaEditor..."
+wine "$editor" "/compile:$source_win" /log \
   >"$HOME/mt5-setup-logs/compile-launch.log" 2>&1 || true
 sleep 5
 
