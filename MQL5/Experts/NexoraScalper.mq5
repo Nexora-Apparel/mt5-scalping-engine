@@ -323,6 +323,19 @@ void TryEntry()
    request.type_time    = ORDER_TIME_GTC;
    request.type_filling = fillingMode;
 
+   MqlTradeCheckResult check = {};
+   if(!OrderCheck(request, check))
+   {
+      Print("Nexora entry blocked by OrderCheck; error=", GetLastError());
+      return;
+   }
+   if(check.retcode != TRADE_RETCODE_DONE)
+   {
+      Print("Nexora entry blocked by preflight check; retcode=", check.retcode,
+            " description=", check.comment);
+      return;
+   }
+
    bool sent = OrderSend(request, result);
    if(sent && (result.retcode == TRADE_RETCODE_DONE ||
                result.retcode == TRADE_RETCODE_PLACED ||
