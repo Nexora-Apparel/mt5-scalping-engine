@@ -126,15 +126,16 @@ double GetDayStartBalance()
 
 bool DailyLossLimitReached()
 {
+   // Refresh the date/baseline first so Strategy Tester can reset its latch at midnight.
+   double startBalance = GetDayStartBalance();
+   if(startBalance <= 0.0) return true;
+
    // Once breached, the daily limit stays latched until the next server day.
    // This prevents new entries if equity later recovers after a temporary drawdown.
    bool inTester = (bool)MQLInfoInteger(MQL_TESTER);
    if(inTester && testerDailyLossLocked) return true;
    if(!inTester && dailyLossLockKey != "" && GlobalVariableCheck(dailyLossLockKey))
       return true;
-
-   double startBalance = GetDayStartBalance();
-   if(startBalance <= 0.0) return true;
    double lossPercent = (startBalance - AccountInfoDouble(ACCOUNT_EQUITY))
                         / startBalance * 100.0;
    if(lossPercent >= MaxDailyLossPercent)
