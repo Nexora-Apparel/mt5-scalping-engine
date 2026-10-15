@@ -228,6 +228,7 @@ int OnInit()
       return INIT_PARAMETERS_INCORRECT;
 
    trade.SetExpertMagicNumber(MagicNumber);
+   trade.SetAsyncMode(false); // Wait for broker response before recording entry state.
    trade.SetDeviationInPoints(MaxDeviationPoints);
    trade.SetTypeFillingBySymbol(_Symbol);
 
