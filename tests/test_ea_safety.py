@@ -42,3 +42,10 @@ def test_order_requests_remain_behind_fail_closed_gates():
     assert "if(!EnableDemoOrders || EmergencyStop)" in source
     assert "return AccountInfoInteger(ACCOUNT_TRADE_MODE) == ACCOUNT_TRADE_MODE_DEMO;" in source
     assert "if(!SafetyGatesPass())" in source
+
+
+def test_strategy_tester_uses_isolated_simulated_risk_state():
+    source = EA_PATH.read_text(encoding="utf-8")
+    assert "bool inTester = (bool)MQLInfoInteger(MQL_TESTER);" in source
+    assert "double testerDayStartBalance = 0.0;" in source
+    assert "datetime testerDayStartTime = 0;" in source
