@@ -55,3 +55,11 @@ def test_position_sizing_prefers_loss_side_tick_value():
     source = EA_PATH.read_text(encoding="utf-8")
     assert "SYMBOL_TRADE_TICK_VALUE_LOSS" in source
     assert "if(tickValue <= 0.0)" in source
+
+def test_daily_loss_lockout_latches_until_next_server_day():
+    source = EA_PATH.read_text(encoding="utf-8")
+    assert "bool testerDailyLossLocked = false;" in source
+    assert "GlobalVariableCheck(dailyLossLockKey)" in source
+    assert "GlobalVariableSet(dailyLossLockKey, 1.0)" in source
+    assert "testerDailyLossLocked = false;" in source
+    assert "Once breached, the daily limit stays latched until the next server day." in source
