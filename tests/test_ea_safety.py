@@ -68,3 +68,10 @@ def test_tester_daily_lock_refreshes_day_before_checking_latch():
     source = EA_PATH.read_text(encoding="utf-8")
     function = source.split("bool DailyLossLimitReached()", 1)[1].split("\nbool HasPositionForSymbol()", 1)[0]
     assert function.index("double startBalance = GetDayStartBalance();") < function.index("if(inTester && testerDailyLossLocked) return true;")
+
+def test_order_requests_are_preflight_checked_before_submission():
+    source = EA_PATH.read_text(encoding="utf-8")
+    assert "MqlTradeCheckResult check = {};" in source
+    assert "if(!OrderCheck(request, check))" in source
+    assert "if(check.retcode != TRADE_RETCODE_DONE)" in source
+    assert source.index("if(!OrderCheck(request, check))") < source.index("bool sent = OrderSend(request, result);")
