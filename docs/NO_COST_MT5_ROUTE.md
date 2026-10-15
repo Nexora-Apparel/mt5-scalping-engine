@@ -13,9 +13,9 @@ The standard MetaTrader 5 desktop terminal and MetaEditor are Windows applicatio
 - `MQL5/Experts/NexoraScalper.mq5` is an experimental direct-terminal EA.
 - It uses a closed-bar 9/21 EMA crossover as a provisional test signal, not a validated profitable strategy.
 - Order submission is disabled by default (`EnableDemoOrders=false`) and the emergency stop defaults to ON (`EmergencyStop=true`).
-- The EA blocks non-demo accounts, enforces a spread ceiling, a single-position-per-symbol rule, a cooldown, risk-based volume sizing, SL/TP, and a persistent start-of-day equity baseline with a daily equity-loss lockout.
+- The EA blocks non-demo accounts, enforces a spread ceiling, a single-position-per-symbol rule, a cooldown, risk-based volume sizing, SL/TP, and a persistent start-of-day equity baseline. Once the daily equity-loss threshold is breached, a per-day lock remains active until the next broker-server day.
 - Symbol point sizes and spreads differ by broker and instrument. Inputs must be calibrated for the exact Exness symbol (including suffix) before any demo order test.
-- The EA compiled in MetaEditor via Windows GitHub Actions on 2026-10-15 with 0 errors and 0 warnings. The compiled artifact is stored temporarily in the successful workflow run. Compilation does not prove the strategy is profitable or safe.
+- The EA compiled in MetaEditor via Windows GitHub Actions on 2026-10-15 with 0 errors and 0 warnings before the latest daily-loss lockout change. The latest source change must pass the compile workflow again; compilation does not prove the strategy is profitable or safe.
 - The EA has not yet been run in MT5 Strategy Tester or demo-forward-tested. Do not enable order submission or use it on a live account.
 
 ## Safe validation sequence
