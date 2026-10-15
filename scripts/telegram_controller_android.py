@@ -116,6 +116,22 @@ async def cmd_emergency(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
 
 
+async def cmd_resetstop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Clear the monitoring-only stop latch; this cannot enable order execution."""
+    global EMERGENCY_STOP, BOT_ACTIVE
+    if not authorized(update):
+        if update.message:
+            await update.message.reply_text("Access denied.")
+        return
+    EMERGENCY_STOP = False
+    BOT_ACTIVE = False
+    if update.message:
+        await update.message.reply_text(
+            "Emergency stop cleared for monitoring controls only. Controller remains STOPPED. "
+            "Order execution is not implemented and remains disabled."
+        )
+
+
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not authorized(update):
         if update.message:
@@ -174,6 +190,7 @@ def main() -> None:
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("stop", cmd_stop))
     app.add_handler(CommandHandler("emergency", cmd_emergency))
+    app.add_handler(CommandHandler("resetstop", cmd_resetstop))
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("balance", cmd_balance))
     print("Polling Telegram. Keep Pydroid open and Android battery restrictions disabled.")
