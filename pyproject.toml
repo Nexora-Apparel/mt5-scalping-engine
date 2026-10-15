@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mt5-scalping-engine"
+version = "0.1.0"
+description = "Safety-first MetaApi-connected MT5 demo scalping engine"
+requires-python = ">=3.11"
+dependencies = [
+  "metaapi-cloud-sdk",
+  "pydantic-settings>=2.2,<3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
