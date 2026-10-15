@@ -206,8 +206,32 @@ async def cmd_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 async def post_init(app: Application) -> None:
-    # This only informs the owner that the control process started; no trading is started.
+    # Automatically animate startup in the owner's private Telegram chat when their
+    # numeric user ID is configured and they have already opened the bot at least once.
     print(f"{APP_NAME} controller started. Trading execution is disabled.")
+    if ALLOWED_USER_ID:
+        try:
+            message = await app.bot.send_message(
+                chat_id=ALLOWED_USER_ID,
+                text="◌ Starting Scalper AI…",
+            )
+            await animate_text(
+                message,
+                [
+                    "◌ Starting Scalper AI…",
+                    "◔ Loading controller…",
+                    "◑ Checking safety locks…",
+                    "◕ Connecting Telegram controls…",
+                    "✅ Scalper AI is online",
+                    "📡 Monitoring: OFF",
+                    "🛡️ Emergency stop: ON" if EMERGENCY_STOP else "🛡️ Emergency stop: OFF",
+                    "⛔ Trading: DISABLED",
+                ],
+                delay=0.32,
+            )
+        except Exception as exc:
+            # Startup must still succeed if the user has not opened the bot yet.
+            print(f"Startup animation unavailable: {type(exc).__name__}")
 
 
 def main() -> None:
