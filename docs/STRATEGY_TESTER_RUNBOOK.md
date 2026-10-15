@@ -37,6 +37,7 @@ Reject the strategy if results depend on a small number of trades, disappear aft
 
 - Keep risk per trade at or below the EA's 0.25% default while researching.
 - The daily-loss gate uses a reconstructed server-day opening balance from account history and compares it with current equity. If history cannot be selected or a valid baseline cannot be established, the EA blocks entries.
+- Once the daily loss threshold is reached, the EA latches the lockout until the next broker-server day, even if equity subsequently recovers. In Strategy Tester, the latch is isolated from terminal global variables and resets when the simulated server day changes.
 - Verify stop-loss/target distances, volume steps, filling mode, spread limits, and duplicate-position behavior for the actual broker symbol.
 - After an acceptable backtest, run a demo forward test and inspect terminal/journal logs. Keep the emergency stop ON except during an explicitly supervised demo test.
 - Never use a real account as a test environment. Do not enable live trading based on compilation or a single backtest.
