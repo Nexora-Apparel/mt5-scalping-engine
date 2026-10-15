@@ -35,20 +35,20 @@ mkdir -p "$WINEPREFIX" "$HOME/mt5-setup-logs"
 
 # Start a private virtual display because the installer/editor are Windows GUI programs.
 display_num=99
-while [[ -S "/tmp/.X11-unix/X\${display_num}" ]]; do
+while [[ -S "/tmp/.X11-unix/X${display_num}" ]]; do
   display_num=$((display_num + 1))
   if [[ "$display_num" -gt 120 ]]; then
     echo "ERROR: No free X display number found." >&2
     exit 2
   fi
 done
-Xvfb ":\${display_num}" -screen 0 1280x800x24 -ac >"$HOME/mt5-setup-logs/xvfb.log" 2>&1 &
+Xvfb ":${display_num}" -screen 0 1280x800x24 -ac >"$HOME/mt5-setup-logs/xvfb.log" 2>&1 &
 xvfb_pid=$!
 cleanup() {
   kill "$xvfb_pid" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
-export DISPLAY=":\${display_num}"
+export DISPLAY=":${display_num}"
 
 wineboot --init || true
 sleep 3
