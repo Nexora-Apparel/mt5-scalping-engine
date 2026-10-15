@@ -27,8 +27,10 @@ datetime lastBarTime = 0;
 datetime lastEntryTime = 0;
 string dayBaselineKey = "";
 string lastEntryKey = "";
+string dailyLossLockKey = "";
 double testerDayStartBalance = 0.0;
 datetime testerDayStartTime = 0;
+bool testerDailyLossLocked = false;
 
 bool IsDemoAccount()
 {
@@ -50,10 +52,15 @@ void RefreshDailyKeys()
    {
       dayBaselineKey = "";
       lastEntryKey = "";
+      dailyLossLockKey = "";
       return;
    }
 
    dayBaselineKey = BuildDayBaselineKey();
+   dailyLossLockKey = StringFormat("NexoraLock_%I64d_%I64u_%s",
+                                   AccountInfoInteger(ACCOUNT_LOGIN), MagicNumber,
+                                   TimeToString(TimeCurrent(), TIME_DATE));
+   StringReplace(dailyLossLockKey, ".", "");
    lastEntryKey = StringFormat("NexoraEntry_%I64d_%I64u",
                                AccountInfoInteger(ACCOUNT_LOGIN), MagicNumber);
    if(GlobalVariableCheck(lastEntryKey))
@@ -100,6 +107,7 @@ double GetDayStartBalance()
       if(testerDayStartTime != currentDay)
       {
          testerDayStartTime = currentDay;
+         testerDailyLossLocked = false;
          testerDayStartBalance = CalculateDayStartBalance();
          if(testerDayStartBalance <= 0.0)
             testerDayStartBalance = AccountInfoDouble(ACCOUNT_BALANCE);
@@ -118,11 +126,26 @@ double GetDayStartBalance()
 
 bool DailyLossLimitReached()
 {
+   // Once breached, the daily limit stays latched until the next server day.
+   // This prevents new entries if equity later recovers after a temporary drawdown.
+   bool inTester = (bool)MQLInfoInteger(MQL_TESTER);
+   if(inTester && testerDailyLossLocked) return true;
+   if(!inTester && dailyLossLockKey != "" && GlobalVariableCheck(dailyLossLockKey))
+      return true;
+
    double startBalance = GetDayStartBalance();
    if(startBalance <= 0.0) return true;
    double lossPercent = (startBalance - AccountInfoDouble(ACCOUNT_EQUITY))
                         / startBalance * 100.0;
-   return lossPercent >= MaxDailyLossPercent;
+   if(lossPercent >= MaxDailyLossPercent)
+   {
+      if(inTester)
+         testerDailyLossLocked = true;
+      else if(dailyLossLockKey != "")
+         GlobalVariableSet(dailyLossLockKey, 1.0);
+      return true;
+   }
+   return false;
 }
 
 bool HasPositionForSymbol()
