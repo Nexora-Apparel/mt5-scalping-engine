@@ -34,5 +34,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+      - name: Validate Linux MT5 bootstrap shell syntax
+        run: bash -n scripts/bootstrap_mt5_linux.sh
       - name: Run unit and fail-closed configuration tests
         run: pytest -q
