@@ -61,6 +61,42 @@ async def deriv_read_only_balance() -> str:
         return f"Deriv connection error: {type(exc).__name__}. Check internet and setup."
 
 
+
+async def animate_text(message: Any, frames: list[str], delay: float = 0.35) -> None:
+    """Create a lightweight Telegram text animation by editing one message."""
+    for frame in frames:
+        try:
+            await message.edit_text(frame)
+        except Exception:
+            pass
+        await asyncio.sleep(delay)
+
+
+async def cmd_animate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Preview the controller's lightweight Telegram animation."""
+    if not authorized(update):
+        if update.message:
+            await update.message.reply_text("Access denied.")
+        return
+    if not update.message:
+        return
+    message = await update.message.reply_text("◌ Initializing Scalper AI…")
+    await animate_text(
+        message,
+        [
+            "◌ Initializing Scalper AI…",
+            "◔ Initializing Scalper AI…",
+            "◑ Initializing Scalper AI…",
+            "◕ Initializing Scalper AI…",
+            "● Scalper AI ready",
+            "📡 Monitoring: OFF",
+            "🛡️ Risk lock: ON",
+            "⛔ Trading: DISABLED",
+        ],
+        delay=0.28,
+    )
+
+
 async def cmd_whoami(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     if update.message and user:
@@ -152,9 +188,21 @@ async def cmd_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await update.message.reply_text("Access denied.")
         return
     if update.message:
-        await update.message.reply_text("Checking Deriv demo account (read-only)…")
+        message = await update.message.reply_text("◌ Connecting to Deriv demo…")
+        await animate_text(
+            message,
+            [
+                "◌ Connecting to Deriv demo…",
+                "◔ Opening secure connection…",
+                "◑ Checking demo authorization…",
+                "◕ Requesting balance (read-only)…",
+            ],
+            delay=0.3,
+        )
         result = await deriv_read_only_balance()
-        await update.message.reply_text(result)
+        await message.edit_text(
+            f"✅ {result}" if result.startswith("Demo connection OK.") else f"⚠️ {result}"
+        )
 
 
 async def post_init(app: Application) -> None:
@@ -187,6 +235,7 @@ def main() -> None:
 
     app = Application.builder().token(telegram_token).post_init(post_init).build()
     app.add_handler(CommandHandler("whoami", cmd_whoami))
+    app.add_handler(CommandHandler("animate", cmd_animate))
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("stop", cmd_stop))
     app.add_handler(CommandHandler("emergency", cmd_emergency))
