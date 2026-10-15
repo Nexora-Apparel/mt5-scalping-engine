@@ -8,7 +8,7 @@ A safety-first experimental trading project for an Exness MT5 demo account.
 - A direct MT5 Expert Advisor has been added as a potential route that does not require MetaApi. It uses native MQL5 order requests and compiles without an external Trade.mqh dependency.
 - The EA uses a provisional 9/21 EMA crossover for controlled research only. This is not a validated profitable strategy.
 - Order submission is disabled by default and the emergency stop defaults to ON.
-- The current EA source compiled successfully in MetaEditor on 2026-10-15: **0 errors, 0 warnings**. The compiled `.ex5` is available for 14 days from the [latest successful compile run](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/38769969580); open the run and download the `NexoraScalper-compiled` artifact.
+- The current EA source compiled successfully in MetaEditor on 2026-10-15: **0 errors, 0 warnings**. The compiled `.ex5` is available for 14 days from the [latest successful compile run](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/38770182819); open the run and download the `NexoraScalper-compiled` artifact.
 - The daily equity-loss lockout now latches after a breach until the next broker-server day, including a separate in-memory lock in Strategy Tester.
 - The EA has **not** yet been run in MT5 Strategy Tester or demo-forward-tested.
 - No persistent cloud terminal has been provisioned yet. Live trading is not approved.
@@ -30,6 +30,6 @@ See [docs/NO_COST_MT5_ROUTE.md](docs/NO_COST_MT5_ROUTE.md) for limitations, [doc
 
 ## Safety gates
 
-Before demo order testing, validate account identity, broker symbol mapping, quote freshness, spread/slippage limits, risk-based sizing, broker volume constraints, SL/TP placement, max positions, cooldown, duplicate-order protection, daily equity-loss lockout, emergency stop, and audit logs.
+Before demo order testing, validate account identity, broker symbol mapping, quote freshness, spread/slippage limits, risk-based sizing, broker volume constraints, SL/TP placement, order preflight checks, max positions, cooldown, duplicate-order protection, daily equity-loss lockout, emergency stop, and audit logs.
 
 Never commit credentials, tokens, account IDs, or private logs.
