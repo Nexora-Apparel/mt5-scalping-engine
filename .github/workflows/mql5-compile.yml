@@ -35,38 +35,39 @@ jobs:
         run: |
           $installer = Join-Path $env:RUNNER_TEMP "mt5setup.exe"
           $installPath = "C:\MT5"
-          $process = Start-Process -FilePath $installer -ArgumentList @("/auto", "/path:`"$installPath`"") -Wait -PassThru
-          Write-Host "Installer process exit code: $($process.ExitCode)"
-          # Installer exit codes can vary; determine success from the actual installed files.
-          $searchRoots = @(
-            $installPath,
-            "C:\Program Files\MetaTrader 5",
-            "C:\Program Files\Exness MetaTrader 5",
-            "C:\Program Files (x86)\MetaTrader 5",
-            "C:\Program Files (x86)\Exness MetaTrader 5"
-          ) | Where-Object { Test-Path $_ }
-          $editorFound = Get-ChildItem -Path $searchRoots -Filter "metaeditor64.exe" -File -Recurse -Depth 5 -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (!$editorFound) {
-            foreach ($root in $searchRoots) {
-              Write-Host "Inspecting install root: $root"
-              Get-ChildItem -Path $root -Force -ErrorAction SilentlyContinue | Select-Object -First 20 FullName
-            }
-            Write-Host "MetaEditor not found in the expected bounded search roots; refusing an unbounded drive scan."
-            throw "MetaEditor was not found after installer exit code $($process.ExitCode)."
-          }
-          $editor = $editorFound.FullName
-          $terminalRoot = Split-Path $editor
-          $includeCandidates = @(
-            (Join-Path $terminalRoot "MQL5"),
-            (Join-Path $env:APPDATA "MetaQuotes\Terminal")
+          # Do not wait for the installer process to exit: it may launch the terminal
+          # and keep that process alive. Poll for the required files instead.
+          $process = Start-Process -FilePath $installer -ArgumentList @("/auto", "/path:`"$installPath`"") -PassThru
+          $editorCandidates = @(
+            (Join-Path $installPath "metaeditor64.exe"),
+            "C:\Program Files\MetaTrader 5\metaeditor64.exe",
+            "C:\Program Files\Exness MetaTrader 5\metaeditor64.exe",
+            "C:\Program Files (x86)\MetaTrader 5\metaeditor64.exe",
+            "C:\Program Files (x86)\Exness MetaTrader 5\metaeditor64.exe"
           )
-          $include = $includeCandidates | Where-Object { Test-Path (Join-Path $_ "Include\Trade\Trade.mqh") } | Select-Object -First 1
-          if (!$include) {
-            $tradeInclude = Get-ChildItem -Path $searchRoots -Filter "Trade.mqh" -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match "MQL5\\Include\\Trade\\Trade\.mqh$" } | Select-Object -First 1
-            if ($tradeInclude) { $include = $tradeInclude.FullName -replace "\\Include\\Trade\\Trade\.mqh$","" }
+          $editor = $null
+          for ($attempt = 1; $attempt -le 18; $attempt++) {
+            foreach ($candidate in $editorCandidates) {
+              if (Test-Path $candidate) {
+                $editor = $candidate
+                break
+              }
+            }
+            if ($editor) { break }
+            Start-Sleep -Seconds 5
           }
-          if (!$include) {
-            throw "MetaEditor was found at $editor but the standard MQL5 Trade include could not be located."
+          if (!$editor) {
+            $installerState = Get-Process -Id $process.Id -ErrorAction SilentlyContinue
+            if ($installerState) {
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+              Write-Host "Stopped installer process after timeout."
+            }
+            throw "MetaEditor was not found in expected install paths after 90 seconds."
+          }
+          $terminalRoot = Split-Path $editor
+          $include = Join-Path $terminalRoot "MQL5"
+          if (!(Test-Path (Join-Path $include "Include\Trade\Trade.mqh"))) {
+            throw "MetaEditor was found at $editor but the standard MQL5 Trade include is missing at $include."
           }
           Write-Host "MetaEditor found: $editor"
           Write-Host "MQL5 include root: $include"
