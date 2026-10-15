@@ -75,3 +75,9 @@ def test_order_requests_are_preflight_checked_before_submission():
     assert "if(!OrderCheck(request, check))" in source
     assert "if(check.retcode != TRADE_RETCODE_DONE)" in source
     assert source.index("if(!OrderCheck(request, check))") < source.index("bool sent = OrderSend(request, result);")
+
+def test_linux_bootstrap_sets_wine_prefix_before_installer_launch():
+    script = (Path(__file__).parents[1] / "scripts" / "bootstrap_mt5_linux.sh").read_text(encoding="utf-8")
+    assert script.index('export WINEPREFIX="$HOME/.mt5"') < script.index('bash "$installer"')
+    assert 'export WINEARCH=win64' in script
+    assert "Official installer exited before MT5 terminal/MetaEditor appeared." in script
