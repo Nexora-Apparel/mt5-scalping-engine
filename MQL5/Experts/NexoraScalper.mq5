@@ -27,6 +27,8 @@ datetime lastBarTime = 0;
 datetime lastEntryTime = 0;
 string dayBaselineKey = "";
 string lastEntryKey = "";
+double testerDayStartBalance = 0.0;
+datetime testerDayStartTime = 0;
 
 bool IsDemoAccount()
 {
@@ -43,6 +45,14 @@ string BuildDayBaselineKey()
 
 void RefreshDailyKeys()
 {
+   // Tester runs must not reuse terminal-global state from earlier tests.
+   if(MQLInfoInteger(MQL_TESTER))
+   {
+      dayBaselineKey = "";
+      lastEntryKey = "";
+      return;
+   }
+
    dayBaselineKey = BuildDayBaselineKey();
    lastEntryKey = StringFormat("NexoraEntry_%I64d_%I64u",
                                AccountInfoInteger(ACCOUNT_LOGIN), MagicNumber);
@@ -80,6 +90,23 @@ double CalculateDayStartBalance()
 
 double GetDayStartBalance()
 {
+   if(MQLInfoInteger(MQL_TESTER))
+   {
+      datetime now = TimeCurrent();
+      MqlDateTime dayParts;
+      if(!TimeToStruct(now, dayParts)) return 0.0;
+      dayParts.hour = 0; dayParts.min = 0; dayParts.sec = 0;
+      datetime currentDay = StructToTime(dayParts);
+      if(testerDayStartTime != currentDay)
+      {
+         testerDayStartTime = currentDay;
+         testerDayStartBalance = CalculateDayStartBalance();
+         if(testerDayStartBalance <= 0.0)
+            testerDayStartBalance = AccountInfoDouble(ACCOUNT_BALANCE);
+      }
+      return testerDayStartBalance;
+   }
+
    if(!GlobalVariableCheck(dayBaselineKey))
    {
       double baseline = CalculateDayStartBalance();
@@ -176,9 +203,10 @@ bool SafetyGatesPass()
 {
    if(!EnableDemoOrders || EmergencyStop)
       return false;
-   if(!IsDemoAccount())
+   bool inTester = (bool)MQLInfoInteger(MQL_TESTER);
+   if(!inTester && !IsDemoAccount())
       return false;
-   if(!TerminalInfoInteger(TERMINAL_CONNECTED) ||
+   if((!inTester && !TerminalInfoInteger(TERMINAL_CONNECTED)) ||
       !MQLInfoInteger(MQL_TRADE_ALLOWED) ||
       !TerminalInfoInteger(TERMINAL_TRADE_ALLOWED))
       return false;
