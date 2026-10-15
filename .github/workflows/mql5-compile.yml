@@ -1,0 +1,79 @@
+name: MQL5 compile check
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "MQL5/**/*.mq5"
+      - "MQL5/**/*.mqh"
+      - ".github/workflows/mql5-compile.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  compile-ea:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Download official MetaTrader 5 installer
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP "mt5setup.exe"
+          Invoke-WebRequest -Uri "https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe" -OutFile $installer
+          if ((Get-Item $installer).Length -lt 1000000) {
+            throw "Installer download looks incomplete; refusing to continue."
+          }
+          Write-Host "Downloaded MetaTrader installer ($((Get-Item $installer).Length) bytes)."
+
+      - name: Install MetaTrader 5
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP "mt5setup.exe"
+          $installPath = "C:\MT5"
+          $process = Start-Process -FilePath $installer -ArgumentList @("/auto", "/path:$installPath") -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "MetaTrader installer exited with code $($process.ExitCode)."
+          }
+          $editor = Join-Path $installPath "metaeditor64.exe"
+          $include = Join-Path $installPath "MQL5"
+          if (!(Test-Path $editor)) {
+            Get-ChildItem -Path "C:\Program Files" -Filter "metaeditor64.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 10 FullName
+            throw "MetaEditor was not found at $editor."
+          }
+          if (!(Test-Path (Join-Path $include "Include\Trade\Trade.mqh"))) {
+            throw "Standard MQL5 Trade include was not found under $include."
+          }
+          "METAEDITOR=$editor" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "MQL5_INCLUDE=$include" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Compile NexoraScalper
+        shell: pwsh
+        run: |
+          $source = (Resolve-Path "MQL5\Experts\NexoraScalper.mq5").Path
+          $log = Join-Path (Split-Path $source) "NexoraScalper.log"
+          if (Test-Path $log) { Remove-Item $log -Force }
+          $arguments = @("/compile:$source", "/include:$env:MQL5_INCLUDE", "/log")
+          Write-Host "Compiling EA with MetaEditor; no terminal account is configured and no orders can be submitted."
+          $process = Start-Process -FilePath $env:METAEDITOR -ArgumentList $arguments -Wait -PassThru
+          Start-Sleep -Seconds 2
+          if (!(Test-Path $log)) {
+            throw "MetaEditor did not produce a compilation log. Process exit code: $($process.ExitCode)"
+          }
+          Get-Content $log
+          $logText = Get-Content $log -Raw
+          if ($logText -match "(?i)\b[1-9]\d* errors?\b" -or $logText -notmatch "(?i)0 errors?") {
+            throw "MQL5 compilation did not report zero errors."
+          }
+          if ($logText -match "(?i)\b[1-9]\d* warnings?\b") {
+            Write-Warning "Compiler warnings were reported; review the log above."
+          }
+          $compiled = Join-Path (Split-Path $source) "NexoraScalper.ex5"
+          if (!(Test-Path $compiled)) {
+            throw "Compiler reported no errors but did not create the EX5 output."
+          }
+          Write-Host "MQL5 compilation succeeded. This verifies compilation only, not strategy performance."
