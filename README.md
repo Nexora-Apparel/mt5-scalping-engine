@@ -1,46 +1,32 @@
 # MT5 Scalping Engine
 
-A safety-first Python trading engine for an **Exness MT5 demo account** connected through MetaApi Cloud.
+A safety-first experimental trading project for an Exness MT5 demo account.
 
 ## Current status
 
-This repository starts with the project scaffold and safety boundaries. It does not place trades yet.
+- A read-only MetaApi diagnostic exists, but its first run failed because the MetaApi account was undeployed and the dashboard requested a balance top-up.
+- A direct MT5 Expert Advisor has been added as a potential route that does not require MetaApi.
+- The EA uses a provisional 9/21 EMA crossover for controlled research only. This is not a validated profitable strategy.
+- Order submission is disabled by default and the emergency stop defaults to ON.
+- The EA has **not** yet been compiled in MetaEditor or tested in MT5 Strategy Tester.
+- Live trading is not approved.
 
-- MetaApi account and demo connection are configured externally by the operator.
-- Live trading is disabled by design.
-- Order submission must not be enabled until market-data validation, strategy tests, risk controls, and demo execution tests pass.
-- Never commit API tokens, broker credentials, account IDs, or private logs.
+## Choose a connection route
 
-## Architecture
+1. **MetaApi Cloud:** requires an account deployment and may incur balance/usage charges.
+2. **Direct MT5 desktop EA:** avoids MetaApi, but requires a Windows computer with MT5 desktop installed and online. Android alone cannot run the desktop EA continuously.
 
-- `src/mt5_scalping/config.py` — environment configuration and fail-closed defaults.
+See [docs/NO_COST_MT5_ROUTE.md](docs/NO_COST_MT5_ROUTE.md) for limitations and the validation sequence.
+
+## Python project
+
+- `src/mt5_scalping/config.py` — environment configuration with fail-closed defaults.
 - `src/mt5_scalping/health.py` — read-only health-check result model.
-- `src/mt5_scalping/strategies/` — signal generation, separate from execution.
-- `src/mt5_scalping/risk/` — position sizing and hard risk limits.
-- `src/mt5_scalping/execution/` — execution adapter; no order submission is enabled in this scaffold.
-- `tests/` — unit tests.
-
-## Local setup
-
-Python 3.11+ is recommended.
-
-1. Create a virtual environment.
-2. Install dependencies: `pip install -r requirements.txt`
-3. Copy `.env.example` to `.env` and populate secrets locally.
-4. Run tests: `pytest`
-
-Do not put secrets in source code or commit the local `.env` file.
+- `scripts/check_metaapi.py` — read-only MetaApi diagnostic; never submits orders.
+- `tests/` — Python unit tests.
 
 ## Safety gates
 
-Before any demo order can be enabled, the project must test:
-- account identity and connection state;
-- quote freshness and broker symbol mapping;
-- spread and slippage limits;
-- position sizing and broker volume constraints;
-- stop-loss validation before entry;
-- max open positions, cooldown, duplicate-order protection;
-- daily loss and drawdown lockouts;
-- emergency stop and persistent audit logging.
+Before demo order testing, validate account identity, broker symbol mapping, quote freshness, spread/slippage limits, risk-based sizing, broker volume constraints, SL/TP placement, max positions, cooldown, duplicate-order protection, daily equity-loss lockout, emergency stop, and audit logs.
 
-Live trading remains disabled until a separate review explicitly changes the deployment configuration.
+Never commit credentials, tokens, account IDs, or private logs.
