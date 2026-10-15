@@ -17,7 +17,7 @@ input int    StopLossPoints         = 300;   // Normal profile stop in broker po
 input int    TakeProfitPoints       = 450;   // Normal profile target in broker points
 input bool   EnableSmallBalanceProfile = true; // Experimental profile for small-balance DEMO tests only
 input double SmallBalanceThresholdUSD = 100.0; // Use small profile at/below this equity
-input double SmallBalanceRiskPercent  = 4.0; // Aggressive experimental risk; DEMO TESTING ONLY
+input double SmallBalanceRiskPercent  = 0.5; // Conservative cap; may skip trades when minimum lot exceeds budget
 input int    SmallBalanceMaxSpreadPoints = 20; // Strict spread ceiling for small-balance profile
 input int    SmallBalanceStopLossPoints = 40; // Must cover stop level plus typical spread
 input int    SmallBalanceTakeProfitPoints = 60; // Experimental 1.5:1 nominal target/risk
@@ -313,7 +313,7 @@ bool SafetyGatesPass()
       return false;
    if(EnableSmallBalanceProfile &&
       (SmallBalanceThresholdUSD <= 0.0 || SmallBalanceRiskPercent <= 0.0 ||
-       SmallBalanceRiskPercent > 5.0 || SmallBalanceMaxSpreadPoints <= 0 ||
+       SmallBalanceRiskPercent > 0.5 || SmallBalanceMaxSpreadPoints <= 0 ||
        SmallBalanceStopLossPoints <= 0 ||
        SmallBalanceTakeProfitPoints <= 0))
       return false;
