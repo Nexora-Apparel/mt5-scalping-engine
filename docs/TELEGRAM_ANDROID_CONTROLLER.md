@@ -2,8 +2,9 @@
 
 ## What this stage does
 - Runs on the user's Android phone in Pydroid 3.
-- Telegram commands: `/whoami`, `/start`, `/stop`, `/status`, `/emergency`, `/resetstop`, `/balance`.
+- Telegram commands: `/whoami`, `/animate`, `/start`, `/stop`, `/status`, `/emergency`, `/resetstop`, `/balance`.
 - Owner restriction for all controls/account queries.
+- `/animate` previews a lightweight animated startup/status sequence; `/balance` shows animated connection progress.
 - `/balance` authenticates with Deriv and requests balance only, and rejects accounts unless Deriv explicitly reports a virtual/demo account.
 - Credentials are prompted interactively (hidden input for tokens) and are not stored in this source file.
 - No order placement or live trading is implemented. `/start` only marks monitoring as armed; the emergency stop defaults ON. `/resetstop` clears that latch for monitoring controls only; order execution remains disabled.
