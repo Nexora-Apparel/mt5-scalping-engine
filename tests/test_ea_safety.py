@@ -49,3 +49,9 @@ def test_strategy_tester_uses_isolated_simulated_risk_state():
     assert "bool inTester = (bool)MQLInfoInteger(MQL_TESTER);" in source
     assert "double testerDayStartBalance = 0.0;" in source
     assert "datetime testerDayStartTime = 0;" in source
+
+
+def test_position_sizing_prefers_loss_side_tick_value():
+    source = EA_PATH.read_text(encoding="utf-8")
+    assert "SYMBOL_TRADE_TICK_VALUE_LOSS" in source
+    assert "if(tickValue <= 0.0)" in source
