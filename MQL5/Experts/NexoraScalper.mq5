@@ -28,6 +28,7 @@ int slowHandle = INVALID_HANDLE;
 datetime lastBarTime = 0;
 datetime lastEntryTime = 0;
 string dayEquityKey = "";
+string lastEntryKey = "";
 
 bool IsDemoAccount()
 {
@@ -40,6 +41,15 @@ string BuildDayEquityKey()
    StringReplace(datePart, ".", "");
    return StringFormat("NexoraEq_%I64d_%I64u_%s",
                        AccountInfoInteger(ACCOUNT_LOGIN), MagicNumber, datePart);
+}
+
+void RefreshDailyKeys()
+{
+   dayEquityKey = BuildDayEquityKey();
+   lastEntryKey = StringFormat("NexoraEntry_%I64d_%I64u",
+                               AccountInfoInteger(ACCOUNT_LOGIN), MagicNumber);
+   if(GlobalVariableCheck(lastEntryKey))
+      lastEntryTime = (datetime)GlobalVariableGet(lastEntryKey);
 }
 
 double GetDayStartEquity()
@@ -152,6 +162,8 @@ bool SafetyGatesPass()
       return false;
    if(DailyLossLimitReached() || !SpreadIsAcceptable() || HasPositionForSymbol())
       return false;
+   if(CooldownSeconds < 0 || MaxSpreadPoints <= 0 || MaxDeviationPoints < 0)
+      return false;
    if(lastEntryTime > 0 && TimeCurrent() - lastEntryTime < CooldownSeconds)
       return false;
    return true;
@@ -198,7 +210,11 @@ void TryEntry()
 
    if(sent && (trade.ResultRetcode() == TRADE_RETCODE_DONE ||
                trade.ResultRetcode() == TRADE_RETCODE_PLACED))
+   {
       lastEntryTime = TimeCurrent();
+      if(lastEntryKey != "")
+         GlobalVariableSet(lastEntryKey, (double)lastEntryTime);
+   }
    else
       Print("Nexora entry rejected; retcode=", trade.ResultRetcode(),
             " description=", trade.ResultRetcodeDescription());
@@ -220,7 +236,7 @@ int OnInit()
    if(fastHandle == INVALID_HANDLE || slowHandle == INVALID_HANDLE)
       return INIT_FAILED;
 
-   dayEquityKey = BuildDayEquityKey();
+   RefreshDailyKeys();
    GetDayStartEquity(); // Persist baseline across terminal restarts for this account/day.
    lastBarTime = iTime(_Symbol, PERIOD_CURRENT, 0);
 
@@ -232,6 +248,8 @@ int OnInit()
 
 void OnTick()
 {
+   // Refresh the date-keyed baseline at midnight, including after a terminal restart.
+   RefreshDailyKeys();
    if(!IsNewBar())
       return;
    if(!SafetyGatesPass())
