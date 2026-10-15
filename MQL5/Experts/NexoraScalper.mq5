@@ -243,6 +243,43 @@ double CalculateVolume(double stopDistancePrice)
    return NormalizeDouble(volume, volumeDigits);
 }
 
+void LogSmallBalanceDiagnostics()
+{
+   if(!EnableSmallBalanceProfile || AccountInfoDouble(ACCOUNT_EQUITY) > SmallBalanceThresholdUSD)
+      return;
+
+   double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+   double minVolume = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+   double riskBudget = equity * SmallBalanceRiskPercent / 100.0;
+   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   double slDistance = EffectiveStopLossPoints() * point;
+   double buyLoss = 0.0, sellLoss = 0.0, buyMargin = 0.0, sellMargin = 0.0;
+   bool buyRiskOk = OrderCalcProfit(ORDER_TYPE_BUY, _Symbol, minVolume, ask, ask - slDistance, buyLoss);
+   bool sellRiskOk = OrderCalcProfit(ORDER_TYPE_SELL, _Symbol, minVolume, bid, bid + slDistance, sellLoss);
+   bool buyMarginOk = OrderCalcMargin(ORDER_TYPE_BUY, _Symbol, minVolume, ask, buyMargin);
+   bool sellMarginOk = OrderCalcMargin(ORDER_TYPE_SELL, _Symbol, minVolume, bid, sellMargin);
+
+   Print("Nexora small-balance diagnostic: equity=", DoubleToString(equity, 2),
+         " riskBudget=", DoubleToString(riskBudget, 2),
+         " minVolume=", DoubleToString(minVolume, 2),
+         " point=", DoubleToString(point, 5),
+         " spreadPoints=", (long)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD),
+         " stopsLevel=", (long)SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL),
+         " SLpoints=", EffectiveStopLossPoints(),
+         " TPpoints=", EffectiveTakeProfitPoints());
+   Print("Nexora small-balance diagnostic: buyRiskOK=", buyRiskOk,
+         " buyStopLoss=", buyRiskOk ? DoubleToString(-buyLoss, 2) : "n/a",
+         " buyMarginOK=", buyMarginOk,
+         " buyMargin=", buyMarginOk ? DoubleToString(buyMargin, 2) : "n/a",
+         " sellRiskOK=", sellRiskOk,
+         " sellStopLoss=", sellRiskOk ? DoubleToString(-sellLoss, 2) : "n/a",
+         " sellMarginOK=", sellMarginOk,
+         " sellMargin=", sellMarginOk ? DoubleToString(sellMargin, 2) : "n/a",
+         " note=diagnostic only; no order sent");
+}
+
 bool GetCrossSignal(bool &buySignal, bool &sellSignal)
 {
    buySignal = false;
@@ -437,6 +474,7 @@ int OnInit()
          ", SmallBalanceProfile=", EnableSmallBalanceProfile,
          ", SmallBalanceRiskPercent=", SmallBalanceRiskPercent,
          ". Experimental only; live trading is blocked by design.");
+   LogSmallBalanceDiagnostics();
    return INIT_SUCCEEDED;
 }
 
