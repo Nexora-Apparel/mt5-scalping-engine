@@ -4,7 +4,7 @@
 //| Order submission is OFF by default. Demo testing only.            |
 //+------------------------------------------------------------------+
 #property strict
-#property version   "001.000"
+#property version   "1.000"
 #property description "Experimental EMA-cross scalper with basic risk gates; disabled by default."
 
 
