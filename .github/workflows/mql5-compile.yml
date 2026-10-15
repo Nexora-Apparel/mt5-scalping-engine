@@ -36,18 +36,39 @@ jobs:
           $installer = Join-Path $env:RUNNER_TEMP "mt5setup.exe"
           $installPath = "C:\MT5"
           $process = Start-Process -FilePath $installer -ArgumentList @("/auto", "/path:$installPath") -Wait -PassThru
-          if ($process.ExitCode -ne 0) {
-            throw "MetaTrader installer exited with code $($process.ExitCode)."
+          Write-Host "Installer process exit code: $($process.ExitCode)"
+          # Installer exit codes can vary; determine success from the actual installed files.
+          $searchRoots = @(
+            $installPath,
+            "$env:APPDATA\MetaQuotes\Terminal",
+            "$env:LOCALAPPDATA\Programs",
+            "C:\Program Files",
+            "C:\Program Files (x86)"
+          ) | Where-Object { Test-Path $_ }
+          $editorFound = Get-ChildItem -Path $searchRoots -Filter "metaeditor64.exe" -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (!$editorFound) {
+            foreach ($root in $searchRoots) {
+              Write-Host "Inspecting install root: $root"
+              Get-ChildItem -Path $root -Force -ErrorAction SilentlyContinue | Select-Object -First 20 FullName
+            }
+            throw "MetaEditor was not found after installer exit code $($process.ExitCode)."
           }
-          $editor = Join-Path $installPath "metaeditor64.exe"
-          $include = Join-Path $installPath "MQL5"
-          if (!(Test-Path $editor)) {
-            Get-ChildItem -Path "C:\Program Files" -Filter "metaeditor64.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 10 FullName
-            throw "MetaEditor was not found at $editor."
+          $editor = $editorFound.FullName
+          $terminalRoot = Split-Path $editor
+          $includeCandidates = @(
+            (Join-Path $terminalRoot "MQL5"),
+            (Join-Path $env:APPDATA "MetaQuotes\Terminal")
+          )
+          $include = $includeCandidates | Where-Object { Test-Path (Join-Path $_ "Include\Trade\Trade.mqh") } | Select-Object -First 1
+          if (!$include) {
+            $tradeInclude = Get-ChildItem -Path $searchRoots -Filter "Trade.mqh" -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match "MQL5\\Include\\Trade\\Trade\.mqh$" } | Select-Object -First 1
+            if ($tradeInclude) { $include = $tradeInclude.FullName -replace "\\Include\\Trade\\Trade\.mqh$","" }
           }
-          if (!(Test-Path (Join-Path $include "Include\Trade\Trade.mqh"))) {
-            throw "Standard MQL5 Trade include was not found under $include."
+          if (!$include) {
+            throw "MetaEditor was found at $editor but the standard MQL5 Trade include could not be located."
           }
+          Write-Host "MetaEditor found: $editor"
+          Write-Host "MQL5 include root: $include"
           "METAEDITOR=$editor" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "MQL5_INCLUDE=$include" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
