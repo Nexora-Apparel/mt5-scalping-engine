@@ -31,6 +31,10 @@ if [[ "$mem_kib" -lt 2097152 && "$swap_total_kib" -lt 1048576 && ! -e /swapfile 
 fi
 
 mkdir -p "$HOME/mt5-setup-logs"
+# Set the Wine prefix before invoking the installer so installation and compile
+# phases use the same isolated terminal directory.
+export WINEPREFIX="$HOME/.mt5"
+export WINEARCH=win64
 # Start an isolated local-only X display and lightweight window manager for the
 # official installer and any Wine Mono/Gecko prompts. No display port is exposed.
 display_num=99
@@ -63,7 +67,7 @@ chmod 700 "$installer"
 # periodically press Enter to accept the default/continue action. No broker account is
 # configured, and the EA's order switch/emergency stop remain closed.
 echo "[3/5] Running the official MetaTrader Linux installer..."
-bash "$installer" >"$HOME/mt5-setup-logs/official-installer.log" 2>&1 &
+WINEDEBUG=-all bash "$installer" >"$HOME/mt5-setup-logs/official-installer.log" 2>&1 &
 installer_pid=$!
 
 mt5_root="$HOME/.mt5/drive_c/Program Files/MetaTrader 5"
@@ -83,7 +87,11 @@ for attempt in $(seq 1 120); do
 done
 
 if [[ ! -f "$terminal" || ! -f "$editor" ]]; then
-  echo "ERROR: MT5 terminal/MetaEditor did not appear within 10 minutes." >&2
+  if ! kill -0 "$installer_pid" >/dev/null 2>&1; then
+    echo "ERROR: Official installer exited before MT5 terminal/MetaEditor appeared." >&2
+  else
+    echo "ERROR: MT5 terminal/MetaEditor did not appear within 10 minutes." >&2
+  fi
   echo "Official installer log tail:" >&2
   tail -n 100 "$HOME/mt5-setup-logs/official-installer.log" >&2 || true
   echo "No account was configured and no trades were placed." >&2
@@ -91,8 +99,6 @@ if [[ ! -f "$terminal" || ! -f "$editor" ]]; then
 fi
 
 echo "[4/5] Preparing the portable Experts folder..."
-export WINEPREFIX="$HOME/.mt5"
-export WINEARCH=win64
 mkdir -p "$mt5_root/MQL5/Experts"
 source_url="https://raw.githubusercontent.com/Nexora-Apparel/mt5-scalping-engine/main/MQL5/Experts/NexoraScalper.mq5"
 curl --fail --location --retry 3 --output "$mt5_root/MQL5/Experts/NexoraScalper.mq5" "$source_url"
