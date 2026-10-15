@@ -109,7 +109,7 @@ sleep 15
 kill "$terminal_init_pid" >/dev/null 2>&1 || true
 # The Wine wrapper may leave the Windows terminal child running; reset Wine cleanly
 # before compiling so the headless terminal does not hold the display open.
-wineserver -k >/dev/null 2>&1 || true
+timeout 30s wineserver -k >/dev/null 2>&1 || true
 sleep 2
 wineboot --init || true
 mkdir -p "$mt5_root/MQL5/Experts"
@@ -135,7 +135,7 @@ for attempt in $(seq 1 60); do
 done
 kill "$compile_pid" >/dev/null 2>&1 || true
 wait "$compile_pid" >/dev/null 2>&1 || true
-wineserver -k >/dev/null 2>&1 || true
+timeout 30s wineserver -k >/dev/null 2>&1 || true
 sleep 2
 if [[ ! -f "$compile_log" ]]; then
   echo "ERROR: MetaEditor did not create a compile log. See $HOME/mt5-setup-logs/." >&2
