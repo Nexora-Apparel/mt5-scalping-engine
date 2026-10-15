@@ -10,7 +10,7 @@
 
 input bool   EnableDemoOrders       = false; // Keep false until Strategy Tester review
 input bool   EmergencyStop          = true;  // True blocks all new entries
-input double RiskPercentPerTrade    = 0.25;  // Percent of start-of-day equity
+input double RiskPercentPerTrade    = 0.25;  // Percent of reconstructed start-of-day balance
 input double MaxDailyLossPercent    = 1.00;  // Includes floating equity loss
 input int    MaxSpreadPoints        = 80;    // Broker points; tune per symbol after measuring
 input int    StopLossPoints         = 300;   // Must be calibrated per symbol/broker
@@ -25,7 +25,7 @@ int fastHandle = INVALID_HANDLE;
 int slowHandle = INVALID_HANDLE;
 datetime lastBarTime = 0;
 datetime lastEntryTime = 0;
-string dayEquityKey = "";
+string dayBaselineKey = "";
 string lastEntryKey = "";
 
 bool IsDemoAccount()
@@ -33,38 +33,68 @@ bool IsDemoAccount()
    return AccountInfoInteger(ACCOUNT_TRADE_MODE) == ACCOUNT_TRADE_MODE_DEMO;
 }
 
-string BuildDayEquityKey()
+string BuildDayBaselineKey()
 {
    string datePart = TimeToString(TimeCurrent(), TIME_DATE);
    StringReplace(datePart, ".", "");
-   return StringFormat("NexoraEq_%I64d_%I64u_%s",
+   return StringFormat("NexoraBase_%I64d_%I64u_%s",
                        AccountInfoInteger(ACCOUNT_LOGIN), MagicNumber, datePart);
 }
 
 void RefreshDailyKeys()
 {
-   dayEquityKey = BuildDayEquityKey();
+   dayBaselineKey = BuildDayBaselineKey();
    lastEntryKey = StringFormat("NexoraEntry_%I64d_%I64u",
                                AccountInfoInteger(ACCOUNT_LOGIN), MagicNumber);
    if(GlobalVariableCheck(lastEntryKey))
       lastEntryTime = (datetime)GlobalVariableGet(lastEntryKey);
 }
 
-double GetDayStartEquity()
+double CalculateDayStartBalance()
 {
-   if(!GlobalVariableCheck(dayEquityKey))
-      GlobalVariableSet(dayEquityKey, AccountInfoDouble(ACCOUNT_EQUITY));
-   return GlobalVariableGet(dayEquityKey);
+   datetime now = TimeCurrent();
+   MqlDateTime dayParts;
+   if(!TimeToStruct(now, dayParts)) return 0.0;
+   dayParts.hour = 0; dayParts.min = 0; dayParts.sec = 0;
+   datetime dayStart = StructToTime(dayParts);
+   if(!HistorySelect(dayStart, now))
+   {
+      Print("Nexora risk gate: cannot select today's account history.");
+      return 0.0;
+   }
+   double netBalanceChanges = 0.0;
+   int deals = HistoryDealsTotal();
+   for(int i = 0; i < deals; i++)
+   {
+      ulong ticket = HistoryDealGetTicket(i);
+      if(ticket == 0) continue;
+      netBalanceChanges += HistoryDealGetDouble(ticket, DEAL_PROFIT);
+      netBalanceChanges += HistoryDealGetDouble(ticket, DEAL_COMMISSION);
+      netBalanceChanges += HistoryDealGetDouble(ticket, DEAL_SWAP);
+      netBalanceChanges += HistoryDealGetDouble(ticket, DEAL_FEE);
+   }
+   double startBalance = AccountInfoDouble(ACCOUNT_BALANCE) - netBalanceChanges;
+   if(startBalance <= 0.0) return 0.0;
+   return startBalance;
+}
+
+double GetDayStartBalance()
+{
+   if(!GlobalVariableCheck(dayBaselineKey))
+   {
+      double baseline = CalculateDayStartBalance();
+      if(baseline <= 0.0) return 0.0;
+      if(!GlobalVariableSet(dayBaselineKey, baseline)) return 0.0;
+   }
+   return GlobalVariableGet(dayBaselineKey);
 }
 
 bool DailyLossLimitReached()
 {
-   double startEquity = GetDayStartEquity();
-   if(startEquity <= 0.0)
-      return true;
-
-   double lossPercent = (startEquity - AccountInfoDouble(ACCOUNT_EQUITY))
-                        / startEquity * 100.0;
+   double startBalance = GetDayStartBalance();
+   if(startBalance <= 0.0) return true;
+   double lossPercent = (startBalance - AccountInfoDouble(ACCOUNT_EQUITY))
+                        / startBalance * 100.0;
    return lossPercent >= MaxDailyLossPercent;
 }
 
@@ -93,7 +123,7 @@ bool SpreadIsAcceptable()
 
 double CalculateVolume(double stopDistancePrice)
 {
-   double equity = GetDayStartEquity();
+   double equity = GetDayStartBalance();
    double riskMoney = equity * RiskPercentPerTrade / 100.0;
    double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
    double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
@@ -265,7 +295,7 @@ int OnInit()
       return INIT_FAILED;
 
    RefreshDailyKeys();
-   GetDayStartEquity(); // Persist baseline across terminal restarts for this account/day.
+   GetDayStartBalance(); // Persist baseline across terminal restarts for this account/day.
    lastBarTime = iTime(_Symbol, PERIOD_CURRENT, 0);
 
    Print("NexoraScalper initialized. EnableDemoOrders=", EnableDemoOrders,
