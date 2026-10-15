@@ -63,3 +63,8 @@ def test_daily_loss_lockout_latches_until_next_server_day():
     assert "GlobalVariableSet(dailyLossLockKey, 1.0)" in source
     assert "testerDailyLossLocked = false;" in source
     assert "Once breached, the daily limit stays latched until the next server day." in source
+
+def test_tester_daily_lock_refreshes_day_before_checking_latch():
+    source = EA_PATH.read_text(encoding="utf-8")
+    function = source.split("bool DailyLossLimitReached()", 1)[1].split("\nbool HasPositionForSymbol()", 1)[0]
+    assert function.index("double startBalance = GetDayStartBalance();") < function.index("if(inTester && testerDailyLossLocked) return true;")
