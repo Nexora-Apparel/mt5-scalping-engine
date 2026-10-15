@@ -35,8 +35,8 @@ jobs:
         run: |
           $installer = Join-Path $env:RUNNER_TEMP "mt5setup.exe"
           $installPath = "C:\MT5"
-          # Do not wait for the installer process to exit: it may launch the terminal
-          # and keep that process alive. Poll for the required files instead.
+          # The bootstrap installer may spawn a background installer process; do not
+          # treat MetaEditor appearing alone as proof that the full terminal is ready.
           $process = Start-Process -FilePath $installer -ArgumentList @("/auto", "/path:`"$installPath`"") -PassThru
           $editorCandidates = @(
             (Join-Path $installPath "metaeditor64.exe"),
@@ -46,48 +46,55 @@ jobs:
             "C:\Program Files (x86)\Exness MetaTrader 5\metaeditor64.exe"
           )
           $editor = $null
-          for ($attempt = 1; $attempt -le 18; $attempt++) {
+          $include = $null
+          for ($attempt = 1; $attempt -le 24; $attempt++) {
             foreach ($candidate in $editorCandidates) {
               if (Test-Path $candidate) {
                 $editor = $candidate
-                break
+                $terminalRoot = Split-Path $editor
+                $directInclude = Join-Path $terminalRoot "MQL5\Include\Trade\Trade.mqh"
+                if (Test-Path $directInclude) {
+                  $include = Join-Path $terminalRoot "MQL5"
+                  break
+                }
               }
             }
-            if ($editor) { break }
+            if (!$include) {
+              $dataRoot = Join-Path $env:APPDATA "MetaQuotes\Terminal"
+              if (Test-Path $dataRoot) {
+                foreach ($instance in Get-ChildItem -Path $dataRoot -Directory -ErrorAction SilentlyContinue) {
+                  $candidateInclude = Join-Path $instance.FullName "MQL5\Include\Trade\Trade.mqh"
+                  if (Test-Path $candidateInclude) {
+                    $include = Join-Path $instance.FullName "MQL5"
+                    if (!$editor) { $editor = $editorCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1 }
+                    break
+                  }
+                }
+              }
+            }
+            if ($editor -and $include) { break }
+            if ($attempt -eq 12 -and $editor) {
+              $terminalRoot = Split-Path $editor
+              $terminalExe = Join-Path $terminalRoot "terminal64.exe"
+              if (Test-Path $terminalExe) {
+                Write-Host "Starting terminal briefly to initialize standard MQL5 data files; no account is configured."
+                $terminalProcess = Start-Process -FilePath $terminalExe -ArgumentList @("/portable") -PassThru
+                Start-Sleep -Seconds 10
+                Stop-Process -Id $terminalProcess.Id -Force -ErrorAction SilentlyContinue
+              }
+            }
             Start-Sleep -Seconds 5
           }
-          if (!$editor) {
-            $installerState = Get-Process -Id $process.Id -ErrorAction SilentlyContinue
-            if ($installerState) {
-              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-              Write-Host "Stopped installer process after timeout."
+          if (!$editor) { throw "MetaEditor was not found after 120 seconds; installer exit code is $($process.ExitCode)." }
+          if (!$include) {
+            Write-Host "MetaEditor found: $editor"
+            Write-Host "Installer process exit code: $($process.ExitCode)"
+            foreach ($root in @($installPath, (Join-Path $env:APPDATA "MetaQuotes\Terminal"))) {
+              if (Test-Path $root) { Get-ChildItem -Path $root -Force -ErrorAction SilentlyContinue | Select-Object -First 20 FullName }
             }
-            throw "MetaEditor was not found in expected install paths after 90 seconds."
+            throw "MetaEditor exists, but the standard MQL5 Trade include did not appear within 120 seconds."
           }
-          $terminalRoot = Split-Path $editor
-          $include = Join-Path $terminalRoot "MQL5"
-          $tradeInclude = Join-Path $include "Include\Trade\Trade.mqh"
-          if (!(Test-Path $tradeInclude)) {
-            $terminalExe = Join-Path $terminalRoot "terminal64.exe"
-            if (Test-Path $terminalExe) {
-              Write-Host "Standard includes not in the install root; initializing portable terminal files without account login."
-              $terminalProcess = Start-Process -FilePath $terminalExe -ArgumentList @("/portable") -PassThru
-              Start-Sleep -Seconds 15
-              Stop-Process -Id $terminalProcess.Id -Force -ErrorAction SilentlyContinue
-            }
-            $includeSearchRoots = @($terminalRoot, (Join-Path $env:APPDATA "MetaQuotes\Terminal")) | Where-Object { Test-Path $_ }
-            $tradeInclude = Get-ChildItem -Path $includeSearchRoots -Filter "Trade.mqh" -File -Recurse -Depth 8 -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match "MQL5\\Include\\Trade\\Trade\.mqh$" } | Select-Object -First 1
-            if ($tradeInclude) { $include = $tradeInclude.FullName -replace "\\Include\\Trade\\Trade\.mqh$","" }
-          }
-          if (!(Test-Path (Join-Path $include "Include\Trade\Trade.mqh"))) {
-            foreach ($root in @($terminalRoot, (Join-Path $env:APPDATA "MetaQuotes\Terminal"))) {
-              if (Test-Path $root) {
-                Write-Host "Directory sample for $root"
-                Get-ChildItem -Path $root -Force -ErrorAction SilentlyContinue | Select-Object -First 15 FullName
-              }
-            }
-            throw "MetaEditor was found at $editor but the standard MQL5 Trade include could not be located."
-          }
+          if (!(Test-Path (Join-Path $include "Include\Trade\Trade.mqh"))) { throw "Resolved MQL5 include root is invalid: $include" }
           Write-Host "MetaEditor found: $editor"
           Write-Host "MQL5 include root: $include"
           "METAEDITOR=$editor" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
