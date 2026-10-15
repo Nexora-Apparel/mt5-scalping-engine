@@ -66,8 +66,27 @@ jobs:
           }
           $terminalRoot = Split-Path $editor
           $include = Join-Path $terminalRoot "MQL5"
+          $tradeInclude = Join-Path $include "Include\Trade\Trade.mqh"
+          if (!(Test-Path $tradeInclude)) {
+            $terminalExe = Join-Path $terminalRoot "terminal64.exe"
+            if (Test-Path $terminalExe) {
+              Write-Host "Standard includes not in the install root; initializing portable terminal files without account login."
+              $terminalProcess = Start-Process -FilePath $terminalExe -ArgumentList @("/portable") -PassThru
+              Start-Sleep -Seconds 15
+              Stop-Process -Id $terminalProcess.Id -Force -ErrorAction SilentlyContinue
+            }
+            $includeSearchRoots = @($terminalRoot, (Join-Path $env:APPDATA "MetaQuotes\Terminal")) | Where-Object { Test-Path $_ }
+            $tradeInclude = Get-ChildItem -Path $includeSearchRoots -Filter "Trade.mqh" -File -Recurse -Depth 8 -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match "MQL5\\Include\\Trade\\Trade\.mqh$" } | Select-Object -First 1
+            if ($tradeInclude) { $include = $tradeInclude.FullName -replace "\\Include\\Trade\\Trade\.mqh$","" }
+          }
           if (!(Test-Path (Join-Path $include "Include\Trade\Trade.mqh"))) {
-            throw "MetaEditor was found at $editor but the standard MQL5 Trade include is missing at $include."
+            foreach ($root in @($terminalRoot, (Join-Path $env:APPDATA "MetaQuotes\Terminal"))) {
+              if (Test-Path $root) {
+                Write-Host "Directory sample for $root"
+                Get-ChildItem -Path $root -Force -ErrorAction SilentlyContinue | Select-Object -First 15 FullName
+              }
+            }
+            throw "MetaEditor was found at $editor but the standard MQL5 Trade include could not be located."
           }
           Write-Host "MetaEditor found: $editor"
           Write-Host "MQL5 include root: $include"
