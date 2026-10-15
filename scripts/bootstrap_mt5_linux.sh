@@ -14,9 +14,10 @@ if ! command -v sudo >/dev/null 2>&1; then
 fi
 
 export DEBIAN_FRONTEND=noninteractive
-echo "[1/5] Installing Wine and Xvfb dependencies..."
+echo "[1/5] Enabling 32-bit Wine support and installing dependencies..."
+sudo dpkg --add-architecture i386
 sudo apt-get update
-sudo apt-get install -y wine wine64 winbind xvfb xauth curl ca-certificates fonts-wine
+sudo apt-get install -y wine wine64 wine32:i386 winbind xvfb xauth curl ca-certificates fonts-wine
 
 # Add a modest swap file on tiny Always Free VMs if the machine has less than 2 GiB RAM
 # and no active swap. This uses local disk space; it does not buy cloud resources.
