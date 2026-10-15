@@ -10,11 +10,17 @@
 
 input bool   EnableDemoOrders       = false; // Keep false until Strategy Tester review
 input bool   EmergencyStop          = true;  // True blocks all new entries
-input double RiskPercentPerTrade    = 0.25;  // Percent of reconstructed start-of-day balance
+input double RiskPercentPerTrade    = 0.25;  // Normal profile: percent of current equity
 input double MaxDailyLossPercent    = 1.00;  // Includes floating equity loss
-input int    MaxSpreadPoints        = 80;    // Broker points; tune per symbol after measuring
-input int    StopLossPoints         = 300;   // Must be calibrated per symbol/broker
-input int    TakeProfitPoints       = 450;   // Must be calibrated per symbol/broker
+input int    MaxSpreadPoints        = 80;    // Normal profile spread ceiling in broker points
+input int    StopLossPoints         = 300;   // Normal profile stop in broker points
+input int    TakeProfitPoints       = 450;   // Normal profile target in broker points
+input bool   EnableSmallBalanceProfile = true; // Experimental profile for small-balance DEMO tests only
+input double SmallBalanceThresholdUSD = 100.0; // Use small profile at/below this equity
+input double SmallBalanceRiskPercent  = 4.0; // Aggressive experimental risk; DEMO TESTING ONLY
+input int    SmallBalanceMaxSpreadPoints = 20; // Strict spread ceiling for small-balance profile
+input int    SmallBalanceStopLossPoints = 40; // Must cover stop level plus typical spread
+input int    SmallBalanceTakeProfitPoints = 60; // Experimental 1.5:1 nominal target/risk
 input int    FastEmaPeriod          = 9;
 input int    SlowEmaPeriod          = 21;
 input int    CooldownSeconds        = 60;
@@ -164,18 +170,46 @@ bool IsNewBar()
    return true;
 }
 
+bool IsSmallBalanceProfile()
+{
+   return EnableSmallBalanceProfile &&
+          AccountInfoDouble(ACCOUNT_EQUITY) > 0.0 &&
+          AccountInfoDouble(ACCOUNT_EQUITY) <= SmallBalanceThresholdUSD;
+}
+
+int EffectiveStopLossPoints()
+{
+   return IsSmallBalanceProfile() ? SmallBalanceStopLossPoints : StopLossPoints;
+}
+
+int EffectiveTakeProfitPoints()
+{
+   return IsSmallBalanceProfile() ? SmallBalanceTakeProfitPoints : TakeProfitPoints;
+}
+
+int EffectiveMaxSpreadPoints()
+{
+   return IsSmallBalanceProfile() ? SmallBalanceMaxSpreadPoints : MaxSpreadPoints;
+}
+
+double EffectiveRiskPercent()
+{
+   return IsSmallBalanceProfile() ? SmallBalanceRiskPercent : RiskPercentPerTrade;
+}
+
 bool SpreadIsAcceptable()
 {
    long spread = 0;
    if(!SymbolInfoInteger(_Symbol, SYMBOL_SPREAD, spread))
       return false;
-   return spread > 0 && spread <= MaxSpreadPoints;
+   return spread > 0 && spread <= EffectiveMaxSpreadPoints();
 }
 
 double CalculateVolume(double stopDistancePrice)
 {
-   double equity = GetDayStartBalance();
-   double riskMoney = equity * RiskPercentPerTrade / 100.0;
+   // Use current equity so lot sizing automatically adapts as the account changes.
+   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+   double riskMoney = equity * EffectiveRiskPercent() / 100.0;
    double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
    double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE_LOSS);
    if(tickValue <= 0.0)
@@ -240,6 +274,12 @@ bool SafetyGatesPass()
    if(RiskPercentPerTrade <= 0.0 || RiskPercentPerTrade > 0.5 ||
       MaxDailyLossPercent <= 0.0 || MaxDailyLossPercent > 2.0)
       return false;
+   if(EnableSmallBalanceProfile &&
+      (SmallBalanceThresholdUSD <= 0.0 || SmallBalanceRiskPercent <= 0.0 ||
+       SmallBalanceRiskPercent > 5.0 || SmallBalanceMaxSpreadPoints <= 0 ||
+       SmallBalanceStopLossPoints <= 0 ||
+       SmallBalanceTakeProfitPoints <= 0))
+      return false;
    if(StopLossPoints <= 0 || TakeProfitPoints <= 0 ||
       FastEmaPeriod <= 0 || SlowEmaPeriod <= FastEmaPeriod)
       return false;
@@ -264,10 +304,18 @@ void TryEntry()
    int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
    long stopsLevel = 0;
    SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL, stopsLevel);
-   if(point <= 0.0 || StopLossPoints < stopsLevel || TakeProfitPoints < stopsLevel)
+   int slPoints = EffectiveStopLossPoints();
+   int tpPoints = EffectiveTakeProfitPoints();
+   long spreadPoints = 0;
+   if(!SymbolInfoInteger(_Symbol, SYMBOL_SPREAD, spreadPoints))
+      return;
+   // For market execution, the stop must also clear the broker's stop level
+   // from the opposite quote (bid/ask), so account for the current spread.
+   if(point <= 0.0 || slPoints < stopsLevel + spreadPoints ||
+      tpPoints < stopsLevel + spreadPoints)
       return;
 
-   double stopDistance = StopLossPoints * point;
+   double stopDistance = slPoints * point;
    double volume = CalculateVolume(stopDistance);
    if(volume <= 0.0)
       return;
@@ -277,15 +325,33 @@ void TryEntry()
       return;
 
    double sl = 0.0, tp = 0.0;
+   double entryPrice = buySignal ? tick.ask : tick.bid;
    if(buySignal)
    {
       sl = NormalizeDouble(tick.ask - stopDistance, digits);
-      tp = NormalizeDouble(tick.ask + TakeProfitPoints * point, digits);
+      tp = NormalizeDouble(tick.ask + tpPoints * point, digits);
    }
    else
    {
       sl = NormalizeDouble(tick.bid + stopDistance, digits);
-      tp = NormalizeDouble(tick.bid - TakeProfitPoints * point, digits);
+      tp = NormalizeDouble(tick.bid - tpPoints * point, digits);
+   }
+
+   // Verify the broker-calculated loss for the chosen volume; never force the
+   // minimum lot if it would exceed the configured per-trade risk budget.
+   double estimatedStopProfit = 0.0;
+   ENUM_ORDER_TYPE intendedType = buySignal ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
+   if(!OrderCalcProfit(intendedType, _Symbol, volume, entryPrice, sl, estimatedStopProfit))
+   {
+      Print("Nexora entry blocked: unable to calculate stop-loss risk.");
+      return;
+   }
+   double riskBudget = AccountInfoDouble(ACCOUNT_EQUITY) * EffectiveRiskPercent() / 100.0;
+   if(estimatedStopProfit >= 0.0 || -estimatedStopProfit > riskBudget + 0.000001)
+   {
+      Print("Nexora entry blocked: minimum/rounded volume exceeds risk budget. Estimated loss=",
+            DoubleToString(-estimatedStopProfit, 2), " budget=", DoubleToString(riskBudget, 2));
+      return;
    }
 
    // Native MQL5 request API avoids a dependency on the standard Trade.mqh library.
@@ -368,7 +434,9 @@ int OnInit()
 
    Print("NexoraScalper initialized. EnableDemoOrders=", EnableDemoOrders,
          ", EmergencyStop=", EmergencyStop,
-         ". This is experimental and not approved for live trading.");
+         ", SmallBalanceProfile=", EnableSmallBalanceProfile,
+         ", SmallBalanceRiskPercent=", SmallBalanceRiskPercent,
+         ". Experimental only; live trading is blocked by design.");
    return INIT_SUCCEEDED;
 }
 
