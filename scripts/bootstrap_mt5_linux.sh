@@ -18,6 +18,18 @@ echo "[1/5] Installing headless display and download dependencies..."
 sudo apt-get update
 sudo apt-get install -y xvfb xauth xdotool openbox curl ca-certificates wget
 
+# Add local-disk swap on tiny Always Free VMs when none is active.
+mem_kib="$(awk '/MemTotal:/ {print $2}' /proc/meminfo)"
+swap_total_kib="$(awk '/SwapTotal:/ {print $2}' /proc/meminfo)"
+if [[ "$mem_kib" -lt 2097152 && "$swap_total_kib" -lt 1048576 && ! -e /swapfile ]]; then
+  echo "Adding a 2 GB swap file to reduce memory pressure on a 1 GB VM..."
+  sudo fallocate -l 2G /swapfile
+  sudo chmod 600 /swapfile
+  sudo mkswap /swapfile
+  sudo swapon /swapfile
+  echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null
+fi
+
 mkdir -p "$HOME/mt5-setup-logs"
 # Start an isolated local-only X display and lightweight window manager for the
 # official installer and any Wine Mono/Gecko prompts. No display port is exposed.
