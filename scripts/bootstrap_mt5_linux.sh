@@ -120,11 +120,22 @@ rel_root="${mt5_root#"$WINEPREFIX/drive_c/"}"
 win_root="C:\\${rel_root//\//\\}"
 source_win="${win_root}\\MQL5\\Experts\\NexoraScalper.mq5"
 echo "[5/5] Compiling NexoraScalper with MetaEditor..."
-wine "$editor" "/compile:$source_win" /log \
-  >"$HOME/mt5-setup-logs/compile-launch.log" 2>&1 || true
-sleep 5
-
 compile_log="$mt5_root/MQL5/Experts/NexoraScalper.log"
+compiled="$mt5_root/MQL5/Experts/NexoraScalper.ex5"
+rm -f "$compile_log" "$compiled"
+timeout 120s wine "$editor" "/compile:$source_win" /log \
+  >"$HOME/mt5-setup-logs/compile-launch.log" 2>&1 &
+compile_pid=$!
+for attempt in $(seq 1 60); do
+  if [[ -f "$compile_log" && -f "$compiled" ]] && grep -Eiq '0 errors' "$compile_log"; then
+    break
+  fi
+  sleep 2
+done
+kill "$compile_pid" >/dev/null 2>&1 || true
+wait "$compile_pid" >/dev/null 2>&1 || true
+wineserver -k >/dev/null 2>&1 || true
+sleep 2
 if [[ ! -f "$compile_log" ]]; then
   echo "ERROR: MetaEditor did not create a compile log. See $HOME/mt5-setup-logs/." >&2
   exit 5
