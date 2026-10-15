@@ -100,7 +100,8 @@ fi
 
 echo "[4/5] Preparing the portable Experts folder..."
 mkdir -p "$mt5_root/MQL5/Experts"
-source_url="https://raw.githubusercontent.com/Nexora-Apparel/mt5-scalping-engine/main/MQL5/Experts/NexoraScalper.mq5"
+# Default to the development branch under test; override only with a reviewed source URL.
+source_url="${NEXORA_EA_SOURCE_URL:-https://raw.githubusercontent.com/Nexora-Apparel/mt5-scalping-engine/telegram-android-controller/MQL5/Experts/NexoraScalper.mq5}"
 curl --fail --location --retry 3 --output "$mt5_root/MQL5/Experts/NexoraScalper.mq5" "$source_url"
 
 echo "[5/5] Compiling NexoraScalper with MetaEditor..."
