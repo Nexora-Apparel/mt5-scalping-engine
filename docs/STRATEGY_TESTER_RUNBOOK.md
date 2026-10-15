@@ -42,6 +42,12 @@ Reject the strategy if results depend on a small number of trades, disappear aft
 - After an acceptable backtest, run a demo forward test and inspect terminal/journal logs. Keep the emergency stop ON except during an explicitly supervised demo test.
 - Never use a real account as a test environment. Do not enable live trading based on compilation or a single backtest.
 
+## Account-balance range
+
+- `MinimumEquityUSD` defaults to USD 10. The EA blocks new entries whenever current equity is below this threshold.
+- There is no EA-imposed maximum account balance. Position sizing remains percentage-based and adapts to current equity; broker maximum volume, available margin, symbol rules, and configured risk limits still constrain actual trades. “No maximum balance” does not mean unlimited lot size or unlimited risk.
+- A balance above USD 10 does not guarantee that a trade is feasible. If the minimum broker volume would exceed the risk budget or margin is insufficient, the EA must skip the trade.
+
 ## Small-balance compatibility test (Deriv XAUUSD)
 
 The EA has an experimental small-balance profile for **Strategy Tester/demo research only**:
