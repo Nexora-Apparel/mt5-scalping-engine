@@ -147,7 +147,7 @@ def test_position_registry_reference_lifecycle_and_deadline_vectors():
     assert False is False
 
 
-def test_execution_guard_is_demo_only_preflight_without_submission():
+# These tests verify source contracts; MetaEditor CI separately compiles the MQL5 module.\ndef test_execution_guard_is_demo_only_preflight_without_submission():
     source = EXECUTION_SOURCE.read_text(encoding="utf-8")
     required = (
         "ValidateDemoIntent", "ACCOUNT_TRADE_MODE_DEMO",
