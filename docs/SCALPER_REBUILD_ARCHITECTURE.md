@@ -6,7 +6,7 @@ Architecture baseline only. The existing `NexoraScalper.mq5` is a legacy prototy
 
 The Exness connectivity workflow is a separate infrastructure check. A successful login does not validate a trading strategy or authorize trading.
 
-All merged foundation modules have passed their respective MetaEditor compile and Project Tests gates: read-only market health, fail-closed risk allocation, position lifecycle tracking, demo-only execution preflight, read-only broker reconciliation, state-only execution coordination, the research-only XAUUSD/XAGUSD strategy evaluator, the point-in-time feature collector, and the versioned feature dataset exporter. These gates establish compilation and source/reference test coverage, not live broker runtime correctness or strategy profitability. The current PR adds a strict, non-mutating CSV integrity auditor and a separate MT5 terminal runtime test for dataset creation, append, invalid-symbol rejection, read-back, and cleanup. The runtime test must pass before any exported dataset is accepted for chronological research. Demo/live trading remains disabled.
+All merged foundation modules have passed their respective MetaEditor compile and Project Tests gates: read-only market health, fail-closed risk allocation, position lifecycle tracking, demo-only execution preflight, read-only broker reconciliation, state-only execution coordination, the research-only XAUUSD/XAGUSD strategy evaluator, the point-in-time feature collector, and the versioned feature dataset exporter. These gates establish compilation and source/reference test coverage, not live broker runtime correctness or strategy profitability. The merged dataset integrity auditor, terminal runtime test, and optional quote-to-CSV feature pipeline have passed their respective CI gates. The pipeline remains disabled by default and no dataset is accepted for research until its integrity audit passes. Demo/live trading remains disabled.
 
 ## Product constraints
 
@@ -145,3 +145,13 @@ The Android operator view must show session state, connection/quote freshness, s
 - An exporter or integrity failure latches the collector into a faulted state; it does not retry writes blindly. Duplicate/out-of-order quote timestamps are ignored.
 - This is research-data collection only. The pipeline does not evaluate trade decisions, prepare execution intents, or call any broker order API. Live trading remains disabled.
 - The MT5 runtime test feeds synthetic timestamped quotes through the pipeline and verifies that two post-warm-up rows are exported, in addition to the existing direct CSV writer tests.
+
+
+## Bounded Exness demo data-collection session
+
+- The manual `mt5-demo-session.yml` workflow starts a temporary Windows-hosted MT5 terminal only when dispatched by the operator. It offers 30-, 60-, or 120-minute sessions and has a 135-minute hard job timeout for setup and shutdown overhead.
+- Broker credentials are read only from the existing `MT5_LOGIN`, `MT5_PASSWORD`, and `MT5_SERVER` repository secrets. They are not workflow inputs, printed to logs, or included in uploaded artifacts.
+- The EA requires an exact connected DEMO account match against the expected login and server before enabling collection. The terminal configuration explicitly sets `AllowLiveTrading=0`.
+- The workflow creates an ephemeral MT5 preset with collection enabled, starts `VeltrixScalper` on the selected exact XAUUSD/XAGUSD chart, and waits for the EA's demo-account guard and collection-ready log markers.
+- At the requested end time, the terminal is stopped, the CSV is copied from the terminal Files sandbox, and the strict Python dataset auditor must pass before the dataset and manifest are uploaded as an artifact.
+- This workflow does not run continuously and does not place, modify, or close trades. It is not dispatched automatically; the operator starts it from GitHub Actions when ready to collect data.

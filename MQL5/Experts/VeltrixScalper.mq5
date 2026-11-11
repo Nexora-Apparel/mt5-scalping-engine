@@ -26,6 +26,8 @@ input uint   FeatureLookbackSeconds = 60;
 input int    FeatureMinObservations = 10;
 input int    FeatureBufferCapacity = 10000;
 input string DatasetSourceId = "";
+input long   ExpectedDemoLogin = 0;
+input string ExpectedDemoServer = "";
 
 CVxMarketGuard g_market;
 CVxFeaturePipeline g_feature_pipeline;
@@ -35,6 +37,21 @@ string g_last_health_reason="";
 
 int OnInit()
 {
+   if(EnableDatasetCollection)
+   {
+      bool expected_account=(ExpectedDemoLogin>0 &&
+                             ExpectedDemoServer!="" &&
+                             TerminalInfoInteger(TERMINAL_CONNECTED) &&
+                             AccountInfoInteger(ACCOUNT_LOGIN)==ExpectedDemoLogin &&
+                             AccountInfoInteger(ACCOUNT_TRADE_MODE)==ACCOUNT_TRADE_MODE_DEMO &&
+                             AccountInfoString(ACCOUNT_SERVER)==ExpectedDemoServer);
+      if(!expected_account)
+      {
+         Print("DATASET DEMO ACCOUNT GUARD FAILED: collection requires the exact connected DEMO account and configured server");
+         return INIT_FAILED;
+      }
+      Print("DATASET DEMO ACCOUNT GUARD PASSED: exact configured DEMO account verified; automated trading disabled");
+   }
    if(!g_market.Init(_Symbol,MaxQuoteAgeMilliseconds,MaxSpreadPoints))
    {
       Print("VELTRIX INIT FAILED: market guard could not initialize for ",_Symbol);

@@ -469,3 +469,17 @@ def test_ea_dataset_collection_is_explicitly_disabled_by_default():
         "positionmodify(",
     )
     assert not [token for token in forbidden if token in lowered]
+
+
+def test_live_dataset_collection_requires_exact_connected_demo_account():
+    source = EA_SOURCE.read_text(encoding="utf-8")
+    required = (
+        "ExpectedDemoLogin", "ExpectedDemoServer",
+        "TERMINAL_CONNECTED", "ACCOUNT_LOGIN",
+        "ACCOUNT_TRADE_MODE_DEMO", "ACCOUNT_SERVER",
+        "DATASET DEMO ACCOUNT GUARD FAILED",
+        "DATASET DEMO ACCOUNT GUARD PASSED",
+    )
+    for token in required:
+        assert token in source
+    assert "input bool   EnableDatasetCollection = false;" in source
