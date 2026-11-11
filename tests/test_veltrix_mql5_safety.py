@@ -43,6 +43,7 @@ def test_veltrix_ea_uses_repository_relative_includes_and_timer():
                     "PositionRegistry.mqh", "ExecutionGuard.mqh",
                     "BrokerReconciler.mqh", "ExecutionCoordinator.mqh"):
         assert f'#include "..\\\\Include\\\\Veltrix\\\\{include}"' in source
+    assert "StrategyResearch.mqh" in source
     assert "EventSetMillisecondTimer" in source
     assert "EventKillTimer" in source
 
