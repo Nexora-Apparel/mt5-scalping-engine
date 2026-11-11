@@ -7,7 +7,7 @@
 #property version   "0.100"
 #property description "VELTRIX scalper foundation; market health only, no order submission."
 
-#include "..\\Include\\Veltrix\\MarketGuard.mqh"
+#include "..\Include\Veltrix\MarketGuard.mqh"
 
 input ulong  MaxQuoteAgeMilliseconds = 2500;
 input double MaxSpreadPoints        = 50.0;
