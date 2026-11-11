@@ -37,10 +37,12 @@ def test_session_disables_automated_trading_and_audits_dataset():
 
 
 def test_startup_failure_emits_terminal_and_expert_diagnostics():
-    source = WORKFLOW.read_text(encoding="utf-8")
-    assert 'C:\\MT5\\MQL5\\Logs' in source
-    assert 'C:\\MT5\\Logs' in source
-    assert "function Show-MT5Diagnostics" in source
-    assert "Get-Content $file.FullName -Tail 80" in source
-    assert "DATASET ACCOUNT DIAGNOSTIC" in source
-    assert "DATASET COLLECTION FAULTED" in source
+    workflow_source = WORKFLOW.read_text(encoding="utf-8")
+    expert_source = (ROOT / "MQL5" / "Experts" / "VeltrixScalper.mq5").read_text(encoding="utf-8")
+    assert 'C:\\MT5\\MQL5\\Logs' in workflow_source
+    assert 'C:\\MT5\\Logs' in workflow_source
+    assert "function Show-MT5Diagnostics" in workflow_source
+    assert "Get-Content $file.FullName -Tail 80" in workflow_source
+    assert "DATASET ACCOUNT DIAGNOSTIC" in expert_source
+    assert "DATASET COLLECTION FAULTED" in expert_source
+    assert "DATASET COLLECTION FAULTED" in workflow_source
