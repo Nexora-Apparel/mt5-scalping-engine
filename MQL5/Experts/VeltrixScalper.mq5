@@ -7,7 +7,8 @@
 #property version   "1.000"
 #property description "VELTRIX scalper foundation; market health only, no order submission."
 
-#include "..\Include\Veltrix\MarketGuard.mqh"
+#include "..\\Include\\Veltrix\\MarketGuard.mqh"
+#include "..\\Include\\Veltrix\\RiskAllocator.mqh"
 
 input ulong  MaxQuoteAgeMilliseconds = 2500;
 input double MaxSpreadPoints        = 50.0;
@@ -47,7 +48,7 @@ int OnInit()
       return INIT_FAILED;
    }
 
-   Print("VELTRIX SAFE MODE: market health monitoring only. No order APIs are called.");
+   Print("VELTRIX SAFE MODE: market health monitoring only. Risk allocator is calculation-only; no order APIs are called.");
    return INIT_SUCCEEDED;
 }
 
