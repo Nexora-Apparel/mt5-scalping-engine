@@ -115,6 +115,39 @@ jobs:
           }
           Write-Host "VELTRIX read-only foundation compilation succeeded."
 
+
+      - name: Compile dataset exporter runtime test script
+        shell: pwsh
+        run: |
+          $source = (Resolve-Path "MQL5\\Scripts\\FeatureDatasetExporterRuntimeTest.mq5").Path
+          $log = Join-Path (Split-Path $source) "FeatureDatasetExporterRuntimeTest.log"
+          if (Test-Path $log) { Remove-Item $log -Force }
+          $arguments = @('/compile:"' + $source + '"', '/log')
+          Write-Host "Compiling terminal-side CSV runtime test; execution remains a separate MT5 runtime check."
+          $process = Start-Process -FilePath $env:METAEDITOR -ArgumentList $arguments -Wait -PassThru
+          Start-Sleep -Seconds 2
+          if (!(Test-Path $log)) { throw "MetaEditor did not produce the runtime-test compilation log." }
+          Get-Content $log
+          $logText = Get-Content $log -Raw
+          if ($logText -match "(?i)\b[1-9]\d* errors?\b" -or $logText -notmatch "(?i)0 errors?") {
+            throw "Dataset runtime-test script did not compile cleanly."
+          }
+          if ($logText -match "(?i)\b[1-9]\d* warnings?\b") {
+            throw "Dataset runtime-test script reported compiler warnings."
+          }
+          $compiled = Join-Path (Split-Path $source) "FeatureDatasetExporterRuntimeTest.ex5"
+          if (!(Test-Path $compiled)) { throw "Runtime-test script EX5 artifact was not created." }
+          Write-Host "Dataset runtime-test script compiled; terminal file I/O is tested separately."
+
+      - name: Upload dataset runtime-test script artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Veltrix-dataset-export-runtime-test
+          path: MQL5/Scripts/FeatureDatasetExporterRuntimeTest.ex5
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload compiled EA artifact
         if: success()
         uses: actions/upload-artifact@v4

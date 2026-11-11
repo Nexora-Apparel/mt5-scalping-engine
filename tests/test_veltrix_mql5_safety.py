@@ -402,3 +402,26 @@ def test_feature_dataset_exporter_rejects_unsafe_paths_and_schema_mismatch():
     assert "FileSeek(handle,0,SEEK_END)" in source
     assert "Existing CSV header does not match expected schema" in source
     assert 'StringSubstr(filename,length-4,4)!=".csv"' in source
+
+
+DATASET_RUNTIME_TEST_SOURCE = ROOT / "MQL5" / "Scripts" / "FeatureDatasetExporterRuntimeTest.mq5"
+
+
+def test_dataset_runtime_script_is_read_only_and_checks_cleanup():
+    source = DATASET_RUNTIME_TEST_SOURCE.read_text(encoding="utf-8")
+    required = (
+        "CVxFeatureDatasetExporter", "AppendSnapshot",
+        "FileOpen", "FileReadString", "FileDelete",
+        "veltrix_dataset_export_runtime_test.result",
+        "invalid symbol was accepted", "mismatched existing CSV header was accepted", "FileIsExist",
+        "DATASET RUNTIME TEST PASS",
+    )
+    for token in required:
+        assert token.lower() in source.lower()
+    lowered = source.lower()
+    forbidden = (
+        "ordersend(", "ordercheck(", "trade_action_deal",
+        "trade_action_pending", "ctrade", "positionopen(",
+        "positionclose(", "positionmodify(",
+    )
+    assert not [token for token in forbidden if token in lowered]
