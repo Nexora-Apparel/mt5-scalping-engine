@@ -9,6 +9,7 @@
 
 #include "..\\Include\\Veltrix\\MarketGuard.mqh"
 #include "..\\Include\\Veltrix\\RiskAllocator.mqh"
+#include "..\\Include\\Veltrix\\PositionRegistry.mqh"
 
 input ulong  MaxQuoteAgeMilliseconds = 2500;
 input double MaxSpreadPoints        = 50.0;
