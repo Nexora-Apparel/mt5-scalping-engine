@@ -2,6 +2,12 @@ name: MQL5 compile check
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "MQL5/**/*.mq5"
+      - "MQL5/**/*.mqh"
+      - ".github/workflows/mql5-compile.yml"
   push:
     branches: [main]
     paths:
@@ -82,11 +88,47 @@ jobs:
           }
           Write-Host "MQL5 compilation succeeded. This verifies compilation only, not strategy performance."
 
+      - name: Compile VeltrixScalper read-only foundation
+        shell: pwsh
+        run: |
+          $source = (Resolve-Path "MQL5\Experts\VeltrixScalper.mq5").Path
+          $log = Join-Path (Split-Path $source) "VeltrixScalper.log"
+          if (Test-Path $log) { Remove-Item $log -Force }
+          $arguments = @('/compile:"' + $source + '"', '/log')
+          Write-Host "Compiling read-only VELTRIX foundation; no account is configured and no order APIs are present."
+          $process = Start-Process -FilePath $env:METAEDITOR -ArgumentList $arguments -Wait -PassThru
+          Start-Sleep -Seconds 2
+          if (!(Test-Path $log)) {
+            throw "MetaEditor did not produce a VELTRIX compilation log. Process exit code: $($process.ExitCode)"
+          }
+          Get-Content $log
+          $logText = Get-Content $log -Raw
+          if ($logText -match "(?i)\b[1-9]\d* errors?\b" -or $logText -notmatch "(?i)0 errors?") {
+            throw "VELTRIX MQL5 compilation did not report zero errors."
+          }
+          if ($logText -match "(?i)\b[1-9]\d* warnings?\b") {
+            throw "VELTRIX MQL5 compilation reported warnings; resolve them before proceeding."
+          }
+          $compiled = Join-Path (Split-Path $source) "VeltrixScalper.ex5"
+          if (!(Test-Path $compiled)) {
+            throw "Compiler reported no errors but did not create VeltrixScalper.ex5."
+          }
+          Write-Host "VELTRIX read-only foundation compilation succeeded."
+
       - name: Upload compiled EA artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: NexoraScalper-compiled
           path: MQL5/Experts/NexoraScalper.ex5
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload compiled VELTRIX foundation artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: VeltrixScalper-read-only-compiled
+          path: MQL5/Experts/VeltrixScalper.ex5
           if-no-files-found: error
           retention-days: 14
