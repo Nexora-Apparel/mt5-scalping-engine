@@ -39,15 +39,48 @@ int OnInit()
 {
    if(EnableDatasetCollection)
    {
-      bool expected_account=(ExpectedDemoLogin>0 &&
-                             ExpectedDemoServer!="" &&
-                             TerminalInfoInteger(TERMINAL_CONNECTED) &&
-                             AccountInfoInteger(ACCOUNT_LOGIN)==ExpectedDemoLogin &&
-                             AccountInfoInteger(ACCOUNT_TRADE_MODE)==ACCOUNT_TRADE_MODE_DEMO &&
-                             AccountInfoString(ACCOUNT_SERVER)==ExpectedDemoServer);
-      if(!expected_account)
+      long actual_login=(long)AccountInfoInteger(ACCOUNT_LOGIN);
+      long actual_trade_mode=(long)AccountInfoInteger(ACCOUNT_TRADE_MODE);
+      string actual_server=AccountInfoString(ACCOUNT_SERVER);
+      bool terminal_connected=(bool)TerminalInfoInteger(TERMINAL_CONNECTED);
+      bool login_match=(ExpectedDemoLogin>0 && actual_login==ExpectedDemoLogin);
+      bool server_configured=(ExpectedDemoServer!="");
+      bool server_match=(server_configured && actual_server==ExpectedDemoServer);
+      bool demo_mode=(actual_trade_mode==ACCOUNT_TRADE_MODE_DEMO);
+      PrintFormat("DATASET ACCOUNT DIAGNOSTIC | expected_login=%I64d actual_login=%I64d login_match=%s expected_server=%s actual_server=%s server_configured=%s server_match=%s trade_mode=%I64d demo_mode=%s terminal_connected=%s symbol=%s",
+                  ExpectedDemoLogin,actual_login,(login_match ? "true" : "false"),
+                  ExpectedDemoServer,actual_server,(server_configured ? "true" : "false"),
+                  (server_match ? "true" : "false"),actual_trade_mode,
+                  (demo_mode ? "true" : "false"),
+                  (terminal_connected ? "true" : "false"),_Symbol);
+      if(ExpectedDemoLogin<=0)
       {
-         Print("DATASET DEMO ACCOUNT GUARD FAILED: collection requires the exact connected DEMO account and configured server");
+         Print("DATASET DEMO ACCOUNT GUARD FAILED: expected demo login is missing or invalid");
+         return INIT_FAILED;
+      }
+      if(!server_configured)
+      {
+         Print("DATASET DEMO ACCOUNT GUARD FAILED: expected demo server is missing");
+         return INIT_FAILED;
+      }
+      if(!terminal_connected)
+      {
+         Print("DATASET DEMO ACCOUNT GUARD FAILED: terminal is not connected to the broker");
+         return INIT_FAILED;
+      }
+      if(!login_match)
+      {
+         Print("DATASET DEMO ACCOUNT GUARD FAILED: connected account login does not match configured demo login");
+         return INIT_FAILED;
+      }
+      if(!demo_mode)
+      {
+         Print("DATASET DEMO ACCOUNT GUARD FAILED: connected account trade mode is not DEMO");
+         return INIT_FAILED;
+      }
+      if(!server_match)
+      {
+         Print("DATASET DEMO ACCOUNT GUARD FAILED: connected broker server does not exactly match configured server");
          return INIT_FAILED;
       }
       Print("DATASET DEMO ACCOUNT GUARD PASSED: exact configured DEMO account verified; automated trading disabled");
