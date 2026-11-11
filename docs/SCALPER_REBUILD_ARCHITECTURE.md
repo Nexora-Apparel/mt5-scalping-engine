@@ -6,7 +6,7 @@ Architecture baseline only. The existing `NexoraScalper.mq5` is a legacy prototy
 
 The Exness connectivity workflow is a separate infrastructure check. A successful login does not validate a trading strategy or authorize trading.
 
-The first replacement-code increment now exists: `VeltrixScalper.mq5` and `MarketGuard.mqh` implement read-only broker metadata discovery and quote-health checks. This increment contains no order-submission API. Its first MetaEditor compile and Python safety tests are running in PR CI; it is not considered compiler-verified until those checks pass. The initial 2,500 ms quote-age and 50-point spread limits are conservative placeholders for health monitoring, not approved trading thresholds.
+The read-only replacement foundation (`VeltrixScalper.mq5` plus `MarketGuard.mqh`) and calculation-only `RiskAllocator.mqh` have passed MetaEditor compilation in the corrected PR #4 head (MQL5 Compile Check #48). Project Tests #63 also passed, including regression coverage for NaN and positive/negative infinity across all numeric risk inputs. The allocator remains calculation-only: neither module submits orders. The initial 2,500 ms quote-age and 50-point spread limits are conservative placeholders for health monitoring, not approved trading thresholds.
 
 ## Product constraints
 
