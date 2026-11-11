@@ -2,7 +2,7 @@
 
 ## Current milestone: Exness demo connectivity only
 
-The workflow `.github/workflows/exness-demo-connectivity.yml` starts a temporary Windows GitHub-hosted runner, installs the generic MetaTrader 5 terminal, and attempts to authenticate to the supplied Exness MT5 demo server.
+The workflow `.github/workflows/exness-demo-connectivity.yml` starts a temporary Windows GitHub-hosted runner, installs the official Exness MetaTrader 5 terminal, and attempts to authenticate to the supplied Exness MT5 demo server.
 
 It is intentionally **not a trading workflow**:
 
