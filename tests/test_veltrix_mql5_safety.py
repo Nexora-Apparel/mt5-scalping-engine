@@ -345,3 +345,51 @@ def test_feature_reference_vectors_use_only_observations_at_or_before_evaluation
     eligible = [t for t in timestamps if t <= evaluation_time]
     assert eligible == [1000, 1100, 1200]
     assert 1300 not in eligible
+
+
+EXPORTER_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "FeatureDatasetExporter.mqh"
+
+
+def test_feature_dataset_exporter_is_versioned_provenance_aware_and_read_only():
+    source = EXPORTER_SOURCE.read_text(encoding="utf-8")
+    required = (
+        "CVxFeatureDatasetExporter", "AppendSnapshot",
+        "VX_FEATURE_DATASET_SCHEMA_VERSION",
+        "VX_FEATURE_CALCULATION_VERSION", "source_id",
+        "quote_time_msc", "window_start_msc",
+        "evaluation_time_msc", "momentum_bps",
+        "realized_volatility_bps", "efficiency_ratio",
+        "FileWrite", "FileFlush", "FILE_CSV",
+        "XAUUSD", "XAGUSD", "SafeFileName",
+        "FileReadString", "Existing CSV header does not match expected schema",
+    )
+    for token in required:
+        assert token.lower() in source.lower()
+    lowered = source.lower()
+    forbidden = (
+        "ordersend(", "ordercheck(", "trade_action_deal",
+        "trade_action_pending", "ctrade", "positionopen(",
+        "positionclose(", "positionmodify(",
+    )
+    assert not [token for token in forbidden if token in lowered]
+
+
+def test_feature_dataset_exporter_is_compiled_but_not_activated():
+    source = EA_SOURCE.read_text(encoding="utf-8")
+    assert "FeatureDatasetExporter.mqh" in source
+    lowered = source.lower()
+    forbidden = ("ordersend(", "ordercheck(", "trade_action_deal",
+                 "trade_action_pending", "ctrade")
+    assert not [token for token in forbidden if token in lowered]
+
+
+def test_feature_dataset_schema_preserves_ordering_and_version_identity():
+    schema = [
+        "schema_version", "feature_version", "source_id", "symbol",
+        "quote_time_msc", "window_start_msc", "evaluation_time_msc",
+        "bid", "ask", "momentum_bps", "realized_volatility_bps",
+        "efficiency_ratio", "observations",
+    ]
+    assert len(schema) == len(set(schema))
+    assert schema.index("quote_time_msc") < schema.index("evaluation_time_msc")
+    assert "source_id" in schema and "feature_version" in schema
