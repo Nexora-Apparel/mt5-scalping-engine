@@ -417,7 +417,7 @@ def test_dataset_runtime_script_is_read_only_and_checks_cleanup():
         "veltrix_dataset_export_runtime_test.result",
         "invalid symbol was accepted", "mismatched existing CSV header was accepted", "FileIsExist",
         "DATASET RUNTIME TEST PASS", "CVxFeaturePipeline",
-        "runtime-pipeline-session", "pipeline.RowsWritten()!=2",
+        "runtime-pipeline-session", "pipeline.RowsWritten()!=2", "pipeline CSV read-back or chronology check failed",
     )
     for token in required:
         assert token.lower() in source.lower()
