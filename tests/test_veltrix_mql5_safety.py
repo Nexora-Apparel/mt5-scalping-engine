@@ -266,6 +266,7 @@ def test_strategy_research_engine_is_isolated_and_candidate_only():
     for token in required:
         assert token in source
     assert "snapshot.feature_window_start_msc>snapshot.quote_time_msc" in source
+    assert "snapshot.quote_time_msc-snapshot.feature_window_start_msc" in source
     assert "MathIsValidNumber(midpoint)" in source
     lowered = source.lower()
     forbidden = (

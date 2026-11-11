@@ -119,7 +119,7 @@ public:
          reason="Bid/ask snapshot is invalid or crossed";
       else if(snapshot.feature_window_start_msc<=0 ||
               snapshot.feature_window_start_msc>snapshot.quote_time_msc ||
-              (ulong)(snapshot.evaluation_time_msc-snapshot.feature_window_start_msc)<config.lookback_ms)
+              (ulong)(snapshot.quote_time_msc-snapshot.feature_window_start_msc)<config.lookback_ms)
          reason="Feature window does not end after its quote or cover the configured lookback";
       else if(snapshot.observations<config.min_observations)
          reason="Insufficient observations for the configured lookback";
