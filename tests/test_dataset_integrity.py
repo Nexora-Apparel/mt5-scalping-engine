@@ -98,3 +98,13 @@ def test_utf8_bom_is_accepted_but_invalid_encoding_is_rejected(tmp_path):
     path.write_bytes(b"\xff\xfe\xff")
     with pytest.raises(audit_module.DatasetIntegrityError, match="UTF-8"):
         audit_module.audit_dataset(path)
+
+
+def test_integrity_audit_does_not_mutate_source_dataset(tmp_path):
+    path = tmp_path / "immutable.csv"
+    write_csv(path, [record(), record(quote=1200, window=700, evaluation=1300)])
+    before = path.read_bytes()
+    manifest = audit_module.audit_dataset(path)
+    after = path.read_bytes()
+    assert manifest["status"] == "PASS"
+    assert before == after
