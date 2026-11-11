@@ -145,12 +145,16 @@ public:
          return false;
       }
       long server_age=(long)server_now*1000-snapshot.tick.time_msc;
-      snapshot.broker_quote_age_ms=server_age;
-      if(server_age<0 || (ulong)server_age>m_max_quote_age_ms)
+      // TimeTradeServer() has one-second resolution. Add 999ms to form a
+      // conservative upper bound rather than falsely rejecting a fresh tick
+      // whose millisecond timestamp is later within the current second.
+      long conservative_age=server_age+999;
+      if(conservative_age<0 || (ulong)conservative_age>m_max_quote_age_ms)
       {
          reason="Quote timestamp is stale or ahead of broker time";
          return false;
       }
+      snapshot.broker_quote_age_ms=(conservative_age>0 ? conservative_age : 0);
 
       ulong local_now=GetTickCount64();
       if(snapshot.tick.time_msc!=m_last_tick_msc)
