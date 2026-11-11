@@ -34,3 +34,13 @@ def test_session_disables_automated_trading_and_audits_dataset():
     assert "ExpectedDemoLogin=" in source
     assert "ExpectedDemoServer=" in source
     assert "Dataset integrity audit failed" in source
+
+
+def test_startup_failure_emits_terminal_and_expert_diagnostics():
+    source = WORKFLOW.read_text(encoding="utf-8")
+    assert 'C:\\MT5\\MQL5\\Logs' in source
+    assert 'C:\\MT5\\Logs' in source
+    assert "function Show-MT5Diagnostics" in source
+    assert "Get-Content $file.FullName -Tail 80" in source
+    assert "DATASET ACCOUNT DIAGNOSTIC" in source
+    assert "DATASET COLLECTION FAULTED" in source
