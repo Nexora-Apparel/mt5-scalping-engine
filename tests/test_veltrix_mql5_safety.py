@@ -44,6 +44,7 @@ def test_veltrix_ea_uses_repository_relative_includes_and_timer():
                     "BrokerReconciler.mqh", "ExecutionCoordinator.mqh"):
         assert f'#include "..\\\\Include\\\\Veltrix\\\\{include}"' in source
     assert "StrategyResearch.mqh" in source
+    assert "FeaturePipeline.mqh" in source
     assert "EventSetMillisecondTimer" in source
     assert "EventKillTimer" in source
 
@@ -425,5 +426,45 @@ def test_dataset_runtime_script_is_read_only_and_checks_cleanup():
         "ordersend(", "ordercheck(", "trade_action_deal",
         "trade_action_pending", "ctrade", "positionopen(",
         "positionclose(", "positionmodify(",
+    )
+    assert not [token for token in forbidden if token in lowered]
+
+
+PIPELINE_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "FeaturePipeline.mqh"
+
+
+def test_feature_pipeline_is_optional_point_in_time_and_fail_closed():
+    source = PIPELINE_SOURCE.read_text(encoding="utf-8")
+    required = (
+        "CVxFeaturePipeline", "CVxFeatureCollector",
+        "CVxFeatureDatasetExporter", "ProcessQuote", "BuildSnapshot",
+        "AppendSnapshot", "ValidSourceId", "ValidFileName",
+        "m_last_quote_msc", "m_last_export_msc", "m_faulted",
+        "m_rows_written", "Collecting warm-up history",
+        "snapshot.evaluation_time_msc=tick.time_msc",
+    )
+    for token in required:
+        assert token.lower() in source.lower()
+    lowered = source.lower()
+    forbidden = (
+        "ordersend(", "ordercheck(", "trade_action_deal",
+        "trade_action_pending", "ctrade", "positionopen(",
+        "positionclose(", "positionmodify(",
+    )
+    assert not [token for token in forbidden if token in lowered]
+
+
+def test_ea_dataset_collection_is_explicitly_disabled_by_default():
+    source = EA_SOURCE.read_text(encoding="utf-8")
+    assert "input bool   EnableDatasetCollection = false;" in source
+    assert "if(EnableDatasetCollection && healthy" in source
+    assert "g_feature_pipeline.ProcessQuote" in source
+    assert "g_feature_pipeline.Init" in source
+    assert "FeaturePipeline.mqh" in source
+    lowered = source.lower()
+    forbidden = (
+        "ordersend(", "ordercheck(", "trade_action_deal",
+        "trade_action_pending", "ctrade", "positionclose(",
+        "positionmodify(",
     )
     assert not [token for token in forbidden if token in lowered]

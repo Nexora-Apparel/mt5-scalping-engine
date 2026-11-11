@@ -162,6 +162,49 @@ void OnStart()
       return;
    }
 
+   FileDelete("veltrix_pipeline_runtime_test.csv");
+   CVxFeaturePipeline pipeline;
+   string pipeline_reason;
+   if(!pipeline.Init("XAUUSD","runtime-pipeline-session",
+                     "veltrix_pipeline_runtime_test.csv",
+                     60000,2500,10,1000,pipeline_reason))
+   {
+      Fail("pipeline init | "+pipeline_reason);
+      return;
+   }
+
+   int pipeline_rows=0;
+   for(int i=0;i<=61;i++)
+   {
+      MqlTick synthetic;
+      ZeroMemory(synthetic);
+      synthetic.time_msc=now+(long)i*1000;
+      synthetic.bid=2000.0+(double)i*0.01;
+      synthetic.ask=synthetic.bid+0.2;
+      bool row_written=false;
+      if(!pipeline.ProcessQuote("XAUUSD",synthetic,row_written,pipeline_reason))
+      {
+         FileDelete("veltrix_pipeline_runtime_test.csv");
+         Fail("pipeline quote processing | "+pipeline_reason);
+         return;
+      }
+      if(row_written)
+         pipeline_rows++;
+   }
+   if(pipeline.RowsWritten()!=2 || pipeline_rows!=2 ||
+      !FileIsExist("veltrix_pipeline_runtime_test.csv"))
+   {
+      FileDelete("veltrix_pipeline_runtime_test.csv");
+      Fail("pipeline did not export exactly two chronological warm-up-complete rows");
+      return;
+   }
+   if(!FileDelete("veltrix_pipeline_runtime_test.csv") ||
+      FileIsExist("veltrix_pipeline_runtime_test.csv"))
+   {
+      Fail("pipeline dataset cleanup failed");
+      return;
+   }
+
    Print("DATASET RUNTIME TEST PASS | exporter and pipeline create, append, reject-invalid, read-back, cleanup");
    WriteRuntimeResult("PASS | exporter and pipeline create, append, reject-invalid, read-back, cleanup");
 }
