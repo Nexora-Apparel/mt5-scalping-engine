@@ -46,3 +46,12 @@ def test_startup_failure_emits_terminal_and_expert_diagnostics():
     assert "DATASET ACCOUNT DIAGNOSTIC" in expert_source
     assert "DATASET COLLECTION FAULTED" in expert_source
     assert "DATASET COLLECTION FAULTED" in workflow_source
+
+
+def test_demo_guard_waits_for_broker_connection_before_reading_account_mode():
+    source = (ROOT / "MQL5" / "Experts" / "VeltrixScalper.mq5").read_text(encoding="utf-8")
+    assert "for(int attempt=0; attempt<90; attempt++)" in source
+    assert "TERMINAL_CONNECTED" in source
+    assert "Sleep(1000)" in source
+    assert source.index("if(!terminal_connected)") < source.index("if(!demo_mode)")
+    assert "broker connection did not complete within 90 seconds" in source

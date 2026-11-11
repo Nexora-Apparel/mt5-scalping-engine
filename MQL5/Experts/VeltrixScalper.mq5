@@ -39,33 +39,50 @@ int OnInit()
 {
    if(EnableDatasetCollection)
    {
-      long actual_login=(long)AccountInfoInteger(ACCOUNT_LOGIN);
-      long actual_trade_mode=(long)AccountInfoInteger(ACCOUNT_TRADE_MODE);
-      string actual_server=AccountInfoString(ACCOUNT_SERVER);
-      bool terminal_connected=(bool)TerminalInfoInteger(TERMINAL_CONNECTED);
-      bool login_match=(ExpectedDemoLogin>0 && actual_login==ExpectedDemoLogin);
-      bool server_configured=(ExpectedDemoServer!="");
-      bool server_match=(server_configured && actual_server==ExpectedDemoServer);
-      bool demo_mode=(actual_trade_mode==ACCOUNT_TRADE_MODE_DEMO);
-      PrintFormat("DATASET ACCOUNT DIAGNOSTIC | expected_login=%I64d actual_login=%I64d login_match=%s expected_server=%s actual_server=%s server_configured=%s server_match=%s trade_mode=%I64d demo_mode=%s terminal_connected=%s symbol=%s",
-                  ExpectedDemoLogin,actual_login,(login_match ? "true" : "false"),
-                  ExpectedDemoServer,actual_server,(server_configured ? "true" : "false"),
-                  (server_match ? "true" : "false"),actual_trade_mode,
-                  (demo_mode ? "true" : "false"),
-                  (terminal_connected ? "true" : "false"),_Symbol);
       if(ExpectedDemoLogin<=0)
       {
          Print("DATASET DEMO ACCOUNT GUARD FAILED: expected demo login is missing or invalid");
          return INIT_FAILED;
       }
-      if(!server_configured)
+      if(ExpectedDemoServer=="")
       {
          Print("DATASET DEMO ACCOUNT GUARD FAILED: expected demo server is missing");
          return INIT_FAILED;
       }
+
+      // MT5 may attach the EA before its asynchronous broker login completes.
+      // Wait a bounded period; never treat disconnected/default account data as valid.
+      bool terminal_connected=false;
+      for(int attempt=0; attempt<90; attempt++)
+      {
+         terminal_connected=(bool)TerminalInfoInteger(TERMINAL_CONNECTED);
+         if(terminal_connected)
+            break;
+         if(IsStopped())
+         {
+            Print("DATASET DEMO ACCOUNT GUARD FAILED: EA stopped while waiting for broker connection");
+            return INIT_FAILED;
+         }
+         if(attempt==0 || (attempt+1)%15==0)
+            PrintFormat("DATASET CONNECTION WAIT | attempt=%d/90 connected=false",attempt+1);
+         Sleep(1000);
+      }
+
+      long actual_login=(long)AccountInfoInteger(ACCOUNT_LOGIN);
+      long actual_trade_mode=(long)AccountInfoInteger(ACCOUNT_TRADE_MODE);
+      string actual_server=AccountInfoString(ACCOUNT_SERVER);
+      bool login_match=(ExpectedDemoLogin>0 && actual_login==ExpectedDemoLogin);
+      bool server_match=(ExpectedDemoServer==actual_server);
+      bool demo_mode=(actual_trade_mode==ACCOUNT_TRADE_MODE_DEMO);
+      terminal_connected=(bool)TerminalInfoInteger(TERMINAL_CONNECTED);
+      PrintFormat("DATASET ACCOUNT DIAGNOSTIC | expected_login=%I64d actual_login=%I64d login_match=%s expected_server=%s actual_server=%s server_match=%s trade_mode=%I64d demo_mode=%s terminal_connected=%s symbol=%s",
+                  ExpectedDemoLogin,actual_login,(login_match ? "true" : "false"),
+                  ExpectedDemoServer,actual_server,(server_match ? "true" : "false"),
+                  actual_trade_mode,(demo_mode ? "true" : "false"),
+                  (terminal_connected ? "true" : "false"),_Symbol);
       if(!terminal_connected)
       {
-         Print("DATASET DEMO ACCOUNT GUARD FAILED: terminal is not connected to the broker");
+         Print("DATASET DEMO ACCOUNT GUARD FAILED: broker connection did not complete within 90 seconds");
          return INIT_FAILED;
       }
       if(!login_match)
@@ -83,7 +100,7 @@ int OnInit()
          Print("DATASET DEMO ACCOUNT GUARD FAILED: connected broker server does not exactly match configured server");
          return INIT_FAILED;
       }
-      Print("DATASET DEMO ACCOUNT GUARD PASSED: exact configured DEMO account verified; automated trading disabled");
+      Print("DATASET DEMO ACCOUNT GUARD PASSED: exact configured DEMO account verified; data collection only; no order submission");
    }
    if(!g_market.Init(_Symbol,MaxQuoteAgeMilliseconds,MaxSpreadPoints))
    {
