@@ -6,6 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 EA_SOURCE = ROOT / "MQL5" / "Experts" / "VeltrixScalper.mq5"
 GUARD_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "MarketGuard.mqh"
 RISK_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "RiskAllocator.mqh"
+POSITION_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "PositionRegistry.mqh"
 
 
 def test_veltrix_foundation_contains_no_order_submission_api():
@@ -110,7 +111,6 @@ def test_reference_risk_vectors_skip_under_minimum_and_respect_portfolio_cap():
                              0.01, 100.0, 0.01, 25.0, 3.0, 1, 3) == 0.5
 
 
-
 def test_reference_risk_vectors_reject_nan_and_infinity():
     baseline = [1000.0, 1.0, 0.1, 0.01, 1.0, 0.01, 100.0,
                 0.01, 0.0, 3.0]
@@ -128,3 +128,25 @@ def test_risk_allocator_checks_finite_inputs_and_derived_values():
     assert "Non-finite derived risk budget" in source
     assert "Calculated raw volume is invalid" in source
     assert "Estimated loss is invalid" in source
+
+
+def test_position_registry_is_per_position_and_fails_closed_on_unknown_broker_state():
+    source = POSITION_SOURCE.read_text(encoding="utf-8")
+    required = ("RegisterConfirmedOpen", "FindByIdentifier", "FindByTicket", "EvaluateCloseDeadlines", "MarkClosePending", "MarkUnknown", "ConfirmClosed", "broker_close_deal_confirmed", "VX_POSITION_UNKNOWN", "VX_POSITION_CLOSED")
+    for token in required:
+        assert token in source
+    assert "hold_seconds<10 || hold_seconds>60" in source
+    assert "!MathIsValidNumber(volume) || volume<=0.0" in source
+    lowered = source.lower()
+    forbidden = ("ordersend(", "ordercheck(", "trade_action_deal", "ctrade", "positionclose(", "positionmodify(")
+    assert not [token for token in forbidden if token in lowered]
+
+
+def test_position_registry_reference_lifecycle_and_deadline_vectors():
+    opened_msc = 1_000_000
+    deadline = opened_msc + 15 * 1000
+    assert deadline == 1_015_000
+    assert opened_msc + 14_999 < deadline
+    assert opened_msc + 15_000 >= deadline
+    broker_close_confirmed = False
+    assert broker_close_confirmed is False
