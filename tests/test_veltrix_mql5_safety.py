@@ -292,3 +292,55 @@ def test_strategy_research_reference_gates_reject_stale_spread_and_weak_momentum
     assert evaluate(100, 2.0, 1.9) == "MOMENTUM"
     assert evaluate(100, 2.0, 2.1) == "CANDIDATE"
     assert evaluate(100, 2.0, -2.1) == "CANDIDATE"
+
+
+FEATURE_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "FeatureCollector.mqh"
+
+
+def test_feature_collector_is_point_in_time_symbol_isolated_and_read_only():
+    source = FEATURE_SOURCE.read_text(encoding="utf-8")
+    required = (
+        "CVxFeatureCollector", "VxFeatureCollectorConfig",
+        "VxQuoteObservation", "PushQuote", "BuildSnapshot",
+        "XAUUSD", "XAGUSD", "time_msc", "MathLog",
+        "MathSqrt", "momentum_bps", "realized_volatility_bps",
+        "efficiency_ratio", "complete lookback", "out of order",
+        "evaluation_time_msc", "MathIsValidNumber",\n        "Feature accumulation overflowed or became non-finite",
+    )
+    for token in required:
+        assert token.lower() in source.lower()
+    lowered = source.lower()
+    forbidden = (
+        "ordersend(", "ordercheck(", "trade_action_deal",
+        "trade_action_pending", "ctrade", "positionopen(",
+        "positionclose(", "positionmodify(",
+    )
+    assert not [token for token in forbidden if token in lowered]
+
+
+def test_feature_collector_is_included_without_enabling_execution():
+    source = EA_SOURCE.read_text(encoding="utf-8")
+    assert "FeatureCollector.mqh" in source
+    lowered = source.lower()
+    forbidden = ("ordersend(", "ordercheck(", "trade_action_deal",
+                 "trade_action_pending", "ctrade")
+    assert not [token for token in forbidden if token in lowered]
+
+
+def test_feature_reference_vectors_use_only_observations_at_or_before_evaluation():
+    prices = [2000.0, 2000.2, 2000.1, 2000.4]
+    log_returns = [math.log(prices[i] / prices[i - 1])
+                   for i in range(1, len(prices))]
+    momentum_bps = math.log(prices[-1] / prices[0]) * 10000
+    realized_volatility_bps = math.sqrt(sum(x * x for x in log_returns)) * 10000
+    path = sum(abs(prices[i] - prices[i - 1])
+               for i in range(1, len(prices)))
+    efficiency = abs(prices[-1] - prices[0]) / path
+    assert momentum_bps > 0
+    assert realized_volatility_bps > 0
+    assert 0 <= efficiency <= 1
+    timestamps = [1000, 1100, 1200, 1300]
+    evaluation_time = 1250
+    eligible = [t for t in timestamps if t <= evaluation_time]
+    assert eligible == [1000, 1100, 1200]
+    assert 1300 not in eligible

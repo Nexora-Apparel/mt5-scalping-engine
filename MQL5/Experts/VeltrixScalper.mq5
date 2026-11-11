@@ -14,6 +14,7 @@
 #include "..\\Include\\Veltrix\\BrokerReconciler.mqh"
 #include "..\\Include\\Veltrix\\ExecutionCoordinator.mqh"
 #include "..\\Include\\Veltrix\\StrategyResearch.mqh"
+#include "..\\Include\\Veltrix\\FeatureCollector.mqh"
 
 input ulong  MaxQuoteAgeMilliseconds = 2500;
 input double MaxSpreadPoints        = 50.0;
