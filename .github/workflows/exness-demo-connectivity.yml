@@ -36,13 +36,13 @@ jobs:
           }
           Write-Host "Required MT5 demo credentials are present."
 
-      - name: Download and install MetaTrader 5
+      - name: Download and install the official Exness MetaTrader 5 terminal
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $installer = Join-Path $env:RUNNER_TEMP "mt5setup.exe"
           $installPath = "C:\MT5"
-          Invoke-WebRequest -Uri "https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe" -OutFile $installer
+          Invoke-WebRequest -Uri "https://download.terminal.free/cdn/web/exness.technologies.ltd/mt5/exness5setup.exe" -OutFile $installer
           if ((Get-Item $installer).Length -lt 1000000) {
             throw "MetaTrader installer download is incomplete."
           }
@@ -55,7 +55,7 @@ jobs:
             throw "MetaTrader terminal64.exe was not found after installation."
           }
           "MT5_TERMINAL=$terminal" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          Write-Host "MetaTrader terminal installed."
+          Write-Host "Official Exness MT5 terminal installed."
 
       - name: Start terminal with demo credentials and trading disabled
         id: connect
