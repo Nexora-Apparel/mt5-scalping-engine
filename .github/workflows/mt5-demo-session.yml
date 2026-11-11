@@ -144,19 +144,52 @@ jobs:
           Set-Content $config $ini -Encoding ASCII
           $process = Start-Process -FilePath $env:MT5_TERMINAL -ArgumentList @("/portable","/config:$config") -PassThru
           "MT5_PROCESS_ID=$($process.Id)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
-          $logDir = "C:\MT5\MQL5\Logs"
+          $expertLogDir = "C:\MT5\MQL5\Logs"
+          $terminalLogDir = "C:\MT5\Logs"
+          $logDirs = @($expertLogDir,$terminalLogDir)
+          function Show-MT5Diagnostics {
+            Write-Host "===== MT5 STARTUP DIAGNOSTICS (secrets redacted/not included) ====="
+            foreach ($dir in $logDirs) {
+              Write-Host "----- Log directory: $dir -----"
+              if (Test-Path $dir) {
+                $files = Get-ChildItem $dir -Filter "*.log" -File -ErrorAction SilentlyContinue |
+                  Sort-Object LastWriteTime -Descending | Select-Object -First 3
+                foreach ($file in $files) {
+                  Write-Host "----- $($file.Name) | $($file.LastWriteTime.ToString('o')) | last 80 lines -----"
+                  Get-Content $file.FullName -Tail 80 -ErrorAction SilentlyContinue |
+                    ForEach-Object { Write-Host $_ }
+                }
+              } else { Write-Host "Directory not present." }
+            }
+            Write-Host "===== END MT5 STARTUP DIAGNOSTICS ====="
+          }
           $deadline = (Get-Date).AddSeconds(180)
           $ready = $false
+          $failurePattern = "DATASET DEMO ACCOUNT GUARD FAILED|DATASET INIT FAILED|VELTRIX INIT FAILED|DATASET COLLECTION FAULTED"
           while ((Get-Date) -lt $deadline) {
-            $latest = Get-ChildItem $logDir -Filter "*.log" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-            if ($latest) {
-              $logText = Get-Content $latest.FullName -Raw -ErrorAction SilentlyContinue
-              if ($logText -match "DATASET DEMO ACCOUNT GUARD FAILED|DATASET INIT FAILED|VELTRIX INIT FAILED") { throw "VELTRIX refused the demo account or symbol." }
-              if ($logText -match "DATASET DEMO ACCOUNT GUARD PASSED" -and $logText -match "DATASET COLLECTION ENABLED") { $ready = $true; break }
+            $expertFiles = @()
+            if (Test-Path $expertLogDir) {
+              $expertFiles = Get-ChildItem $expertLogDir -Filter "*.log" -File -ErrorAction SilentlyContinue |
+                Sort-Object LastWriteTime -Descending | Select-Object -First 3
             }
+            foreach ($file in $expertFiles) {
+              $logText = Get-Content $file.FullName -Raw -ErrorAction SilentlyContinue
+              if ($logText -match $failurePattern) {
+                Show-MT5Diagnostics
+                throw "VELTRIX startup/collection guard reported a failure; inspect the diagnostic lines above."
+              }
+              if ($logText -match "DATASET DEMO ACCOUNT GUARD PASSED" -and $logText -match "DATASET COLLECTION ENABLED") {
+                $ready = $true
+                break
+              }
+            }
+            if ($ready) { break }
             Start-Sleep -Seconds 5
           }
-          if (!$ready) { throw "Demo account and collection startup were not confirmed." }
+          if (!$ready) {
+            Show-MT5Diagnostics
+            throw "Demo account and collection startup were not confirmed within 180 seconds."
+          }
           Write-Host "Demo collection started; credentials are not printed."
 
       - name: Collect for selected duration
