@@ -44,6 +44,6 @@ def test_market_guard_is_read_only_and_checks_quote_health():
 
 def test_veltrix_ea_uses_repository_relative_market_guard_include():
     source = EA_SOURCE.read_text(encoding="utf-8")
-    assert '#include "..\\Include\\Veltrix\\MarketGuard.mqh"' in source
+    assert r'#include "..\Include\Veltrix\MarketGuard.mqh"' in source
     assert "EventSetMillisecondTimer" in source
     assert "EventKillTimer" in source
