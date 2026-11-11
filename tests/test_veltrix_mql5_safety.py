@@ -155,7 +155,6 @@ def test_execution_guard_is_demo_only_preflight_without_submission():
     )
     for token in required:
         assert token.lower() in source.lower()
-    assert '#include "../Include/Veltrix/FeaturePipeline.mqh"' in source
     lowered = source.lower()
     forbidden = ("ordersend(", "ordercheck(", "trade_action_deal",
                  "trade_action_pending", "ctrade", "positionclose(",
@@ -418,7 +417,8 @@ def test_dataset_runtime_script_is_read_only_and_checks_cleanup():
         "veltrix_dataset_export_runtime_test.result",
         "invalid symbol was accepted", "mismatched existing CSV header was accepted", "FileIsExist",
         "DATASET RUNTIME TEST PASS", "CVxFeaturePipeline",
-        "runtime-pipeline-session", "pipeline.RowsWritten()!=2", "pipeline CSV read-back or chronology check failed",
+        "runtime-pipeline-session", "pipeline.RowsWritten()!=2",
+        "FeaturePipeline.mqh", "pipeline CSV read-back or chronology check failed",
     )
     for token in required:
         assert token.lower() in source.lower()
