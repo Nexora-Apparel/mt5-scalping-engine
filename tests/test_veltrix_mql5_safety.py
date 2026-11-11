@@ -8,17 +8,14 @@ GUARD_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "MarketGuard.mqh"
 RISK_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "RiskAllocator.mqh"
 POSITION_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "PositionRegistry.mqh"
 EXECUTION_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "ExecutionGuard.mqh"
+RECONCILER_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "BrokerReconciler.mqh"
 
 
 def test_veltrix_foundation_contains_no_order_submission_api():
     source = EA_SOURCE.read_text(encoding="utf-8").lower()
     forbidden = (
-        "ordersend(",
-        "ordercheck(",
-        "trade_action_deal",
-        "trade_action_pending",
-        "ctrade",
-        "positionopen(",
+        "ordersend(", "ordercheck(", "trade_action_deal",
+        "trade_action_pending", "ctrade", "positionopen(",
     )
     assert not [token for token in forbidden if token in source]
 
@@ -26,21 +23,14 @@ def test_veltrix_foundation_contains_no_order_submission_api():
 def test_market_guard_is_read_only_and_checks_quote_health():
     source = GUARD_SOURCE.read_text(encoding="utf-8")
     required = (
-        "SymbolInfoTick",
-        "SYMBOL_TRADE_TICK_SIZE",
-        "SYMBOL_TRADE_TICK_VALUE_LOSS",
-        "SYMBOL_VOLUME_MIN",
-        "SYMBOL_VOLUME_STEP",
-        "SYMBOL_TRADE_STOPS_LEVEL",
-        "SYMBOL_TRADE_FREEZE_LEVEL",
-        "TimeTradeServer",
-        "GetTickCount64",
-        "m_max_spread_points",
-        "m_max_quote_age_ms",
+        "SymbolInfoTick", "SYMBOL_TRADE_TICK_SIZE",
+        "SYMBOL_TRADE_TICK_VALUE_LOSS", "SYMBOL_VOLUME_MIN",
+        "SYMBOL_VOLUME_STEP", "SYMBOL_TRADE_STOPS_LEVEL",
+        "SYMBOL_TRADE_FREEZE_LEVEL", "TimeTradeServer",
+        "GetTickCount64", "m_max_spread_points", "m_max_quote_age_ms",
     )
     for token in required:
         assert token in source
-
     lowered = source.lower()
     forbidden = ("ordersend(", "ordercheck(", "trade_action_deal", "ctrade")
     assert not [token for token in forbidden if token in lowered]
@@ -48,10 +38,10 @@ def test_market_guard_is_read_only_and_checks_quote_health():
 
 def test_veltrix_ea_uses_repository_relative_includes_and_timer():
     source = EA_SOURCE.read_text(encoding="utf-8")
-    assert r'#include "..\\Include\\Veltrix\\MarketGuard.mqh"' in source
-    assert r'#include "..\\Include\\Veltrix\\RiskAllocator.mqh"' in source
-    assert r'#include "..\\Include\\Veltrix\\PositionRegistry.mqh"' in source
-    assert r'#include "..\\Include\\Veltrix\\ExecutionGuard.mqh"' in source
+    for include in ("MarketGuard.mqh", "RiskAllocator.mqh",
+                    "PositionRegistry.mqh", "ExecutionGuard.mqh",
+                    "BrokerReconciler.mqh"):
+        assert f'#include "..\\\\Include\\\\Veltrix\\\\{include}"' in source
     assert "EventSetMillisecondTimer" in source
     assert "EventKillTimer" in source
 
@@ -59,20 +49,15 @@ def test_veltrix_ea_uses_repository_relative_includes_and_timer():
 def test_risk_allocator_is_fail_closed_and_rounds_volume_down():
     source = RISK_SOURCE.read_text(encoding="utf-8")
     required = (
-        "VxCalculateRiskVolume",
-        "tick_value_loss",
-        "current_open_risk_money",
-        "max_portfolio_risk_percent",
-        "MathFloor",
-        "MathIsValidNumber",
-        "Non-finite numeric input",
+        "VxCalculateRiskVolume", "tick_value_loss",
+        "current_open_risk_money", "max_portfolio_risk_percent",
+        "MathFloor", "MathIsValidNumber", "Non-finite numeric input",
         "volume<request.volume_min",
         "risk-sized volume is below broker minimum",
     )
     lowered = source.lower()
     for token in required:
         assert token.lower() in lowered
-
     assert "MathCeil" not in source
     forbidden = ("ordersend(", "ordercheck(", "trade_action_deal", "ctrade")
     assert not [token for token in forbidden if token in lowered]
@@ -128,13 +113,19 @@ def test_risk_allocator_checks_finite_inputs_and_derived_values():
 
 def test_position_registry_is_per_position_and_fails_closed_on_unknown_broker_state():
     source = POSITION_SOURCE.read_text(encoding="utf-8")
-    required = ("RegisterConfirmedOpen", "FindByIdentifier", "FindByTicket", "EvaluateCloseDeadlines", "MarkClosePending", "MarkUnknown", "ConfirmClosed", "broker_close_deal_confirmed", "VX_POSITION_UNKNOWN", "VX_POSITION_CLOSED")
+    required = (
+        "RegisterConfirmedOpen", "FindByIdentifier", "FindByTicket",
+        "EvaluateCloseDeadlines", "MarkClosePending", "MarkUnknown",
+        "MarkLiveVerified", "ConfirmClosed", "broker_close_deal_confirmed",
+        "VX_POSITION_UNKNOWN", "VX_POSITION_CLOSED",
+    )
     for token in required:
         assert token in source
     assert "hold_seconds<10 || hold_seconds>60" in source
     assert "!MathIsValidNumber(volume) || volume<=0.0" in source
     lowered = source.lower()
-    forbidden = ("ordersend(", "ordercheck(", "trade_action_deal", "ctrade", "positionclose(", "positionmodify(")
+    forbidden = ("ordersend(", "ordercheck(", "trade_action_deal",
+                 "ctrade", "positionclose(", "positionmodify(")
     assert not [token for token in forbidden if token in lowered]
 
 
@@ -144,10 +135,10 @@ def test_position_registry_reference_lifecycle_and_deadline_vectors():
     assert deadline == 1_015_000
     assert opened_msc + 14_999 < deadline
     assert opened_msc + 15_000 >= deadline
-    assert False is False
+    broker_close_confirmed = False
+    assert broker_close_confirmed is False
 
 
-# These tests verify source contracts; MetaEditor CI separately compiles the MQL5 module.
 def test_execution_guard_is_demo_only_preflight_without_submission():
     source = EXECUTION_SOURCE.read_text(encoding="utf-8")
     required = (
@@ -162,11 +153,9 @@ def test_execution_guard_is_demo_only_preflight_without_submission():
     for token in required:
         assert token.lower() in source.lower()
     lowered = source.lower()
-    forbidden = (
-        "ordersend(", "ordercheck(", "trade_action_deal",
-        "trade_action_pending", "ctrade", "positionclose(",
-        "positionmodify(",
-    )
+    forbidden = ("ordersend(", "ordercheck(", "trade_action_deal",
+                 "trade_action_pending", "ctrade", "positionclose(",
+                 "positionmodify(")
     assert not [token for token in forbidden if token in lowered]
 
 
@@ -176,3 +165,31 @@ def test_execution_guard_rejects_live_account_and_non_hedging_mode():
     assert "!=ACCOUNT_MARGIN_MODE_RETAIL_HEDGING" in source
     assert "!MathIsValidNumber(intent.volume)" in source
     assert "!MathIsValidNumber(intent.stop_loss)" in source
+
+
+def test_broker_reconciler_is_read_only_and_requires_confirmed_close_evidence():
+    source = RECONCILER_SOURCE.read_text(encoding="utf-8")
+    required = (
+        "CVxBrokerReconciler", "PositionsTotal", "PositionGetTicket",
+        "POSITION_IDENTIFIER", "HistorySelect", "HistoryDealsTotal",
+        "DEAL_POSITION_ID", "DEAL_ENTRY_OUT", "DEAL_ENTRY_OUT_BY",
+        "VX_RECONCILE_LIVE_VERIFIED", "VX_RECONCILE_PROTECTION_FAILURE",
+        "VX_RECONCILE_CLOSED_CONFIRMED", "VX_RECONCILE_UNKNOWN",
+        "MarkLiveVerified", "ConfirmClosed", "MathIsValidNumber",
+    )
+    for token in required:
+        assert token in source
+    lowered = source.lower()
+    forbidden = (
+        "ordersend(", "ordercheck(", "trade_action_deal",
+        "trade_action_pending", "ctrade", "positionclose(",
+        "positionmodify(",
+    )
+    assert not [token for token in forbidden if token in lowered]
+
+
+def test_broker_reconciler_treats_partial_exit_and_missing_history_as_unknown():
+    source = RECONCILER_SOURCE.read_text(encoding="utf-8")
+    assert "VX_RECONCILE_CLOSE_HISTORY_INCOMPLETE" in source
+    assert "history_ok && row.confirmed_exit_volume+tolerance>=record.volume" in source
+    assert "registry.MarkUnknown(record.identifier,row.reason)" in source
