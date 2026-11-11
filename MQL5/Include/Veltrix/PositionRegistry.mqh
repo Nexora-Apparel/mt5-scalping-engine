@@ -164,6 +164,29 @@ public:
       return true;
    }
 
+   bool MarkLiveVerified(const long identifier,
+                         const ulong broker_ticket,
+                         const string reason)
+   {
+      int index=FindByIdentifier(identifier);
+      if(index<0 || broker_ticket==0 ||
+         m_records[index].state==VX_POSITION_CLOSED)
+         return false;
+
+      int ticket_owner=FindByTicket(broker_ticket);
+      if(ticket_owner>=0 && ticket_owner!=index)
+         return false;
+
+      m_records[index].ticket=broker_ticket;
+      if(m_records[index].state==VX_POSITION_UNKNOWN ||
+         m_records[index].state==VX_POSITION_PROTECTION_FAILURE)
+         m_records[index].state=VX_POSITION_OPEN;
+
+      m_records[index].last_reason=(reason=="" ?
+         "Live broker position re-verified" : reason);
+      return true;
+   }
+
    bool ConfirmClosed(const long identifier,
                       const bool broker_close_deal_confirmed,
                       const string reason)

@@ -6,7 +6,7 @@ Architecture baseline only. The existing `NexoraScalper.mq5` is a legacy prototy
 
 The Exness connectivity workflow is a separate infrastructure check. A successful login does not validate a trading strategy or authorize trading.
 
-The read-only replacement foundation (`VeltrixScalper.mq5` plus `MarketGuard.mqh`) and calculation-only `RiskAllocator.mqh` have passed MetaEditor compilation and Project Tests on their respective merged pull requests. The allocator is fail-closed for non-finite numeric inputs and derived values. The `PositionRegistry.mqh` module tracks broker-confirmed positions independently, enforces 10–60 second holding deadlines, and requires confirmed broker close evidence before marking a position closed. The current increment adds `ExecutionGuard.mqh`, a demo-only preflight that rejects live accounts, requires hedging mode, checks permissions, quote age, spread, stop distance, volume steps, and estimated margin reserve. It uses `OrderCalcMargin` only and contains no order-submission, modification, or closure API. This increment requires fresh compile and project-test validation. The initial 2,500 ms quote-age and 50-point spread limits remain placeholders, not approved trading thresholds.
+The read-only market foundation, calculation-only risk allocator, per-position lifecycle registry, and demo-only execution preflight have passed their respective compile and project-test gates. The current increment adds `BrokerReconciler.mqh`, a read-only reconciliation layer that compares registered positions with live broker positions and closing deal history. It distinguishes live verified, changed/partial volume, protection failure, confirmed closure, incomplete close history, and unknown outcomes. It never treats a missing live position alone as proof of closure. The reconciler is awaiting fresh compile and project-test validation. No order submission, modification, or closure API is introduced; demo/live trading remains disabled.
 
 ## Product constraints
 
@@ -81,10 +81,10 @@ Each position has a unique ticket/identifier and independent state:
 
 Failure states include `REJECTED`, `UNKNOWN`, and `PROTECTION_FAILURE`. Unknown outcomes must be reconciled against broker positions/deals before retrying; never blindly resubmit.
 
-- Preflight validates account mode, terminal permissions, quote freshness, spread, price drift, stop-loss direction/distance, take-profit direction, broker volume constraints, and estimated margin.
-- The guard is a pure preflight boundary; it does not send, modify, or close orders.
+- Demo preflight validates account mode, terminal permissions, quote freshness, spread, price drift, protective stop and target direction, broker volume constraints, and estimated margin.
+- Broker reconciliation checks live position identifiers, volume, protective stops, and closing deal history.
+- A position is marked CLOSED only when confirmed closing deals cover the registered volume; missing or incomplete history remains UNKNOWN.
 - A future execution adapter must independently handle broker retcodes, partial fills, requotes, timeouts, and disconnects.
-- Attach server-side protective stop loss at entry whenever broker rules permit.
 - A local 10–60 second holding-time manager requests closure at the configured deadline; it must not assume the close succeeded until broker state confirms it.
 - Emergency stop blocks new entries immediately and initiates controlled position handling according to a separately tested policy.
 
@@ -109,7 +109,7 @@ The Android operator view must show session state, connection/quote freshness, s
 2. Implement instrument metadata and quote-health module.
 3. Implement pure risk-sizing and portfolio-allocation module with tests.
 4. Implement position registry and lifecycle manager.
-5. Implement demo-only execution preflight and broker reconciliation.
+5. Implement demo-only execution preflight and read-only broker reconciliation.
 6. Add a new strategy only after the execution/risk foundation is testable.
 7. Add bounded Android-triggered demo session workflow.
 8. Run validation gates in order; do not skip directly to live trading.

@@ -11,6 +11,7 @@
 #include "..\\Include\\Veltrix\\RiskAllocator.mqh"
 #include "..\\Include\\Veltrix\\PositionRegistry.mqh"
 #include "..\\Include\\Veltrix\\ExecutionGuard.mqh"
+#include "..\\Include\\Veltrix\\BrokerReconciler.mqh"
 
 input ulong  MaxQuoteAgeMilliseconds = 2500;
 input double MaxSpreadPoints        = 50.0;
@@ -50,7 +51,7 @@ int OnInit()
       return INIT_FAILED;
    }
 
-   Print("VELTRIX SAFE MODE: market health monitoring only. Risk allocator is calculation-only; execution guard is preflight-only; no order APIs are called.");
+   Print("VELTRIX SAFE MODE: market health and read-only broker reconciliation components only. No order APIs are called.");
    return INIT_SUCCEEDED;
 }
 
