@@ -393,3 +393,12 @@ def test_feature_dataset_schema_preserves_ordering_and_version_identity():
     assert len(schema) == len(set(schema))
     assert schema.index("quote_time_msc") < schema.index("evaluation_time_msc")
     assert "source_id" in schema and "feature_version" in schema
+
+
+def test_feature_dataset_exporter_rejects_unsafe_paths_and_schema_mismatch():
+    source = EXPORTER_SOURCE.read_text(encoding="utf-8")
+    assert "StringGetCharacter(filename,i)" in source
+    assert "FileSeek(handle,0,SEEK_SET)" in source
+    assert "FileSeek(handle,0,SEEK_END)" in source
+    assert "Existing CSV header does not match expected schema" in source
+    assert 'StringSubstr(filename,length-4,4)!=".csv"' in source
