@@ -27,6 +27,10 @@ on:
         required: true
         default: 50
 
+concurrency:
+  group: veltrix-demo-data-session
+  cancel-in-progress: false
+
 permissions:
   contents: read
 

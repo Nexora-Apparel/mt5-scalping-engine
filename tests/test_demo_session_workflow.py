@@ -11,6 +11,8 @@ def test_demo_session_is_manual_bounded_and_not_always_on():
     assert 'default: "120"' in source
     assert "Start-Sleep -Seconds ($env:SESSION_MINUTES * 60)" in source
     assert "schedule:" not in source
+    assert "group: veltrix-demo-data-session" in source
+    assert "cancel-in-progress: false" in source
 
 
 def test_demo_credentials_are_secrets_not_workflow_inputs():
