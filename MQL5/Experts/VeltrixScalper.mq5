@@ -7,7 +7,7 @@
 #property version   "0.100"
 #property description "VELTRIX scalper foundation; market health only, no order submission."
 
-#include <Veltrix/MarketGuard.mqh>
+#include "..\\Include\\Veltrix\\MarketGuard.mqh"
 
 input ulong  MaxQuoteAgeMilliseconds = 2500;
 input double MaxSpreadPoints        = 50.0;
@@ -33,7 +33,7 @@ int OnInit()
       return INIT_FAILED;
    }
 
-   PrintFormat("VELTRIX READ-ONLY FOUNDATION | symbol=%s point=%g tick_size=%g tick_value_loss=%g volume_min=%g volume_step=%g stops=%d freeze=%d trade_mode=%d execution=%d filling=%d",
+   PrintFormat("VELTRIX READ-ONLY FOUNDATION | symbol=%s point=%g tick_size=%g tick_value_loss=%g volume_min=%g volume_step=%g stops=%I64d freeze=%I64d trade_mode=%I64d execution=%I64d filling=%I64d",
                spec.symbol,spec.point,spec.tick_size,spec.tick_value_loss,
                spec.volume_min,spec.volume_step,spec.stops_level_points,
                spec.freeze_level_points,spec.trade_mode,spec.execution_mode,
