@@ -6,7 +6,7 @@ Architecture baseline only. The existing `NexoraScalper.mq5` is a legacy prototy
 
 The Exness connectivity workflow is a separate infrastructure check. A successful login does not validate a trading strategy or authorize trading.
 
-The read-only market foundation, calculation-only risk allocator, per-position lifecycle registry, and demo-only execution preflight have passed their respective compile and project-test gates. The current increment adds `BrokerReconciler.mqh`, a read-only reconciliation layer that compares registered positions with live broker positions and closing deal history. It distinguishes live verified, changed/partial volume, protection failure, confirmed closure, incomplete close history, and unknown outcomes. It never treats a missing live position alone as proof of closure. The reconciler is awaiting fresh compile and project-test validation. No order submission, modification, or closure API is introduced; demo/live trading remains disabled.
+The read-only market foundation, calculation-only risk allocator, per-position lifecycle registry, and demo-only execution preflight have passed their respective compile and project-test gates. The current increment adds `BrokerReconciler.mqh`, a read-only reconciliation layer that compares registered positions with live broker positions and closing deal history. It distinguishes live verified, changed/partial volume, protection failure, confirmed closure, incomplete close history, and unknown outcomes. It never treats a missing live position alone as proof of closure. The reconciler passed fresh compile and project-test validation on its merged PR. The current increment adds `ExecutionCoordinator.mqh`, a state-only request lifecycle ledger for prepared intents, submission hand-off, broker responses, partial/full fills, deal deduplication, disconnect uncertainty, reconciliation, and a latched emergency stop. It cancels unsent prepared intents on disconnect and keeps ambiguous zero-fill outcomes UNKNOWN unless broker history confirms terminal rejection. The coordinator makes no broker calls and adds no order APIs. This increment is awaiting fresh compile and project-test validation; demo/live trading remains disabled.
 
 ## Product constraints
 
@@ -93,6 +93,15 @@ Failure states include `REJECTED`, `UNKNOWN`, and `PROTECTION_FAILURE`. Unknown 
 Record session ID, strategy version, quote timestamp, bid/ask, spread, candidate/rejection reason, risk calculation, order request, broker retcode, fills, position ticket, exit reason, realized P/L, and latency. Never log credentials.
 
 The Android operator view must show session state, connection/quote freshness, spread, open positions, position age, aggregate risk, daily drawdown, last action, and emergency-stop state.
+
+### Execution request state coordinator
+
+- Track prepared intent, submission hand-off, acknowledgement, partial/full fills, rejection, unknown outcome, reconciliation, and cancellation.
+- Deduplicate broker deal tickets and reject cumulative fill volume beyond the approved request.
+- On disconnect, cancel intents that were never handed off and mark in-flight outcomes UNKNOWN.
+- Reconnection alone does not resolve unknown outcomes. Require broker reconciliation before any retry.
+- Emergency stop is latched, blocks new intents and submission hand-offs, and does not claim to close existing positions.
+- This coordinator is state-only. It does not call broker execution, order modification, or position closure APIs. There is deliberately no reset method.
 
 ## Validation and release gates
 

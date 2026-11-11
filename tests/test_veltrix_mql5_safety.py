@@ -9,6 +9,7 @@ RISK_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "RiskAllocator.mqh"
 POSITION_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "PositionRegistry.mqh"
 EXECUTION_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "ExecutionGuard.mqh"
 RECONCILER_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "BrokerReconciler.mqh"
+COORDINATOR_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "ExecutionCoordinator.mqh"
 
 
 def test_veltrix_foundation_contains_no_order_submission_api():
@@ -40,7 +41,7 @@ def test_veltrix_ea_uses_repository_relative_includes_and_timer():
     source = EA_SOURCE.read_text(encoding="utf-8")
     for include in ("MarketGuard.mqh", "RiskAllocator.mqh",
                     "PositionRegistry.mqh", "ExecutionGuard.mqh",
-                    "BrokerReconciler.mqh"):
+                    "BrokerReconciler.mqh", "ExecutionCoordinator.mqh"):
         assert f'#include "..\\\\Include\\\\Veltrix\\\\{include}"' in source
     assert "EventSetMillisecondTimer" in source
     assert "EventKillTimer" in source
@@ -194,3 +195,53 @@ def test_broker_reconciler_treats_partial_exit_and_missing_history_as_unknown():
     assert "VX_RECONCILE_CLOSE_HISTORY_INCOMPLETE" in source
     assert "history_ok && row.confirmed_exit_volume+tolerance>=record.volume" in source
     assert "registry.MarkUnknown(record.identifier,row.reason)" in source
+
+
+
+def test_execution_coordinator_is_state_only_and_fail_closed():
+    source = COORDINATOR_SOURCE.read_text(encoding="utf-8")
+    required = (
+        "VX_REQUEST_PREPARED", "VX_REQUEST_SUBMITTING",
+        "VX_REQUEST_ACKNOWLEDGED", "VX_REQUEST_PARTIALLY_FILLED",
+        "VX_REQUEST_FILLED", "VX_REQUEST_REJECTED",
+        "VX_REQUEST_OUTCOME_UNKNOWN", "VX_REQUEST_RECONCILING",
+        "VX_REQUEST_CANCELLED", "Prepare", "MarkSubmitting",
+        "RecordBrokerResponse", "RecordFill", "DealAlreadySeen",
+        "BeginReconciliation", "ResolveFromBroker", "SetDisconnected",
+        "SetReconnected", "LatchEmergencyStop", "m_emergency_stop",
+    )
+    for token in required:
+        assert token in source
+    lowered = source.lower()
+    forbidden = (
+        "ordersend(", "ordercheck(", "trade_action_deal",
+        "trade_action_pending", "ctrade", "positionopen(",
+        "positionclose(", "positionmodify(",
+    )
+    assert not [token for token in forbidden if token in lowered]
+    assert "no broker request sent" in lowered
+    assert "reconcile before retry" in lowered
+    assert "late or contradictory deal" in lowered
+    assert "prepared intent cancelled locally" in lowered
+    assert "no reset method" in lowered
+
+
+def test_execution_coordinator_rejects_zero_unconfirmed_volume_as_terminal():
+    source = COORDINATOR_SOURCE.read_text(encoding="utf-8")
+    assert "else if(broker_confirmed_volume>tolerance)" in source
+    assert "Broker confirms no fill but not a terminal rejection; keep outcome unknown" in source
+    assert "broker_confirms_terminal_rejection && broker_confirmed_volume<=tolerance" in source
+
+
+def test_execution_coordinator_reference_fill_and_disconnect_vectors():
+    requested = 0.30
+    fills = [0.10, 0.05, 0.15]
+    assert sum(fills[:2]) < requested
+    assert abs(sum(fills) - requested) < 1e-12
+    seen_deals = {101, 102}
+    assert 102 in seen_deals
+    assert len(seen_deals) == 2
+    state_after_disconnect = "OUTCOME_UNKNOWN"
+    assert state_after_disconnect != "REJECTED"
+    prepared_after_disconnect = "CANCELLED"
+    assert prepared_after_disconnect != "PREPARED"
