@@ -14,7 +14,7 @@ on:
         description: Collection duration
         type: choice
         required: true
-        default: "120"
+        default: "30"
         options: ["30", "60", "120"]
       lookback_seconds:
         description: Feature lookback seconds
@@ -48,10 +48,11 @@ jobs:
         shell: pwsh
         run: |
           $installer = Join-Path $env:RUNNER_TEMP "mt5setup.exe"
-          Invoke-WebRequest -Uri "https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe" -OutFile $installer
+          Invoke-WebRequest -Uri "https://download.terminal.free/cdn/web/exness.technologies.ltd/mt5/exness5setup.exe" -OutFile $installer
           if ((Get-Item $installer).Length -lt 1000000) { throw "MT5 installer download incomplete." }
           $path = "C:\MT5"
-          Start-Process -FilePath $installer -ArgumentList @("/auto", "/path:$path") | Out-Null
+           $setup = Start-Process -FilePath $installer -ArgumentList @("/auto", "/path:`"$path`"") -Wait -PassThru
+          if ($setup.ExitCode -ne 0) { throw "Official Exness MT5 installer exited with code $($setup.ExitCode)." }
           $editor = Join-Path $path "metaeditor64.exe"
           $terminal = Join-Path $path "terminal64.exe"
           for ($i=0; $i -lt 24; $i++) {
