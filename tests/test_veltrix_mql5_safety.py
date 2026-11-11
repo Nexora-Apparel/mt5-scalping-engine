@@ -198,7 +198,7 @@ def test_broker_reconciler_treats_partial_exit_and_missing_history_as_unknown():
 
 
 
-def test_execution_coordinator_is_state_only_and_fail_closed():
+# Coordinator tests assert state contracts; they do not simulate a live broker.\ndef test_execution_coordinator_is_state_only_and_fail_closed():
     source = COORDINATOR_SOURCE.read_text(encoding="utf-8")
     required = (
         "VX_REQUEST_PREPARED", "VX_REQUEST_SUBMITTING",
