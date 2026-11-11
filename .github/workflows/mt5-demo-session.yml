@@ -157,7 +157,13 @@ jobs:
                 foreach ($file in $files) {
                   Write-Host "----- $($file.Name) | $($file.LastWriteTime.ToString('o')) | last 80 lines -----"
                   Get-Content $file.FullName -Tail 80 -ErrorAction SilentlyContinue |
-                    ForEach-Object { Write-Host $_ }
+                    ForEach-Object {
+                      $line = $_
+                      foreach ($secret in @($env:MT5_LOGIN,$env:MT5_PASSWORD,$env:MT5_SERVER)) {
+                        if ($secret) { $line = $line -replace [regex]::Escape($secret), '[REDACTED]' }
+                      }
+                      Write-Host $line
+                    }
                 }
               } else { Write-Host "Directory not present." }
             }
