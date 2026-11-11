@@ -6,7 +6,7 @@ Architecture baseline only. The existing `NexoraScalper.mq5` is a legacy prototy
 
 The Exness connectivity workflow is a separate infrastructure check. A successful login does not validate a trading strategy or authorize trading.
 
-All merged foundation modules have passed their respective MetaEditor compile and Project Tests gates: read-only market health, fail-closed risk allocation, position lifecycle tracking, demo-only execution preflight, read-only broker reconciliation, state-only execution coordination, the research-only XAUUSD/XAGUSD strategy evaluator, and the point-in-time feature collector. These gates establish compilation and source/reference test coverage, not live broker runtime correctness or strategy profitability. The current increment adds `FeatureDatasetExporter.mqh`, a versioned CSV writer for caller-supplied feature snapshots. It validates source provenance, exact instrument, timestamp order, numeric feature bounds, and safe file names; it also verifies an existing CSV header before appending to prevent mixed-schema datasets. The exporter is included for compilation but is not instantiated or activated by the EA. MT5 terminal file I/O still requires its separate runtime test. Demo/live trading remains disabled.
+All merged foundation modules have passed their respective MetaEditor compile and Project Tests gates: read-only market health, fail-closed risk allocation, position lifecycle tracking, demo-only execution preflight, read-only broker reconciliation, state-only execution coordination, the research-only XAUUSD/XAGUSD strategy evaluator, the point-in-time feature collector, and the versioned feature dataset exporter. These gates establish compilation and source/reference test coverage, not live broker runtime correctness or strategy profitability. The current PR adds a strict, non-mutating CSV integrity auditor and a separate MT5 terminal runtime test for dataset creation, append, invalid-symbol rejection, read-back, and cleanup. The runtime test must pass before any exported dataset is accepted for chronological research. Demo/live trading remains disabled.
 
 ## Product constraints
 
@@ -122,3 +122,15 @@ The Android operator view must show session state, connection/quote freshness, s
 6. Add a new strategy only after the execution/risk foundation is testable.
 7. Add bounded Android-triggered demo session workflow.
 8. Run validation gates in order; do not skip directly to live trading.
+
+
+## Dataset integrity and terminal runtime verification
+
+- `tools/dataset_integrity.py` validates the exact versioned 13-column CSV schema without modifying input rows.
+- It rejects unsupported schema/feature versions, malformed or extra fields, blank records, non-finite values, invalid bid/ask, invalid feature bounds, unsupported symbols, duplicate source/symbol/evaluation timestamps, and non-increasing evaluation timestamps within each source/symbol stream.
+- Timestamp integrity requires `window_start_msc <= quote_time_msc <= evaluation_time_msc`. XAUUSD and XAGUSD remain separate streams.
+- A successful audit emits a JSON manifest containing SHA-256, byte count, record count, version identities, and per-source/symbol UTC evaluation ranges. The auditor never sorts, repairs, deduplicates, imputes, or drops rows.
+- `tests/test_dataset_integrity.py` covers valid datasets and corrupted chronology, schema, encoding, numeric, symbol, and row-width cases.
+- `MQL5/Scripts/FeatureDatasetExporterRuntimeTest.mq5` exercises terminal-side CSV creation, append, invalid-symbol rejection, read-back, and cleanup. The manual/branch-triggered `mql5-dataset-runtime.yml` workflow runs it in an isolated MT5 terminal without broker credentials or trade permissions.
+- MetaEditor compilation of the runtime test script is added to the compile workflow, but compilation and terminal runtime execution remain separate checks.
+- No dataset is eligible for backtesting until both the Python integrity audit and MT5 runtime test pass for the exporter build that produced it.
