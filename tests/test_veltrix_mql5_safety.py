@@ -7,6 +7,7 @@ EA_SOURCE = ROOT / "MQL5" / "Experts" / "VeltrixScalper.mq5"
 GUARD_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "MarketGuard.mqh"
 RISK_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "RiskAllocator.mqh"
 POSITION_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "PositionRegistry.mqh"
+EXECUTION_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "ExecutionGuard.mqh"
 
 
 def test_veltrix_foundation_contains_no_order_submission_api():
@@ -49,6 +50,8 @@ def test_veltrix_ea_uses_repository_relative_includes_and_timer():
     source = EA_SOURCE.read_text(encoding="utf-8")
     assert r'#include "..\\Include\\Veltrix\\MarketGuard.mqh"' in source
     assert r'#include "..\\Include\\Veltrix\\RiskAllocator.mqh"' in source
+    assert r'#include "..\\Include\\Veltrix\\PositionRegistry.mqh"' in source
+    assert r'#include "..\\Include\\Veltrix\\ExecutionGuard.mqh"' in source
     assert "EventSetMillisecondTimer" in source
     assert "EventKillTimer" in source
 
@@ -96,17 +99,10 @@ def _reference_volume(equity, risk_pct, stop_distance, tick_size,
 
 
 def test_reference_risk_vectors_skip_under_minimum_and_respect_portfolio_cap():
-    # A $10 balance with these illustrative contract values cannot support
-    # the broker minimum at the selected stop distance: must skip, not round up.
     assert _reference_volume(10, 0.25, 2.0, 0.01, 1.0,
                              0.01, 100.0, 0.01, 0.0, 1.0, 0, 3) == 0.0
-
-    # A valid illustrative case rounds down to the broker step.
     assert _reference_volume(1000, 1.0, 0.1, 0.01, 1.0,
                              0.01, 100.0, 0.01, 0.0, 3.0, 0, 3) == 1.0
-
-    # Existing exposure consumes portfolio capacity; new risk must fit only
-    # the remaining aggregate budget.
     assert _reference_volume(1000, 2.0, 0.1, 0.01, 1.0,
                              0.01, 100.0, 0.01, 25.0, 3.0, 1, 3) == 0.5
 
@@ -148,5 +144,35 @@ def test_position_registry_reference_lifecycle_and_deadline_vectors():
     assert deadline == 1_015_000
     assert opened_msc + 14_999 < deadline
     assert opened_msc + 15_000 >= deadline
-    broker_close_confirmed = False
-    assert broker_close_confirmed is False
+    assert False is False
+
+
+# These tests verify source contracts; MetaEditor CI separately compiles the MQL5 module.
+def test_execution_guard_is_demo_only_preflight_without_submission():
+    source = EXECUTION_SOURCE.read_text(encoding="utf-8")
+    required = (
+        "ValidateDemoIntent", "ACCOUNT_TRADE_MODE_DEMO",
+        "ACCOUNT_MARGIN_MODE_RETAIL_HEDGING", "TERMINAL_CONNECTED",
+        "TERMINAL_TRADE_ALLOWED", "MQL_TRADE_ALLOWED",
+        "ACCOUNT_TRADE_ALLOWED", "SYMBOL_TRADE_STOPS_LEVEL",
+        "SymbolInfoTick", "OrderCalcMargin", "ACCOUNT_MARGIN_FREE",
+        "margin_reserve_money", "protective stop loss is mandatory",
+        "MathIsValidNumber",
+    )
+    for token in required:
+        assert token.lower() in source.lower()
+    lowered = source.lower()
+    forbidden = (
+        "ordersend(", "ordercheck(", "trade_action_deal",
+        "trade_action_pending", "ctrade", "positionclose(",
+        "positionmodify(",
+    )
+    assert not [token for token in forbidden if token in lowered]
+
+
+def test_execution_guard_rejects_live_account_and_non_hedging_mode():
+    source = EXECUTION_SOURCE.read_text(encoding="utf-8")
+    assert "!=ACCOUNT_TRADE_MODE_DEMO" in source
+    assert "!=ACCOUNT_MARGIN_MODE_RETAIL_HEDGING" in source
+    assert "!MathIsValidNumber(intent.volume)" in source
+    assert "!MathIsValidNumber(intent.stop_loss)" in source
