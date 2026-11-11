@@ -1,0 +1,202 @@
+name: VELTRIX bounded Exness demo data session
+run-name: VELTRIX ${{ inputs.symbol }} demo session (${{ inputs.session_minutes }} min)
+
+on:
+  workflow_dispatch:
+    inputs:
+      symbol:
+        description: Exact Exness instrument
+        type: choice
+        required: true
+        default: XAUUSD
+        options: [XAUUSD, XAGUSD]
+      session_minutes:
+        description: Collection duration
+        type: choice
+        required: true
+        default: "120"
+        options: ["30", "60", "120"]
+      lookback_seconds:
+        description: Feature lookback seconds
+        type: number
+        required: true
+        default: 60
+      max_spread_points:
+        description: Maximum spread in broker points
+        type: number
+        required: true
+        default: 50
+
+permissions:
+  contents: read
+
+jobs:
+  demo-data-session:
+    runs-on: windows-latest
+    timeout-minutes: 135
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install MT5
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP "mt5setup.exe"
+          Invoke-WebRequest -Uri "https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe" -OutFile $installer
+          if ((Get-Item $installer).Length -lt 1000000) { throw "MT5 installer download incomplete." }
+          $path = "C:\MT5"
+          Start-Process -FilePath $installer -ArgumentList @("/auto", "/path:$path") | Out-Null
+          $editor = Join-Path $path "metaeditor64.exe"
+          $terminal = Join-Path $path "terminal64.exe"
+          for ($i=0; $i -lt 24; $i++) {
+            if ((Test-Path $editor) -and (Test-Path $terminal)) { break }
+            Start-Sleep -Seconds 5
+          }
+          if (!(Test-Path $editor) -or !(Test-Path $terminal)) { throw "MT5 installation incomplete." }
+          "METAEDITOR=$editor" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "MT5_TERMINAL=$terminal" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Validate credentials and prepare EA preset
+        shell: pwsh
+        env:
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
+          SESSION_SYMBOL: ${{ inputs.symbol }}
+          SESSION_MINUTES: ${{ inputs.session_minutes }}
+          LOOKBACK_SECONDS: ${{ inputs.lookback_seconds }}
+          MAX_SPREAD_POINTS: ${{ inputs.max_spread_points }}
+        run: |
+          if (!$env:MT5_LOGIN -or !$env:MT5_PASSWORD -or !$env:MT5_SERVER) { throw "MT5_LOGIN, MT5_PASSWORD and MT5_SERVER secrets are required." }
+          $login = 0L
+          if (![long]::TryParse($env:MT5_LOGIN,[ref]$login) -or $login -le 0) { throw "MT5_LOGIN must be numeric." }
+          if ($env:MT5_SERVER -match '[\r\n=]') { throw "Invalid MT5_SERVER secret." }
+          $minutes = [int]$env:SESSION_MINUTES
+          $lookback = [int]$env:LOOKBACK_SECONDS
+          $spread = [double]$env:MAX_SPREAD_POINTS
+          if ($minutes -notin @(30,60,120)) { throw "Session must be 30, 60 or 120 minutes." }
+          if ($lookback -lt 1 -or $lookback -gt 600) { throw "Lookback must be 1-600 seconds." }
+          if ($spread -le 0 -or $spread -gt 1000) { throw "Spread must be 0-1000 points." }
+
+          New-Item -ItemType Directory -Force -Path "C:\MT5\MQL5\Presets","C:\MT5\MQL5\Experts" | Out-Null
+          $preset = @"
+          EnableDatasetCollection=true||false||0||true||N
+          FeatureLookbackSeconds=$lookback||$lookback||1||$lookback||N
+          FeatureMinObservations=10||10||1||10||N
+          FeatureBufferCapacity=10000||10000||100||10000||N
+          MaxQuoteAgeMilliseconds=2500||2500||1||2500||N
+          MaxSpreadPoints=$spread||$spread||0.1||$spread||N
+          HealthPollMilliseconds=250||250||1||250||N
+          DatasetSourceId=
+          ExpectedDemoLogin=$login||$login||1||$login||N
+          ExpectedDemoServer=$env:MT5_SERVER
+          "@
+          Set-Content "C:\MT5\MQL5\Presets\veltrix-session.set" $preset -Encoding Unicode
+
+          $source = (Resolve-Path "MQL5\Experts\VeltrixScalper.mq5").Path
+          $log = Join-Path (Split-Path $source) "VeltrixScalper.log"
+          Start-Process -FilePath $env:METAEDITOR -ArgumentList @('/compile:"' + $source + '"','/log') -Wait | Out-Null
+          Start-Sleep -Seconds 2
+          if (!(Test-Path $log)) { throw "EA compile log missing." }
+          $text = Get-Content $log -Raw
+          if ($text -notmatch "(?i)0 errors?" -or $text -match "(?i)\b[1-9]\d* errors?\b|\b[1-9]\d* warnings?\b") { throw "EA compile failed or warned." }
+          $ex5 = Join-Path (Split-Path $source) "VeltrixScalper.ex5"
+          if (!(Test-Path $ex5)) { throw "EA EX5 missing." }
+          Copy-Item $ex5 "C:\MT5\MQL5\Experts\VeltrixScalper.ex5" -Force
+          "SESSION_MINUTES=$minutes" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "SESSION_SYMBOL=$env:SESSION_SYMBOL" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "SESSION_LOOKBACK=$lookback" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Start exact DEMO account with trading disabled
+        id: start-session
+        shell: pwsh
+        env:
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
+          SESSION_SYMBOL: ${{ inputs.symbol }}
+        run: |
+          $config = Join-Path $env:RUNNER_TEMP "veltrix-session.ini"
+          $ini = @"
+          [Common]
+          Login=$env:MT5_LOGIN
+          Server=$env:MT5_SERVER
+          Password=$env:MT5_PASSWORD
+          KeepPrivate=0
+
+          [Experts]
+          Enabled=1
+          AllowLiveTrading=0
+          AllowDllImport=0
+
+          [StartUp]
+          Expert=VeltrixScalper
+          ExpertParameters=veltrix-session.set
+          Symbol=$env:SESSION_SYMBOL
+          Period=M1
+          "@
+          Set-Content $config $ini -Encoding ASCII
+          $process = Start-Process -FilePath $env:MT5_TERMINAL -ArgumentList @("/portable","/config:$config") -PassThru
+          "MT5_PROCESS_ID=$($process.Id)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          $logDir = "C:\MT5\MQL5\Logs"
+          $deadline = (Get-Date).AddSeconds(180)
+          $ready = $false
+          while ((Get-Date) -lt $deadline) {
+            $latest = Get-ChildItem $logDir -Filter "*.log" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            if ($latest) {
+              $logText = Get-Content $latest.FullName -Raw -ErrorAction SilentlyContinue
+              if ($logText -match "DATASET DEMO ACCOUNT GUARD FAILED|DATASET INIT FAILED|VELTRIX INIT FAILED") { throw "VELTRIX refused the demo account or symbol." }
+              if ($logText -match "DATASET DEMO ACCOUNT GUARD PASSED" -and $logText -match "DATASET COLLECTION ENABLED") { $ready = $true; break }
+            }
+            Start-Sleep -Seconds 5
+          }
+          if (!$ready) { throw "Demo account and collection startup were not confirmed." }
+          Write-Host "Demo collection started; credentials are not printed."
+
+      - name: Collect for selected duration
+        shell: pwsh
+        run: |
+          Start-Sleep -Seconds ($env:SESSION_MINUTES * 60)
+
+      - name: Stop terminal and audit dataset
+        if: always()
+        shell: pwsh
+        env:
+          SESSION_SYMBOL: ${{ inputs.symbol }}
+        run: |
+          if ($env:MT5_PROCESS_ID) {
+            $p = Get-Process -Id $env:MT5_PROCESS_ID -ErrorAction SilentlyContinue
+            if ($p) {
+              if ($p.CloseMainWindow()) {
+                if (!$p.WaitForExit(15000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+              } else { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+            }
+          }
+          Start-Sleep -Seconds 3
+          $source = "C:\MT5\MQL5\Files\veltrix_$env:SESSION_SYMBOL.csv"
+          $dir = Join-Path $env:GITHUB_WORKSPACE "session-artifacts"
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          if (!(Test-Path $source)) { throw "MT5 dataset file was not created." }
+          $target = Join-Path $dir "veltrix_$env:SESSION_SYMBOL.csv"
+          Copy-Item $source $target -Force
+          if ((Get-Item $target).Length -le 100) { throw "Dataset is empty." }
+          python tools/dataset_integrity.py $target --manifest (Join-Path $dir "manifest.json")
+          if ($LASTEXITCODE -ne 0) { throw "Dataset integrity audit failed." }
+          $summary = @"
+          status=PASS
+          symbol=$env:SESSION_SYMBOL
+          session_minutes=$env:SESSION_MINUTES
+          lookback_seconds=$env:SESSION_LOOKBACK
+          "@
+          Set-Content (Join-Path $dir "session-summary.txt") $summary -Encoding ASCII
+
+      - name: Upload audited dataset and manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Veltrix-demo-dataset-${{ inputs.symbol }}-${{ github.run_number }}
+          path: session-artifacts/*
+          if-no-files-found: warn
+          retention-days: 30
