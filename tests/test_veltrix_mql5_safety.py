@@ -305,7 +305,8 @@ def test_feature_collector_is_point_in_time_symbol_isolated_and_read_only():
         "XAUUSD", "XAGUSD", "time_msc", "MathLog",
         "MathSqrt", "momentum_bps", "realized_volatility_bps",
         "efficiency_ratio", "complete lookback", "out of order",
-        "evaluation_time_msc", "MathIsValidNumber",\n        "Feature accumulation overflowed or became non-finite",
+        "evaluation_time_msc", "MathIsValidNumber",
+        "Feature accumulation overflowed or became non-finite",
     )
     for token in required:
         assert token.lower() in source.lower()
