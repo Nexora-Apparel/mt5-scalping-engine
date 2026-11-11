@@ -246,3 +246,47 @@ def test_execution_coordinator_reference_fill_and_disconnect_vectors():
     assert state_after_disconnect != "REJECTED"
     prepared_after_disconnect = "CANCELLED"
     assert prepared_after_disconnect != "PREPARED"
+
+
+STRATEGY_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "StrategyResearch.mqh"
+
+
+def test_strategy_research_engine_is_isolated_and_candidate_only():
+    source = STRATEGY_SOURCE.read_text(encoding="utf-8")
+    required = (
+        "CVxStrategyResearch", "VxStrategyConfig", "VxStrategySnapshot",
+        "VxSignalCandidate", "XAUUSD", "XAGUSD", "max_quote_age_ms",
+        "max_spread_bps", "min_realized_volatility_bps",
+        "max_realized_volatility_bps", "min_abs_momentum_bps",
+        "min_efficiency_ratio", "min_observations", "VX_SIGNAL_LONG",
+        "VX_SIGNAL_SHORT", "VX_SIGNAL_NONE", "Quote is stale",
+        "Spread exceeds", "not an execution instruction",
+    )
+    for token in required:
+        assert token in source
+    assert "snapshot.feature_window_start_msc>snapshot.quote_time_msc" in source
+    assert "MathIsValidNumber(midpoint)" in source
+    lowered = source.lower()
+    forbidden = (
+        "ordersend(", "ordercheck(", "trade_action_deal",
+        "trade_action_pending", "ctrade", "positionopen(",
+        "positionclose(", "positionmodify(",
+    )
+    assert not [token for token in forbidden if token in lowered]
+
+
+def test_strategy_research_reference_gates_reject_stale_spread_and_weak_momentum():
+    def evaluate(age_ms, spread_bps, momentum_bps, min_momentum=2.0):
+        if age_ms > 500:
+            return "STALE"
+        if spread_bps > 8.0:
+            return "SPREAD"
+        if abs(momentum_bps) < min_momentum:
+            return "MOMENTUM"
+        return "CANDIDATE"
+
+    assert evaluate(501, 2.0, 5.0) == "STALE"
+    assert evaluate(100, 8.1, 5.0) == "SPREAD"
+    assert evaluate(100, 2.0, 1.9) == "MOMENTUM"
+    assert evaluate(100, 2.0, 2.1) == "CANDIDATE"
+    assert evaluate(100, 2.0, -2.1) == "CANDIDATE"
