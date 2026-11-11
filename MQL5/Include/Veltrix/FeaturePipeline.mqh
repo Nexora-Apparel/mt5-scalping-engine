@@ -183,6 +183,15 @@ public:
          return true;
       }
 
+      if(snapshot.quote_time_msc!=tick.time_msc ||
+         snapshot.evaluation_time_msc!=tick.time_msc)
+      {
+         reason="Snapshot timestamps do not match the source quote";
+         m_faulted=true;
+         m_fault_reason=reason;
+         return false;
+      }
+
       if(!m_exporter.AppendSnapshot(m_filename,m_source_id,snapshot,reason))
       {
          m_faulted=true;

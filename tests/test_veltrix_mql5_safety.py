@@ -155,6 +155,7 @@ def test_execution_guard_is_demo_only_preflight_without_submission():
     )
     for token in required:
         assert token.lower() in source.lower()
+    assert '#include "../Include/Veltrix/FeaturePipeline.mqh"' in source
     lowered = source.lower()
     forbidden = ("ordersend(", "ordercheck(", "trade_action_deal",
                  "trade_action_pending", "ctrade", "positionclose(",
@@ -441,7 +442,7 @@ def test_feature_pipeline_is_optional_point_in_time_and_fail_closed():
         "AppendSnapshot", "ValidSourceId", "ValidFileName",
         "m_last_quote_msc", "m_last_export_msc", "m_faulted",
         "m_rows_written", "Collecting warm-up history",
-        "snapshot.evaluation_time_msc=tick.time_msc",
+        "Snapshot timestamps do not match the source quote",
     )
     for token in required:
         assert token.lower() in source.lower()

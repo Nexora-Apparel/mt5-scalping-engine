@@ -1,4 +1,5 @@
 #include "../Include/Veltrix/FeatureDatasetExporter.mqh"
+#include "../Include/Veltrix/FeaturePipeline.mqh"
 
 #define VX_RUNTIME_TEST_FILE "veltrix_dataset_export_runtime_test.csv"
 #define VX_RUNTIME_BAD_HEADER_FILE "veltrix_dataset_export_bad_header.csv"
