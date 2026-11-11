@@ -8,8 +8,12 @@ def test_demo_session_is_manual_bounded_and_not_always_on():
     source = WORKFLOW.read_text(encoding="utf-8")
     assert "workflow_dispatch:" in source
     assert "timeout-minutes: 135" in source
-    assert 'default: "120"' in source
+    assert 'default: "30"' in source
     assert "Start-Sleep -Seconds ($env:SESSION_MINUTES * 60)" in source
+    assert "https://download.terminal.free/cdn/web/exness.technologies.ltd/mt5/exness5setup.exe" in source
+    assert "download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe" not in source
+    assert "Start-Process -FilePath $installer" in source
+    assert "-Wait -PassThru" in source
     assert "schedule:" not in source
     assert "group: veltrix-demo-data-session" in source
     assert "cancel-in-progress: false" in source
