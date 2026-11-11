@@ -76,7 +76,8 @@ public:
                               string &reason)
    {
       reason="";
-      if(ticket==0 || identifier<=0 || symbol=="" || volume<=0.0 ||
+      if(ticket==0 || identifier<=0 || symbol=="" ||
+         !MathIsValidNumber(volume) || volume<=0.0 ||
          opened_msc<=0 || hold_seconds<10 || hold_seconds>60)
       {
          reason="Invalid confirmed position data or hold duration outside 10-60 seconds";
