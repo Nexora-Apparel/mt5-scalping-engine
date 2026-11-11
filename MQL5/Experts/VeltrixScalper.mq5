@@ -4,7 +4,7 @@
 //| Trading is intentionally not implemented or permitted here.     |
 //+------------------------------------------------------------------+
 #property strict
-#property version   "001.000"
+#property version   "1.000"
 #property description "VELTRIX scalper foundation; market health only, no order submission."
 
 #include "..\Include\Veltrix\MarketGuard.mqh"
