@@ -1,0 +1,139 @@
+name: Exness MT5 demo connectivity check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mt5-demo-connectivity
+  cancel-in-progress: false
+
+jobs:
+  connect-demo:
+    name: Verify MT5 demo login (no trading)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+      MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
+      MT5_SERVER: ${{ secrets.MT5_SERVER }}
+    steps:
+      - name: Validate required secrets without printing them
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ([string]::IsNullOrWhiteSpace($env:MT5_LOGIN) -or
+              $env:MT5_LOGIN -notmatch '^\d+$') {
+            throw "MT5_LOGIN is missing or is not a numeric account login."
+          }
+          if ([string]::IsNullOrWhiteSpace($env:MT5_PASSWORD)) {
+            throw "MT5_PASSWORD is missing."
+          }
+          if ([string]::IsNullOrWhiteSpace($env:MT5_SERVER)) {
+            throw "MT5_SERVER is missing. Use the exact Exness MT5 server name."
+          }
+          Write-Host "Required MT5 demo credentials are present."
+
+      - name: Download and install MetaTrader 5
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installer = Join-Path $env:RUNNER_TEMP "mt5setup.exe"
+          $installPath = "C:\MT5"
+          Invoke-WebRequest -Uri "https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe" -OutFile $installer
+          if ((Get-Item $installer).Length -lt 1000000) {
+            throw "MetaTrader installer download is incomplete."
+          }
+          $setup = Start-Process -FilePath $installer -ArgumentList @("/auto", "/path:`"$installPath`"") -PassThru
+          $terminal = Join-Path $installPath "terminal64.exe"
+          for ($i = 0; $i -lt 36 -and !(Test-Path $terminal); $i++) {
+            Start-Sleep -Seconds 5
+          }
+          if (!(Test-Path $terminal)) {
+            throw "MetaTrader terminal64.exe was not found after installation."
+          }
+          "MT5_TERMINAL=$terminal" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "MetaTrader terminal installed."
+
+      - name: Start terminal with demo credentials and trading disabled
+        id: connect
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $config = Join-Path $env:RUNNER_TEMP "mt5-demo-connect.ini"
+          $safeLogin = $env:MT5_LOGIN
+          $server = $env:MT5_SERVER
+          if ($server -match '[\r\n=]') { throw "MT5_SERVER contains invalid configuration characters." }
+
+          $ini = @"
+          [Common]
+          Login=$safeLogin
+          Password=$($env:MT5_PASSWORD)
+          Server=$server
+          KeepPrivate=0
+          NewsEnable=0
+
+          [Experts]
+          Enabled=0
+          AllowLiveTrading=0
+          AllowDllImport=0
+          "@
+          Set-Content -LiteralPath $config -Value $ini -Encoding Unicode
+
+          try {
+            $proc = Start-Process -FilePath $env:MT5_TERMINAL -ArgumentList "/config:$config" -PassThru
+            Write-Host "MT5 started in read-only connectivity mode. No EA is loaded and automated trading is disabled."
+
+            $deadline = (Get-Date).AddMinutes(7)
+            $authFound = $false
+            $logFiles = @()
+            while ((Get-Date) -lt $deadline) {
+              Start-Sleep -Seconds 10
+              if ($proc.HasExited) {
+                throw "MetaTrader exited before account authorization was confirmed."
+              }
+              $root = Join-Path $env:APPDATA "MetaQuotes\Terminal"
+              if (Test-Path $root) {
+                $logFiles = @(Get-ChildItem -Path $root -Filter "*.log" -File -Recurse -ErrorAction SilentlyContinue |
+                  Where-Object { $_.LastWriteTime -gt (Get-Date).AddMinutes(-12) } |
+                  Sort-Object LastWriteTime -Descending)
+                foreach ($file in $logFiles) {
+                  $content = Get-Content -LiteralPath $file.FullName -Raw -ErrorAction SilentlyContinue
+                  if ($content -match '(?i)authorized on') {
+                    $authFound = $true
+                    break
+                  }
+                  if ($content -match '(?i)authorization on .* failed|authorization failed|invalid account') {
+                    throw "MT5 log reports an account authorization failure. Verify the login, password, and exact server."
+                  }
+                }
+              }
+              if ($authFound) { break }
+            }
+
+            if (!$authFound) {
+              throw "MT5 process started, but no successful 'authorized on' event was found within 7 minutes. Check the exact Exness server name and inspect the run summary."
+            }
+
+            Start-Sleep -Seconds 30
+            if ($proc.HasExited) {
+              throw "MT5 closed immediately after authorization; connection stability was not established."
+            }
+            Write-Host "SUCCESS: MT5 log confirmed account authorization and the terminal remained running for an additional 30 seconds."
+          }
+          finally {
+            if ($proc -and !$proc.HasExited) {
+              Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+              Start-Sleep -Seconds 2
+            }
+            Remove-Item -LiteralPath $config -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Report safe result
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host "This workflow is a connectivity test only. It does not load an Expert Advisor, enable automated trading, or submit orders."
+          Write-Host "The hosted Windows runner is temporary and is shut down when the job ends."
