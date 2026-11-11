@@ -188,7 +188,8 @@ def test_broker_reconciler_is_read_only_and_requires_confirmed_close_evidence():
     assert not [token for token in forbidden if token in lowered]
 
 
-# Incomplete broker history is deliberately not promoted to a confirmed close.\ndef test_broker_reconciler_treats_partial_exit_and_missing_history_as_unknown():
+# Incomplete broker history is deliberately not promoted to a confirmed close.
+def test_broker_reconciler_treats_partial_exit_and_missing_history_as_unknown():
     source = RECONCILER_SOURCE.read_text(encoding="utf-8")
     assert "VX_RECONCILE_CLOSE_HISTORY_INCOMPLETE" in source
     assert "history_ok && row.confirmed_exit_volume+tolerance>=record.volume" in source
