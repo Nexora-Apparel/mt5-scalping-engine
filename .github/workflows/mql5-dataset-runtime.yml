@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - veltrix/dataset-integrity-audit
+      - veltrix/feature-pipeline-integration
 
 permissions:
   contents: read

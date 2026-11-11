@@ -377,6 +377,7 @@ def test_feature_dataset_exporter_is_versioned_provenance_aware_and_read_only():
 def test_feature_dataset_exporter_is_compiled_but_not_activated():
     source = EA_SOURCE.read_text(encoding="utf-8")
     assert "FeatureDatasetExporter.mqh" in source
+    assert "FeaturePipeline.mqh" in source
     lowered = source.lower()
     forbidden = ("ordersend(", "ordercheck(", "trade_action_deal",
                  "trade_action_pending", "ctrade")
@@ -414,7 +415,8 @@ def test_dataset_runtime_script_is_read_only_and_checks_cleanup():
         "FileOpen", "FileReadString", "FileDelete",
         "veltrix_dataset_export_runtime_test.result",
         "invalid symbol was accepted", "mismatched existing CSV header was accepted", "FileIsExist",
-        "DATASET RUNTIME TEST PASS",
+        "DATASET RUNTIME TEST PASS", "CVxFeaturePipeline",
+        "runtime-pipeline-session", "pipeline.RowsWritten()!=2",
     )
     for token in required:
         assert token.lower() in source.lower()

@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property strict
 #property version   "1.000"
-#property description "VELTRIX scalper foundation; market health only, no order submission."
+#property description "VELTRIX safe foundation; optional research data collection only, no order submission."
 
 #include "..\\Include\\Veltrix\\MarketGuard.mqh"
 #include "..\\Include\\Veltrix\\RiskAllocator.mqh"
@@ -16,12 +16,20 @@
 #include "..\\Include\\Veltrix\\StrategyResearch.mqh"
 #include "..\\Include\\Veltrix\\FeatureCollector.mqh"
 #include "..\\Include\\Veltrix\\FeatureDatasetExporter.mqh"
+#include "..\\Include\\Veltrix\\FeaturePipeline.mqh"
 
 input ulong  MaxQuoteAgeMilliseconds = 2500;
 input double MaxSpreadPoints        = 50.0;
 input uint   HealthPollMilliseconds = 250;
+input bool   EnableDatasetCollection = false;
+input uint   FeatureLookbackSeconds = 60;
+input int    FeatureMinObservations = 10;
+input int    FeatureBufferCapacity = 10000;
+input string DatasetSourceId = "";
 
 CVxMarketGuard g_market;
+CVxFeaturePipeline g_feature_pipeline;
+bool g_dataset_fault_reported=false;
 bool g_last_health_state=false;
 string g_last_health_reason="";
 
@@ -47,6 +55,33 @@ int OnInit()
                spec.freeze_level_points,spec.trade_mode,spec.execution_mode,
                spec.filling_mode);
 
+   if(EnableDatasetCollection)
+   {
+      if(FeatureLookbackSeconds<1 || FeatureLookbackSeconds>600)
+      {
+         Print("DATASET INIT FAILED: lookback must be between 1 and 600 seconds");
+         return INIT_PARAMETERS_INCORRECT;
+      }
+
+      string source_id=DatasetSourceId;
+      if(source_id=="")
+         source_id=StringFormat("mt5-%I64d-%I64u",(long)TimeLocal(),GetTickCount64());
+
+      string filename=StringFormat("veltrix_%s.csv",_Symbol);
+      if(!g_feature_pipeline.Init(_Symbol,source_id,filename,
+                                  (ulong)FeatureLookbackSeconds*1000,
+                                  MaxQuoteAgeMilliseconds,
+                                  FeatureMinObservations,
+                                  FeatureBufferCapacity,reason))
+      {
+         Print("DATASET INIT FAILED: ",reason);
+         return INIT_FAILED;
+      }
+      PrintFormat("DATASET COLLECTION ENABLED | symbol=%s source=%s file=%s lookback=%d seconds min_observations=%d capacity=%d",
+                  _Symbol,source_id,filename,(int)FeatureLookbackSeconds,
+                  FeatureMinObservations,FeatureBufferCapacity);
+   }
+
    uint poll=HealthPollMilliseconds;
    if(poll<100) poll=100;
    if(!EventSetMillisecondTimer(poll))
@@ -64,6 +99,22 @@ void OnTimer()
    VxQuoteSnapshot quote;
    string reason;
    bool healthy=g_market.ReadQuote(quote,reason);
+
+   if(EnableDatasetCollection && healthy && !g_dataset_fault_reported)
+   {
+      bool row_written=false;
+      string pipeline_reason;
+      if(!g_feature_pipeline.ProcessQuote(_Symbol,quote.tick,row_written,pipeline_reason))
+      {
+         Print("DATASET COLLECTION FAULTED | ",pipeline_reason);
+         g_dataset_fault_reported=true;
+      }
+      else if(row_written && g_feature_pipeline.RowsWritten()%500==0)
+      {
+         PrintFormat("DATASET COLLECTION PROGRESS | symbol=%s rows=%I64d",
+                     _Symbol,g_feature_pipeline.RowsWritten());
+      }
+   }
 
    if(healthy!=g_last_health_state || (!healthy && reason!=g_last_health_reason))
    {
@@ -84,5 +135,9 @@ void OnTimer()
 void OnDeinit(const int reason)
 {
    EventKillTimer();
-   Print("VELTRIX read-only foundation stopped. No trading actions were available.");
+   if(EnableDatasetCollection)
+      PrintFormat("DATASET COLLECTION STOPPED | rows=%I64d faulted=%s",
+                  g_feature_pipeline.RowsWritten(),
+                  (g_feature_pipeline.IsFaulted() ? "true" : "false"));
+   Print("VELTRIX safe foundation stopped. No trading actions were available.");
 }

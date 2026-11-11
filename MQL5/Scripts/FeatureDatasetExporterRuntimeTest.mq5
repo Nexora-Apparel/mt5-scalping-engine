@@ -162,6 +162,6 @@ void OnStart()
       return;
    }
 
-   Print("DATASET RUNTIME TEST PASS | create, append, reject-invalid, read-back, cleanup");
-   WriteRuntimeResult("PASS | create, append, reject-invalid, read-back, cleanup");
+   Print("DATASET RUNTIME TEST PASS | exporter and pipeline create, append, reject-invalid, read-back, cleanup");
+   WriteRuntimeResult("PASS | exporter and pipeline create, append, reject-invalid, read-back, cleanup");
 }

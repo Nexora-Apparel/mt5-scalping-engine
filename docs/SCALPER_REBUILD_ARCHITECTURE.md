@@ -134,3 +134,14 @@ The Android operator view must show session state, connection/quote freshness, s
 - `MQL5/Scripts/FeatureDatasetExporterRuntimeTest.mq5` exercises terminal-side CSV creation, append, invalid-symbol rejection, read-back, and cleanup. The manual/branch-triggered `mql5-dataset-runtime.yml` workflow runs it in an isolated MT5 terminal without broker credentials or trade permissions.
 - MetaEditor compilation of the runtime test script is added to the compile workflow, but compilation and terminal runtime execution remain separate checks.
 - No dataset is eligible for backtesting until both the Python integrity audit and MT5 runtime test pass for the exporter build that produced it.
+
+
+## Optional live feature-data collection
+
+- `FeaturePipeline.mqh` connects the read-only quote snapshot to the bounded point-in-time collector and versioned CSV exporter.
+- Collection is controlled by the explicit EA input `EnableDatasetCollection`, which defaults to `false`. No collection starts unless the operator enables it on an exact `XAUUSD` or `XAGUSD` chart.
+- Each session uses a unique provenance identifier unless the operator supplies one. Dataset filenames are generated from the exact instrument and restricted to safe CSV basenames.
+- The pipeline accepts each strictly newer broker quote once, uses the quote's own millisecond timestamp as the evaluation timestamp, waits for the complete configured lookback, and exports only validated snapshots.
+- An exporter or integrity failure latches the collector into a faulted state; it does not retry writes blindly. Duplicate/out-of-order quote timestamps are ignored.
+- This is research-data collection only. The pipeline does not evaluate trade decisions, prepare execution intents, or call any broker order API. Live trading remains disabled.
+- The MT5 runtime test feeds synthetic timestamped quotes through the pipeline and verifies that two post-warm-up rows are exported, in addition to the existing direct CSV writer tests.
