@@ -2,6 +2,18 @@ name: Project tests
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "scripts/**"
+      - "MQL5/**"
+      - "docs/**"
+      - "README.md"
+      - "pyproject.toml"
+      - "requirements.txt"
+      - ".github/workflows/tests.yml"
   push:
     branches:
       - main
