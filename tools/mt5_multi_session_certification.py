@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import statistics
 from datetime import datetime
 from pathlib import Path
@@ -27,6 +28,19 @@ def _parse_utc(value: Any, label: str) -> datetime:
     return parsed
 
 
+def _validated_duration(manifest: dict[str, Any], index: int) -> float:
+    value = manifest.get("duration_seconds")
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ProfileError(f"session {index}: duration_seconds must be a numeric monotonic measurement")
+    if not math.isfinite(value) or value < 0:
+        raise ProfileError(f"session {index}: duration_seconds must be finite and non-negative")
+    if manifest.get("duration_clock") != "monotonic":
+        raise ProfileError(f"session {index}: duration was not measured monotonically")
+    if value < 1800:
+        raise ProfileError(f"session {index}: collection was shorter than 30 minutes")
+    return float(value)
+
+
 def certify_sessions(sessions: list[tuple[str | Path, str | Path]]) -> dict[str, Any]:
     if len(sessions) < 2:
         raise ProfileError("at least two independent collection sessions are required")
@@ -45,30 +59,35 @@ def certify_sessions(sessions: list[tuple[str | Path, str | Path]]) -> dict[str,
             manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             raise ProfileError(f"session {index}: unable to read manifest") from exc
+        if not isinstance(manifest, dict):
+            raise ProfileError(f"session {index}: manifest root must be an object")
+
         start = _parse_utc(manifest.get("collection_started_utc"),
                            f"session {index} collection_started_utc")
         end = _parse_utc(manifest.get("collection_ended_utc"),
                          f"session {index} collection_ended_utc")
         if end <= start:
             raise ProfileError(f"session {index}: collection end must follow start")
-        if manifest.get("duration_clock") != "monotonic":
-            raise ProfileError(f"session {index}: duration was not measured monotonically")
-        if manifest.get("duration_seconds", 0) < 1800:
-            raise ProfileError(f"session {index}: collection was shorter than 30 minutes")
-        intervals.append((start, end))
+        duration = _validated_duration(manifest, index)
+
+        intervals.append((start, end, index))
         profiles.append({
             "session": index,
             "sha256": digest,
             "records": profile["records"],
             "started_utc": start.isoformat(),
             "ended_utc": end.isoformat(),
-            "duration_seconds": manifest["duration_seconds"],
+            "duration_seconds": duration,
             "status": profile["status"],
             "symbols": profile["symbols"],
         })
 
-    if len(set(intervals)) != len(intervals):
-        raise ProfileError("duplicate collection interval supplied")
+    ordered_intervals = sorted(intervals, key=lambda item: item[0])
+    for previous, current in zip(ordered_intervals, ordered_intervals[1:]):
+        if current[0] < previous[1]:
+            raise ProfileError(
+                f"overlapping collection intervals: sessions {previous[2]} and {current[2]}"
+            )
 
     by_symbol: dict[str, Any] = {}
     overall_review = any(p["status"] == "REVIEW" for p in profiles)
@@ -130,8 +149,8 @@ def main() -> int:
     try:
         result = certify_sessions(sessions)
     except (ProfileError, OSError) as exc:
-        parser.exit(2, f"CERTIFICATION FAIL: {exc}\n")
-    rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
+        parser.exit(2, f"CERTIFICATION FAIL: {exc}\\n")
+    rendered = json.dumps(result, indent=2, sort_keys=True) + "\\n"
     if args.output:
         args.output.write_text(rendered, encoding="utf-8")
     print(rendered, end="")
