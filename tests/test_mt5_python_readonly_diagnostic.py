@@ -1,8 +1,12 @@
 from pathlib import Path
 from types import SimpleNamespace
 import re
+import sys
 
 import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 from tools.mt5_python_readonly_diagnostic import (
     DEMO_TRADE_MODE,
@@ -14,7 +18,6 @@ from tools.mt5_python_readonly_diagnostic import (
 )
 
 
-ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "tools" / "mt5_python_readonly_diagnostic.py"
 WORKFLOW = ROOT / ".github" / "workflows" / "veltrix-demo-python-diagnostics.yml"
 
