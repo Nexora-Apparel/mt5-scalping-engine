@@ -38,3 +38,8 @@ def test_product_docs_declare_xauusd_only():
     assert "XAUUSD-only" in (ROOT/"README.md").read_text()
     scope=(ROOT/"docs/INSTRUMENT_SCOPE.md").read_text()
     assert "XAUUSD" in scope and "XAGUSD" in scope
+
+def test_legacy_ea_is_also_locked_to_verified_gold_contract():
+    legacy = (ROOT / "MQL5/Experts/NexoraScalper.mq5").read_text()
+    assert 'StringSubstr(normalized_symbol, 0, 6) != "XAUUSD"' in legacy
+    assert 'base_currency != "XAU" || profit_currency != "USD"' in legacy
