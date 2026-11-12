@@ -4,6 +4,7 @@
 //+------------------------------------------------------------------+
 #ifndef VELTRIX_FEATURE_COLLECTOR_MQH
 #define VELTRIX_FEATURE_COLLECTOR_MQH
+#include "StrategyResearch.mqh"
 struct VxQuoteObservation { long time_msc; double bid; double ask; };
 struct VxFeatureCollectorConfig
 {
@@ -45,7 +46,7 @@ public:
       if(!m_initialized){reason="Feature collector is not initialized";return false;}
       if(symbol!="XAUUSD" || symbol!=m_symbol){reason="Only the configured XAUUSD quote is accepted";return false;}
       if(time_msc<=0 || time_msc<=m_last_time_msc){reason="Quote timestamp is duplicate, invalid, or out of order";return false;}
-      if(!MathIsValidNumber(bid)||!MathIsValidNumber(ask)||bid<=0.0||ask<=bid)
+      if(!MathIsValidNumber(bid) || !MathIsValidNumber(ask) || bid<=0.0 || ask<=bid)
       {reason="Quote bid/ask is invalid or crossed";return false;}
       int count=ArraySize(m_quotes);
       if(count>=m_capacity){for(int i=1;i<count;i++)m_quotes[i-1]=m_quotes[i];count--;ArrayResize(m_quotes,count);}
