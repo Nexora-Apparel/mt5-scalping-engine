@@ -29,7 +29,7 @@ def write_fixture(tmp_path, rows):
     raw = csv_path.read_bytes()
     manifest = {
         "sha256": hashlib.sha256(raw).hexdigest(),
-        "records": len(rows), "account_mode": "DEMO",
+        "records": len(rows), "account_mode": "DEMO", "status": "PASS",
         "trading_enabled": False, "dll_imports_enabled": False,
         "instrument_specs": {
             "XAUUSD": {"point": 0.001, "broker_symbol": "XAUUSDm"},
