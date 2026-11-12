@@ -25,7 +25,7 @@ def make_session(tmp_path, name, start_ms, *, gap_ms=1000):
                 "volume": "1", "volume_real": "1.0", "flags": "3",
             })
     with csv_path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=HEADER, lineterminator="\n")
+        writer = csv.DictWriter(handle, fieldnames=HEADER, lineterminator="\\n")
         writer.writeheader()
         writer.writerows(rows)
     start = datetime.fromtimestamp(start_ms / 1000, timezone.utc)
@@ -71,11 +71,40 @@ def test_rejects_duplicate_dataset(tmp_path):
         certify_sessions([first, first])
 
 
-def test_rejects_short_or_non_monotonic_duration(tmp_path):
+def test_rejects_overlapping_collection_intervals(tmp_path):
+    first = make_session(tmp_path, "one", 1_800_000_000_000)
+    # Starts 10 minutes after the first session, so the 30-minute windows overlap.
+    second = make_session(tmp_path, "two", 1_800_000_600_000)
+    with pytest.raises(ProfileError, match="overlapping collection intervals"):
+        certify_sessions([first, second])
+
+
+@pytest.mark.parametrize("duration", [None, "1800", True, float("nan"), float("inf"), -1, 1799.99])
+def test_rejects_invalid_or_short_duration_evidence(tmp_path, duration):
+    first = make_session(tmp_path, "one", 1_800_000_000_000)
+    second = make_session(tmp_path, "two", 1_800_003_000_000)
+    manifest = json.loads(second[1].read_text())
+    manifest["duration_seconds"] = duration
+    second[1].write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ProfileError):
+        certify_sessions([first, second])
+
+
+def test_rejects_non_monotonic_duration_clock(tmp_path):
     first = make_session(tmp_path, "one", 1_800_000_000_000)
     second = make_session(tmp_path, "two", 1_800_003_000_000)
     manifest = json.loads(second[1].read_text())
     manifest["duration_clock"] = "wall"
     second[1].write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(ProfileError, match="not measured monotonically"):
+        certify_sessions([first, second])
+
+
+def test_rejects_non_increasing_utc_interval(tmp_path):
+    first = make_session(tmp_path, "one", 1_800_000_000_000)
+    second = make_session(tmp_path, "two", 1_800_003_000_000)
+    manifest = json.loads(second[1].read_text())
+    manifest["collection_ended_utc"] = manifest["collection_started_utc"]
+    second[1].write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ProfileError, match="end must follow start"):
         certify_sessions([first, second])
