@@ -104,9 +104,10 @@ jobs:
           New-Item -ItemType Directory -Force -Path $destination | Out-Null
           foreach ($root in @("C:\MT5\Logs", "C:\MT5\MQL5\Logs")) {
             if (Test-Path $root) {
+              $prefix = if ($root -like "*MQL5*") { "experts_" } else { "terminal_" }
               Get-ChildItem $root -Filter "*.log" -File -ErrorAction SilentlyContinue |
                 ForEach-Object {
-                  Copy-Item $_.FullName (Join-Path $destination ($root.Replace(':','').Replace('\\','_') + "_" + $_.Name)) -Force
+                  Copy-Item $_.FullName (Join-Path $destination ($prefix + $_.Name)) -Force
                 }
             }
           }
