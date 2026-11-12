@@ -116,6 +116,29 @@ jobs:
           Write-Host "VELTRIX read-only foundation compilation succeeded."
 
 
+      - name: Compile VELTRIX read-only DEMO diagnostic
+        shell: pwsh
+        run: |
+          $source = (Resolve-Path "MQL5\Experts\VeltrixDemoDiagnostics.mq5").Path
+          $log = Join-Path (Split-Path $source) "VeltrixDemoDiagnostics.log"
+          if (Test-Path $log) { Remove-Item $log -Force }
+          $arguments = @('/compile:"' + $source + '"', '/log')
+          Write-Host "Compiling read-only DEMO diagnostic; no account is configured and no order APIs are present."
+          $process = Start-Process -FilePath $env:METAEDITOR -ArgumentList $arguments -Wait -PassThru
+          Start-Sleep -Seconds 2
+          if (!(Test-Path $log)) { throw "MetaEditor did not produce the diagnostic compilation log." }
+          Get-Content $log
+          $logText = Get-Content $log -Raw
+          if ($logText -match "(?i)\b[1-9]\d* errors?\b" -or $logText -notmatch "(?i)0 errors?") {
+            throw "VELTRIX DEMO diagnostic compilation did not report zero errors."
+          }
+          if ($logText -match "(?i)\b[1-9]\d* warnings?\b") {
+            throw "VELTRIX DEMO diagnostic reported compiler warnings."
+          }
+          $compiled = Join-Path (Split-Path $source) "VeltrixDemoDiagnostics.ex5"
+          if (!(Test-Path $compiled)) { throw "Diagnostic EX5 artifact was not created." }
+          Write-Host "VELTRIX read-only DEMO diagnostic compilation succeeded."
+
       - name: Compile dataset exporter runtime test script
         shell: pwsh
         run: |
