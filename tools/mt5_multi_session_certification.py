@@ -1,8 +1,4 @@
-"""Aggregate independent, provenance-verified MT5 DEMO tick sessions.
-
-This is descriptive certification support only. It does not infer execution
-quality, profitability, or permission to trade.
-"""
+"""Aggregate independent, provenance-verified XAUUSD-only MT5 DEMO tick sessions."""
 from __future__ import annotations
 
 import argparse
@@ -44,87 +40,60 @@ def _validated_duration(manifest: dict[str, Any], index: int) -> float:
 def certify_sessions(sessions: list[tuple[str | Path, str | Path]]) -> dict[str, Any]:
     if len(sessions) < 2:
         raise ProfileError("at least two independent collection sessions are required")
-
-    profiles = []
-    hashes = set()
-    intervals = []
+    profiles, hashes, intervals = [], set(), []
     for index, (csv_path, manifest_path) in enumerate(sessions, start=1):
         profile = profile_dataset(csv_path, manifest_path)
         digest = profile["sha256"]
         if digest in hashes:
             raise ProfileError("duplicate dataset supplied; sessions must be independent")
         hashes.add(digest)
-
         try:
             manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             raise ProfileError(f"session {index}: unable to read manifest") from exc
         if not isinstance(manifest, dict):
             raise ProfileError(f"session {index}: manifest root must be an object")
-
-        start = _parse_utc(manifest.get("collection_started_utc"),
-                           f"session {index} collection_started_utc")
-        end = _parse_utc(manifest.get("collection_ended_utc"),
-                         f"session {index} collection_ended_utc")
+        start = _parse_utc(manifest.get("collection_started_utc"), f"session {index} collection_started_utc")
+        end = _parse_utc(manifest.get("collection_ended_utc"), f"session {index} collection_ended_utc")
         if end <= start:
             raise ProfileError(f"session {index}: collection end must follow start")
         duration = _validated_duration(manifest, index)
-
         intervals.append((start, end, index))
         profiles.append({
-            "session": index,
-            "sha256": digest,
-            "records": profile["records"],
-            "started_utc": start.isoformat(),
-            "ended_utc": end.isoformat(),
-            "duration_seconds": duration,
-            "status": profile["status"],
-            "symbols": profile["symbols"],
+            "session": index, "sha256": digest, "records": profile["records"],
+            "started_utc": start.isoformat(), "ended_utc": end.isoformat(),
+            "duration_seconds": duration, "status": profile["status"], "symbols": profile["symbols"],
         })
-
-    ordered_intervals = sorted(intervals, key=lambda item: item[0])
-    for previous, current in zip(ordered_intervals, ordered_intervals[1:]):
+    ordered = sorted(intervals, key=lambda item: item[0])
+    for previous, current in zip(ordered, ordered[1:]):
         if current[0] < previous[1]:
-            raise ProfileError(
-                f"overlapping collection intervals: sessions {previous[2]} and {current[2]}"
-            )
-
-    by_symbol: dict[str, Any] = {}
-    overall_review = any(p["status"] == "REVIEW" for p in profiles)
-    for symbol in ("XAUUSD", "XAGUSD"):
-        items = [p["symbols"][symbol] for p in profiles]
-        rates = [item["ticks_per_second"] for item in items if item["ticks_per_second"] is not None]
-        p95_gaps = [item["intertick_gap_ms_p95"] for item in items
-                    if item["intertick_gap_ms_p95"] is not None]
-        spreads = [item["spread_points_median"] for item in items]
-        gaps_over_5s = sum(item["gaps_over_5s"] for item in items)
-        status = "REVIEW" if any(item["status"] == "REVIEW" for item in items) else "PASS"
-        by_symbol[symbol] = {
-            "status": status,
-            "sessions": len(items),
-            "total_records": sum(item["records"] for item in items),
-            "ticks_per_second_median": round(statistics.median(rates), 4) if rates else None,
-            "ticks_per_second_min": round(min(rates), 4) if rates else None,
-            "ticks_per_second_max": round(max(rates), 4) if rates else None,
-            "intertick_gap_p95_ms_median": round(statistics.median(p95_gaps), 3) if p95_gaps else None,
-            "sessions_with_gaps_over_5s": sum(item["gaps_over_5s"] > 0 for item in items),
-            "total_gaps_over_5s": gaps_over_5s,
-            "session_median_spread_points_min": round(min(spreads), 6),
-            "session_median_spread_points_max": round(max(spreads), 6),
-            "session_median_spread_points": [round(value, 6) for value in spreads],
-            "zero_volume_real_pct_by_session": [item["zero_volume_real_pct"] for item in items],
-        }
-        overall_review = overall_review or status == "REVIEW"
-
+            raise ProfileError(f"overlapping collection intervals: sessions {previous[2]} and {current[2]}")
+    items = [p["symbols"]["XAUUSD"] for p in profiles]
+    rates = [item["ticks_per_second"] for item in items if item["ticks_per_second"] is not None]
+    p95 = [item["intertick_gap_ms_p95"] for item in items if item["intertick_gap_ms_p95"] is not None]
+    spreads = [item["spread_points_median"] for item in items]
+    gaps5 = sum(item["gaps_over_5s"] for item in items)
+    status = "REVIEW" if any(item["status"] == "REVIEW" for item in items) else "PASS"
+    gold = {
+        "status": status, "sessions": len(items), "total_records": sum(item["records"] for item in items),
+        "ticks_per_second_median": round(statistics.median(rates), 4) if rates else None,
+        "ticks_per_second_min": round(min(rates), 4) if rates else None,
+        "ticks_per_second_max": round(max(rates), 4) if rates else None,
+        "intertick_gap_p95_ms_median": round(statistics.median(p95), 3) if p95 else None,
+        "sessions_with_gaps_over_5s": sum(item["gaps_over_5s"] > 0 for item in items),
+        "total_gaps_over_5s": gaps5,
+        "session_median_spread_points_min": round(min(spreads), 6),
+        "session_median_spread_points_max": round(max(spreads), 6),
+        "session_median_spread_points": [round(value, 6) for value in spreads],
+        "zero_volume_real_pct_by_session": [item["zero_volume_real_pct"] for item in items],
+    }
     return {
-        "status": "REVIEW" if overall_review else "PASS",
-        "certification_type": "MULTI_SESSION_DESCRIPTIVE_ONLY",
-        "sessions": profiles,
-        "session_count": len(profiles),
-        "symbols": by_symbol,
+        "status": "REVIEW" if status == "REVIEW" else "PASS",
+        "certification_type": "XAUUSD_ONLY_MULTI_SESSION_DESCRIPTIVE",
+        "sessions": profiles, "session_count": len(profiles), "symbols": {"XAUUSD": gold},
         "limitations": [
-            "A PASS means only that supplied independent sessions passed the configured data-integrity and descriptive gap checks.",
-            "This report does not certify live quote availability, spreads under future conditions, slippage, fills, execution quality, or profitability.",
+            "A PASS means only that supplied independent XAUUSD sessions passed configured data-integrity and descriptive gap checks.",
+            "This report does not certify live quote availability, future spreads, slippage, fills, execution quality, or profitability.",
             "No trading authorization is granted; DEMO execution requires a separate risk-controlled implementation and validation.",
         ],
     }
@@ -132,10 +101,8 @@ def certify_sessions(sessions: list[tuple[str | Path, str | Path]]) -> dict[str,
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--session", action="append", required=True, metavar="CSV=MANIFEST",
-        help="one collected session; repeat at least twice",
-    )
+    parser.add_argument("--session", action="append", required=True, metavar="CSV=MANIFEST",
+                        help="one XAUUSD collection session; repeat at least twice")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     sessions = []
