@@ -194,8 +194,9 @@ def test_incremental_tick_cursor_advances_on_short_batches_and_filters_pre_sessi
 
 def test_tick_audit_reports_long_intertick_gaps_without_silently_filling_them(tmp_path):
     path = tmp_path / "gaps.csv"
-    write_rows(path, [valid_row(stamp=1_800_000_000_000),
-                      valid_row(stamp=1_800_000_007_500)])
+    write_rows(path, [valid_row("XAUUSD", stamp=1_800_000_000_000),
+                      valid_row("XAUUSD", stamp=1_800_000_007_500),
+                      valid_row("XAGUSD", stamp=1_800_000_000_000)])
     result = collector.audit_ticks(path)
     assert result["streams"]["XAUUSD"]["max_intertick_gap_ms"] == 7500
     assert result["streams"]["XAUUSD"]["gaps_over_5_seconds"] == 1
