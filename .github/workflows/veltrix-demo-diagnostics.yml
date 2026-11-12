@@ -136,27 +136,35 @@ jobs:
             $deadline = (Get-Date).AddMinutes(5)
             $passed = $false
             $failure = $false
+            $seenLogs = @{}
             while ((Get-Date) -lt $deadline) {
               if ($proc.HasExited) { throw "MT5 exited before diagnostic completed." }
-              $logDir = "C:\MT5\MQL5\Logs"
-              if (Test-Path $logDir) {
-                $files = Get-ChildItem $logDir -Filter "*.log" -File -ErrorAction SilentlyContinue |
-                  Sort-Object LastWriteTime -Descending | Select-Object -First 3
-                foreach ($file in $files) {
-                  $logText = Get-Content $file.FullName -Raw -ErrorAction SilentlyContinue
+              # Search all terminal subdirectories: broker-branded portable builds
+              # may store Expert and Journal logs in different locations.
+              $files = Get-ChildItem "C:\MT5" -Filter "*.log" -File -Recurse -ErrorAction SilentlyContinue |
+                Sort-Object LastWriteTime -Descending | Select-Object -First 30
+              foreach ($file in $files) {
+                try {
+                  $logText = Get-Content $file.FullName -Raw -ErrorAction Stop
                   if ($logText -match "VELTRIX DEMO DIAGNOSTIC FAILED") { $failure = $true; break }
                   if ($logText -match "VELTRIX DEMO DIAGNOSTIC PASSED") { $passed = $true; break }
-                }
+                  if ($logText -match "VELTRIX DEMO DIAGNOSTIC WAIT|VELTRIX DEMO DIAGNOSTIC STARTED") {
+                    $seenLogs[$file.FullName] = $file.LastWriteTimeUtc
+                  }
+                } catch { }
               }
-              if ($passed) { break }
-              if ($failure) { break }
+              if ($passed -or $failure) { break }
               Start-Sleep -Seconds 5
             }
+            Write-Host "Diagnostic log files containing startup markers: $($seenLogs.Count)"
             if (!$passed) {
+              Write-Host "Recent MT5 log inventory:"
+              Get-ChildItem "C:\MT5" -Filter "*.log" -File -Recurse -ErrorAction SilentlyContinue |
+                Sort-Object LastWriteTime -Descending | Select-Object -First 20 FullName, Length, LastWriteTime |
+                Format-Table -AutoSize
               if ($failure) { throw "Read-only DEMO diagnostic reported a failed account or quote guard." }
-              throw "Read-only DEMO diagnostic did not complete within five minutes."
+              throw "Read-only DEMO diagnostic did not complete within five minutes; inspect uploaded terminal logs."
             }
-            Write-Host "SUCCESS: DEMO account identity and five consecutive fresh quote samples for both XAUUSD and XAGUSD were verified."
           }
           finally {
             if ($proc -and !$proc.HasExited) {
@@ -165,6 +173,35 @@ jobs:
             }
             Remove-Item -LiteralPath $config -Force -ErrorAction SilentlyContinue
           }
+
+      - name: Collect MT5 diagnostic logs
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $destination = Join-Path $env:RUNNER_TEMP "veltrix-mt5-diagnostic-logs"
+          New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          if (Test-Path "C:\MT5") {
+            Get-ChildItem "C:\MT5" -Filter "*.log" -File -Recurse -ErrorAction SilentlyContinue |
+              ForEach-Object {
+                $safeName = ($_.FullName -replace '[:\\]', '_')
+                Copy-Item $_.FullName (Join-Path $destination $safeName) -Force
+              }
+          }
+          Write-Host "Collected $((Get-ChildItem $destination -File | Measure-Object).Count) MT5 log files."
+          Get-ChildItem $destination -File | ForEach-Object {
+            Write-Host "----- $($_.Name) (last 160 lines) -----"
+            Get-Content $_.FullName -Tail 160
+          }
+
+      - name: Upload MT5 diagnostic logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veltrix-mt5-diagnostic-logs
+          path: ${{ runner.temp }}/veltrix-mt5-diagnostic-logs/
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Confirm no trading was enabled
         if: always()
