@@ -49,6 +49,8 @@ def validate_account(
         raise DiagnosticFailure(f"terminal_info unavailable; last_error={mt5.last_error()}")
     if not bool(getattr(terminal, "connected", False)):
         raise DiagnosticFailure("terminal is not connected to a trade server")
+    if bool(getattr(terminal, "trade_allowed", True)):
+        raise DiagnosticFailure("terminal trading permission is enabled; read-only guard requires it disabled")
 
     account = mt5.account_info()
     if account is None:
@@ -67,6 +69,7 @@ def validate_account(
 
     return {
         "connected": True,
+        "terminal_trade_allowed": False,
         "login_match": login_match,
         "server_match": server_match,
         "trade_mode": trade_mode,
