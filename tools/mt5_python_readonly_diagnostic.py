@@ -1,7 +1,7 @@
-"""Read-only MT5 DEMO account and broker-symbol quote diagnostic.
+"""Read-only MT5 DEMO account and XAUUSD broker-contract quote diagnostic.
 
-Discovers broker suffixes from the connected account's symbol catalogue. It
-never guesses GOLD/SILVER aliases and never submits or manages orders.
+Discovers the XAUUSD broker suffix from the connected account catalogue and
+verifies the contract currencies. It never submits or manages orders.
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable
 
-CANONICAL_SYMBOLS = ("XAUUSD", "XAGUSD")
+CANONICAL_SYMBOLS = ("XAUUSD",)
 DEMO_TRADE_MODE = 0
 
 
@@ -48,8 +48,7 @@ def validate_account(mt5: Any, expected_login: int, expected_server: str) -> dic
     if bool(getattr(terminal, "trade_allowed", True)):
         raise DiagnosticFailure("terminal trading permission is enabled; read-only guard requires it disabled")
     if bool(getattr(terminal, "dlls_allowed", True)):
-        raise DiagnosticFailure("terminal DLL imports are enabled; read-only guard requires them disabled")
-
+        raise DiagnosticFailure("terminal DLL imports are enabled; read-only guard requires it disabled")
     account = mt5.account_info()
     if account is None:
         raise DiagnosticFailure(f"account_info unavailable; last_error={mt5.last_error()}")
@@ -74,7 +73,9 @@ def _symbol_name(item: Any) -> str:
 
 
 def discover_symbol(mt5: Any, canonical: str) -> str:
-    """Resolve only an unambiguous canonical instrument with optional broker suffix."""
+    """Resolve only XAUUSD with an optional unambiguous broker suffix."""
+    if canonical != "XAUUSD":
+        raise DiagnosticFailure("instrument scope violation: XAUUSD is the only supported instrument")
     catalogue = mt5.symbols_get()
     if catalogue is None:
         raise DiagnosticFailure(f"symbol catalogue unavailable; last_error={mt5.last_error()}")
@@ -84,40 +85,31 @@ def discover_symbol(mt5: Any, canonical: str) -> str:
         normalized = re.sub(r"[^A-Z0-9]", "", name.upper())
         if not normalized.startswith(canonical):
             continue
-        # The canonical six-character instrument must be followed only by a
-        # broker suffix; its underlying base/quote currencies must agree.
         base = str(getattr(item, "currency_base", "") or "").upper()
         profit = str(getattr(item, "currency_profit", "") or "").upper()
-        if base and base != canonical[:3]:
+        if base and base != "XAU":
             continue
-        if profit and profit != canonical[3:]:
+        if profit and profit != "USD":
             continue
         candidates.append(name)
-
     candidates = sorted(set(candidates), key=lambda name: (name.upper() != canonical, len(name), name))
-    # Prefer the exact canonical symbol when the broker publishes it alongside
-    # other suffix variants; otherwise require exactly one suffix candidate.
     if canonical in candidates:
         candidates = [canonical]
     if len(candidates) != 1:
-        hints = [
-            _symbol_name(item) for item in catalogue
-            if any(term in _symbol_name(item).upper() for term in ("XAU", "XAG", "GOLD", "SILVER"))
-        ]
+        hints = [_symbol_name(item) for item in catalogue
+                 if "XAU" in _symbol_name(item).upper()]
         raise DiagnosticFailure(
-            f"{canonical}: expected one canonical broker symbol, found {len(candidates)}; "
-            f"candidates={candidates}; metal_catalogue_hints={sorted(set(hints))[:30]}"
+            f"XAUUSD: expected one canonical broker symbol, found {len(candidates)}; "
+            f"candidates={candidates}; gold_catalogue_hints={sorted(set(hints))[:30]}"
         )
     resolved = candidates[0]
     if not mt5.symbol_select(resolved, True):
-        raise DiagnosticFailure(f"{canonical}: broker symbol {resolved} exists but could not be selected")
+        raise DiagnosticFailure(f"XAUUSD: broker symbol {resolved} exists but could not be selected")
     return resolved
 
 
-def validate_quote(
-    mt5: Any, symbol: str, now_ms: int, max_quote_age_ms: int, max_spread_points: float,
-    canonical: str | None = None,
-) -> dict[str, Any]:
+def validate_quote(mt5: Any, symbol: str, now_ms: int, max_quote_age_ms: int,
+                   max_spread_points: float, canonical: str | None = None) -> dict[str, Any]:
     info = mt5.symbol_info(symbol)
     if info is None:
         raise DiagnosticFailure(f"{symbol}: symbol_info unavailable; last_error={mt5.last_error()}")
@@ -126,8 +118,7 @@ def validate_quote(
     if tick is None:
         raise DiagnosticFailure(f"{symbol}: no readable tick; last_error={mt5.last_error()}")
     bid, ask, tick_time_ms = float(tick.bid), float(tick.ask), int(tick.time_msc)
-    if (not all(math.isfinite(v) for v in (point, bid, ask)) or point <= 0 or
-            bid <= 0 or ask <= bid or tick_time_ms <= 0):
+    if not all(math.isfinite(v) for v in (point, bid, ask)) or point <= 0 or bid <= 0 or ask <= bid or tick_time_ms <= 0:
         raise DiagnosticFailure(f"{symbol}: invalid point, bid, ask, or tick timestamp")
     age_ms = now_ms - tick_time_ms
     if age_ms < -5_000 or age_ms > max_quote_age_ms:
@@ -135,19 +126,15 @@ def validate_quote(
     spread_points = (ask - bid) / point
     if not math.isfinite(spread_points) or spread_points <= 0 or spread_points > max_spread_points:
         raise DiagnosticFailure(f"{symbol}: spread outside configured limit (spread_points={spread_points:.2f})")
-    return {
-        "canonical": canonical or symbol, "broker_symbol": symbol, "bid": bid, "ask": ask,
-        "spread_points": round(spread_points, 2), "age_ms": age_ms,
-        "time_msc": tick_time_ms, "digits": int(getattr(info, "digits", 0)),
-    }
+    return {"canonical": canonical or "XAUUSD", "broker_symbol": symbol, "bid": bid, "ask": ask,
+            "spread_points": round(spread_points, 2), "age_ms": age_ms,
+            "time_msc": tick_time_ms, "digits": int(getattr(info, "digits", 0))}
 
 
-def run_diagnostic(
-    mt5: Any, config: DiagnosticConfig, *, emit_fn: Callable[..., None] = emit,
-    now_ms_fn: Callable[[], int] | None = None,
-    monotonic_fn: Callable[[], float] = time.monotonic,
-    sleep_fn: Callable[[float], None] = time.sleep,
-) -> None:
+def run_diagnostic(mt5: Any, config: DiagnosticConfig, *, emit_fn: Callable[..., None] = emit,
+                   now_ms_fn: Callable[[], int] | None = None,
+                   monotonic_fn: Callable[[], float] = time.monotonic,
+                   sleep_fn: Callable[[float], None] = time.sleep) -> None:
     if config.login <= 0 or not config.password or not config.server:
         raise DiagnosticFailure("required account configuration is missing")
     if not config.terminal_path:
@@ -160,31 +147,23 @@ def run_diagnostic(
         raise DiagnosticFailure("stable sample count is outside safe bounds")
     if not 15 <= config.timeout_seconds <= 300:
         raise DiagnosticFailure("diagnostic timeout is outside safe bounds")
-
     clock_ms = now_ms_fn or (lambda: int(time.time() * 1000))
     emit_fn("INITIALIZING", portable=True, timeout_ms=120_000)
-    if not mt5.initialize(
-        config.terminal_path, login=config.login, password=config.password,
-        server=config.server, timeout=120_000, portable=True,
-    ):
+    if not mt5.initialize(config.terminal_path, login=config.login, password=config.password,
+                          server=config.server, timeout=120_000, portable=True):
         raise DiagnosticFailure(f"MT5 initialize failed; last_error={mt5.last_error()}")
-
     try:
         identity = validate_account(mt5, config.login, config.server)
         emit_fn("ACCOUNT_VERIFIED", **identity)
-        resolved = {canonical: discover_symbol(mt5, canonical) for canonical in CANONICAL_SYMBOLS}
+        resolved = {"XAUUSD": discover_symbol(mt5, "XAUUSD")}
         emit_fn("SYMBOLS_RESOLVED", symbols=resolved)
-
         started = monotonic_fn()
         stable_samples = 0
         while monotonic_fn() - started < config.timeout_seconds:
             validate_account(mt5, config.login, config.server)
             try:
-                quotes = [
-                    validate_quote(mt5, resolved[canonical], clock_ms(), config.max_quote_age_ms,
-                                   config.max_spread_points, canonical)
-                    for canonical in CANONICAL_SYMBOLS
-                ]
+                quotes = [validate_quote(mt5, resolved["XAUUSD"], clock_ms(),
+                                         config.max_quote_age_ms, config.max_spread_points, "XAUUSD")]
             except DiagnosticFailure as exc:
                 stable_samples = 0
                 emit_fn("QUOTE_BLOCKED", reason=str(exc), stable_samples=stable_samples)
@@ -197,7 +176,7 @@ def run_diagnostic(
                         trading="disabled")
                 return
             sleep_fn(config.sample_interval_seconds)
-        raise DiagnosticFailure("both canonical metal instruments did not produce enough consecutive fresh, valid quotes before timeout")
+        raise DiagnosticFailure("XAUUSD did not produce enough consecutive fresh, valid quotes before timeout")
     finally:
         mt5.shutdown()
 
