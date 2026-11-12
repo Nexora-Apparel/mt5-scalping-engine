@@ -1,4 +1,4 @@
-"""Bounded, read-only Exness DEMO tick collector for XAUUSD and XAGUSD.
+"""Bounded, read-only Exness DEMO tick collector for XAUUSD only.
 
 The collector verifies DEMO identity throughout the session, requires terminal
 trading/DLL permissions to remain disabled, resolves contracts from the broker
@@ -148,7 +148,7 @@ def wait_for_fresh_quotes(
     monotonic=time.monotonic, sleep=time.sleep,
     now=lambda: datetime.now(timezone.utc),
 ) -> list[dict[str, Any]]:
-    """Wait for five consecutive fresh quotes for both metals before timing collection."""
+    """Wait for five consecutive fresh XAUUSD quotes before timing collection."""
     started = monotonic()
     stable = 0
     last_reason = "no quote samples received"
@@ -171,7 +171,7 @@ def wait_for_fresh_quotes(
         sleep(min(1.0, max(0.0, timeout_seconds - (monotonic() - started))))
     raise DiagnosticFailure(
         f"fresh quote warm-up failed after {timeout_seconds}s; "
-        f"required {stable_samples_required} consecutive samples for both metals; "
+        f"required {stable_samples_required} consecutive fresh XAUUSD samples; "
         f"last_reason={last_reason}"
     )
 

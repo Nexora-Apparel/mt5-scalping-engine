@@ -1,16 +1,11 @@
 //+------------------------------------------------------------------+
 //| StrategyResearch.mqh                                             |
-//| Deterministic candidate evaluator only; no trading operations.   |
+//| XAUUSD-only deterministic candidate evaluator; no trade APIs.   |
 //+------------------------------------------------------------------+
 #ifndef VELTRIX_STRATEGY_RESEARCH_MQH
 #define VELTRIX_STRATEGY_RESEARCH_MQH
 
-enum ENUM_VX_SIGNAL_DIRECTION
-{
-   VX_SIGNAL_NONE=0,
-   VX_SIGNAL_LONG=1,
-   VX_SIGNAL_SHORT=-1
-};
+enum ENUM_VX_SIGNAL_DIRECTION { VX_SIGNAL_NONE=0, VX_SIGNAL_LONG=1, VX_SIGNAL_SHORT=-1 };
 
 struct VxStrategyConfig
 {
@@ -24,7 +19,6 @@ struct VxStrategyConfig
    double min_efficiency_ratio;
    int min_observations;
 };
-
 struct VxStrategySnapshot
 {
    string symbol;
@@ -38,7 +32,6 @@ struct VxStrategySnapshot
    double efficiency_ratio;
    int observations;
 };
-
 struct VxSignalCandidate
 {
    bool eligible;
@@ -57,9 +50,9 @@ class CVxStrategyResearch
 private:
    bool ValidConfig(const VxStrategyConfig &config,string &reason) const
    {
-      if(config.symbol!="XAUUSD" && config.symbol!="XAGUSD")
+      if(config.symbol!="XAUUSD")
       {
-         reason="Only configured XAUUSD or XAGUSD symbols are supported";
+         reason="XAGUSD and all other instruments are disabled; XAUUSD only";
          return false;
       }
       if(config.lookback_ms==0 || config.max_quote_age_ms==0 ||
@@ -68,28 +61,17 @@ private:
          !MathIsValidNumber(config.max_realized_volatility_bps) ||
          !MathIsValidNumber(config.min_abs_momentum_bps) ||
          !MathIsValidNumber(config.min_efficiency_ratio) ||
-         config.max_spread_bps<=0.0 ||
-         config.min_realized_volatility_bps<0.0 ||
+         config.max_spread_bps<=0.0 || config.min_realized_volatility_bps<0.0 ||
          config.max_realized_volatility_bps<=config.min_realized_volatility_bps ||
-         config.min_abs_momentum_bps<=0.0 ||
-         config.min_efficiency_ratio<0.0 ||
-         config.min_efficiency_ratio>1.0 ||
-         config.min_observations<2)
-      {
-         reason="Strategy configuration is invalid or incomplete";
-         return false;
-      }
+         config.min_abs_momentum_bps<=0.0 || config.min_efficiency_ratio<0.0 ||
+         config.min_efficiency_ratio>1.0 || config.min_observations<2)
+      { reason="Strategy configuration is invalid or incomplete"; return false; }
       reason="";
       return true;
    }
-
 public:
-   // Evaluates a point-in-time feature snapshot. Thresholds are supplied
-   // by the research caller and are not calibrated trading parameters.
-   bool Evaluate(const VxStrategyConfig &config,
-                 const VxStrategySnapshot &snapshot,
-                 VxSignalCandidate &candidate,
-                 string &reason) const
+   bool Evaluate(const VxStrategyConfig &config,const VxStrategySnapshot &snapshot,
+                 VxSignalCandidate &candidate,string &reason) const
    {
       candidate.eligible=false;
       candidate.direction=VX_SIGNAL_NONE;
@@ -100,19 +82,15 @@ public:
       candidate.realized_volatility_bps=snapshot.realized_volatility_bps;
       candidate.efficiency_ratio=snapshot.efficiency_ratio;
       candidate.reason="";
-
-      if(!ValidConfig(config,reason))
-      {
-         candidate.reason=reason;
-         return false;
-      }
-      if(snapshot.symbol!=config.symbol)
+      if(!ValidConfig(config,reason)) { candidate.reason=reason; return false; }
+      if(snapshot.symbol!="XAUUSD")
+         reason="Snapshot contains a non-XAUUSD instrument";
+      else if(snapshot.symbol!=config.symbol)
          reason="Snapshot symbol does not match its independent configuration";
       else if(snapshot.evaluation_time_msc<=0 || snapshot.quote_time_msc<=0 ||
               snapshot.quote_time_msc>snapshot.evaluation_time_msc)
          reason="Quote timestamp is missing or lies after evaluation time";
-      else if((ulong)(snapshot.evaluation_time_msc-snapshot.quote_time_msc)>
-              config.max_quote_age_ms)
+      else if((ulong)(snapshot.evaluation_time_msc-snapshot.quote_time_msc)>config.max_quote_age_ms)
          reason="Quote is stale";
       else if(snapshot.bid<=0.0 || snapshot.ask<=snapshot.bid ||
               !MathIsValidNumber(snapshot.bid) || !MathIsValidNumber(snapshot.ask))
@@ -137,10 +115,8 @@ public:
          else
          {
             candidate.spread_bps=((snapshot.ask-snapshot.bid)/midpoint)*10000.0;
-            if(!MathIsValidNumber(candidate.spread_bps))
-               reason="Calculated spread is invalid or non-finite";
-            else if(candidate.spread_bps>config.max_spread_bps)
-               reason="Spread exceeds the research configuration limit";
+            if(!MathIsValidNumber(candidate.spread_bps)) reason="Calculated spread is invalid or non-finite";
+            else if(candidate.spread_bps>config.max_spread_bps) reason="Spread exceeds the research configuration limit";
             else if(snapshot.realized_volatility_bps<config.min_realized_volatility_bps ||
                     snapshot.realized_volatility_bps>config.max_realized_volatility_bps)
                reason="Realized volatility is outside the configured research band";
@@ -150,21 +126,18 @@ public:
                reason="Absolute momentum is below the configured threshold";
             else
             {
-               candidate.direction=(snapshot.momentum_bps>0.0 ?
-                                    VX_SIGNAL_LONG : VX_SIGNAL_SHORT);
+               candidate.direction=(snapshot.momentum_bps>0.0 ? VX_SIGNAL_LONG : VX_SIGNAL_SHORT);
                candidate.eligible=true;
-               candidate.reason="Research candidate passed configured feature gates; not an execution instruction";
+               candidate.reason="XAUUSD research candidate passed configured feature gates; not an execution instruction";
                reason="";
                return true;
             }
          }
       }
-
       candidate.reason=reason;
       candidate.direction=VX_SIGNAL_NONE;
       candidate.eligible=false;
       return true;
    }
 };
-
 #endif

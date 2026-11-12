@@ -352,6 +352,27 @@ void TryEntry()
 
 int OnInit()
 {
+   // Legacy prototype is retained for audit only; hard-lock it to the verified
+   // XAUUSD contract so it cannot be attached to silver or another instrument.
+   string normalized_symbol = _Symbol;
+   StringToUpper(normalized_symbol);
+   string base_currency = "", profit_currency = "";
+   if(StringLen(normalized_symbol) < 6 ||
+      StringSubstr(normalized_symbol, 0, 6) != "XAUUSD" ||
+      !SymbolInfoString(_Symbol, SYMBOL_CURRENCY_BASE, base_currency) ||
+      !SymbolInfoString(_Symbol, SYMBOL_CURRENCY_PROFIT, profit_currency))
+   {
+      Print("Nexora legacy prototype blocked: only a verified XAUUSD contract is permitted.");
+      return INIT_FAILED;
+   }
+   StringToUpper(base_currency);
+   StringToUpper(profit_currency);
+   if(base_currency != "XAU" || profit_currency != "USD")
+   {
+      Print("Nexora legacy prototype blocked: broker contract is not XAUUSD.");
+      return INIT_FAILED;
+   }
+
    if(FastEmaPeriod <= 0 || SlowEmaPeriod <= FastEmaPeriod ||
       RiskPercentPerTrade <= 0.0 || MaxDailyLossPercent <= 0.0 ||
       StopLossPoints <= 0 || TakeProfitPoints <= 0)

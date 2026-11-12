@@ -1,5 +1,5 @@
 name: VELTRIX Python read-only Exness DEMO diagnostics
-run-name: VELTRIX Python DEMO diagnostics (XAUUSD + XAGUSD)
+run-name: VELTRIX Python DEMO diagnostics (XAUUSD only)
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   demo-diagnostics:
-    name: Verify Exness DEMO identity and metal quotes (read-only)
+    name: Verify Exness DEMO identity and XAUUSD quote (read-only)
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
