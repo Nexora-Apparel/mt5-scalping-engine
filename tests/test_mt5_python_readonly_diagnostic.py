@@ -33,10 +33,11 @@ class FakeClock:
 
 
 class FakeMT5:
-    def __init__(self, clock, *, trade_mode=DEMO_TRADE_MODE, connected=True):
+    def __init__(self, clock, *, trade_mode=DEMO_TRADE_MODE, connected=True, trade_allowed=False):
         self.clock = clock
         self.trade_mode = trade_mode
         self.connected = connected
+        self.trade_allowed = trade_allowed
         self.shutdown_called = False
         self.initialize_args = None
 
@@ -45,7 +46,7 @@ class FakeMT5:
         return True
 
     def terminal_info(self):
-        return SimpleNamespace(connected=self.connected, trade_allowed=False)
+        return SimpleNamespace(connected=self.connected, trade_allowed=self.trade_allowed)
 
     def account_info(self):
         return SimpleNamespace(
@@ -87,14 +88,17 @@ def test_account_identity_accepts_only_exact_demo_login_and_server():
 
 
 @pytest.mark.parametrize(
-    ("trade_mode", "connected", "message"),
+    ("trade_mode", "connected", "trade_allowed", "message"),
     [
-        (2, True, "not DEMO"),
-        (0, False, "not connected"),
+        (2, True, False, "not DEMO"),
+        (0, False, False, "not connected"),
+        (0, True, True, "trading permission is enabled"),
     ],
 )
-def test_account_guard_fails_closed(trade_mode, connected, message):
-    api = FakeMT5(FakeClock(), trade_mode=trade_mode, connected=connected)
+def test_account_guard_fails_closed(trade_mode, connected, trade_allowed, message):
+    api = FakeMT5(
+        FakeClock(), trade_mode=trade_mode, connected=connected, trade_allowed=trade_allowed
+    )
     with pytest.raises(DiagnosticFailure, match=message):
         validate_account(api, 12345678, "Exness-MT5Trial")
 
