@@ -62,6 +62,8 @@ def audit_ticks(path: str | Path, expected_symbols: tuple[str, ...] = CANONICAL_
     first: dict[str, int] = {}
     last: dict[str, int] = {}
     previous: dict[str, int] = {}
+    max_gap_ms: dict[str, int] = {symbol: 0 for symbol in expected_symbols}
+    gaps_over_5s: dict[str, int] = {symbol: 0 for symbol in expected_symbols}
     seen: set[tuple[Any, ...]] = set()
     rows = 0
 
@@ -102,6 +104,11 @@ def audit_ticks(path: str | Path, expected_symbols: tuple[str, ...] = CANONICAL_
             seen.add(identity)
             if symbol in previous and stamp < previous[symbol]:
                 raise DiagnosticFailure(f"line {line}: tick timestamps moved backwards for {symbol}")
+            if symbol in previous:
+                gap = stamp - previous[symbol]
+                max_gap_ms[symbol] = max(max_gap_ms[symbol], gap)
+                if gap > 5_000:
+                    gaps_over_5s[symbol] += 1
             previous[symbol] = stamp
             first.setdefault(symbol, stamp)
             last[symbol] = stamp
@@ -126,6 +133,8 @@ def audit_ticks(path: str | Path, expected_symbols: tuple[str, ...] = CANONICAL_
                 "first_time_utc": utc_iso(first[symbol]),
                 "last_time_msc": last[symbol],
                 "last_time_utc": utc_iso(last[symbol]),
+                "max_intertick_gap_ms": max_gap_ms[symbol],
+                "gaps_over_5_seconds": gaps_over_5s[symbol],
             } for symbol in expected_symbols
         },
     }
@@ -206,6 +215,21 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
         if identity["trade_mode"] != DEMO_TRADE_MODE:
             raise DiagnosticFailure("account is not DEMO")
         symbols = {name: discover_symbol(mt5, name) for name in CANONICAL_SYMBOLS}
+        instrument_specs = {}
+        for canonical, broker_symbol in symbols.items():
+            info = mt5.symbol_info(broker_symbol)
+            if info is None or float(getattr(info, "point", 0.0)) <= 0:
+                raise DiagnosticFailure(f"{canonical}: broker instrument specification unavailable")
+            instrument_specs[canonical] = {
+                "broker_symbol": broker_symbol,
+                "point": float(info.point),
+                "digits": int(getattr(info, "digits", 0)),
+                "currency_base": str(getattr(info, "currency_base", "") or ""),
+                "currency_profit": str(getattr(info, "currency_profit", "") or ""),
+                "trade_tick_size": float(getattr(info, "trade_tick_size", 0.0) or 0.0),
+                "trade_contract_size": float(getattr(info, "trade_contract_size", 0.0) or 0.0),
+            }
+        spread_samples = {name: [] for name in CANONICAL_SYMBOLS}
         source_id = "exness-demo-" + re.sub(r"[^A-Za-z0-9_-]", "-", server)[:70]
         started_utc = now()
         start_mono = monotonic()
@@ -218,7 +242,8 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
             validate_account(mt5, login, server)
             current_ms = int(now().timestamp() * 1000)
             for canonical in CANONICAL_SYMBOLS:
-                validate_quote(mt5, symbols[canonical], current_ms, 15_000, 1_000, canonical)
+                quote = validate_quote(mt5, symbols[canonical], current_ms, 15_000, 1_000, canonical)
+                spread_samples[canonical].append(quote["spread_points"])
                 cursors[canonical] = _collect_symbol_ticks(
                     mt5, canonical, symbols[canonical], source_id,
                     cursors[canonical], records, start_time_msc,
@@ -251,6 +276,15 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
             "account_mode": "DEMO",
             "server": server,
             "symbols": symbols,
+            "instrument_specs": instrument_specs,
+            "spread_points": {
+                name: {
+                    "samples": len(values),
+                    "minimum": min(values),
+                    "maximum": max(values),
+                    "mean": round(sum(values) / len(values), 4),
+                } for name, values in spread_samples.items() if values
+            },
             "trading_enabled": False,
             "dll_imports_enabled": False,
             "collection_method": "MetaQuotes copy_ticks_from / COPY_TICKS_ALL",
