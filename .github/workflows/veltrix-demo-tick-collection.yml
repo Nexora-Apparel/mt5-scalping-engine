@@ -104,6 +104,45 @@ jobs:
           Start-Sleep -Seconds 2
           Write-Host "Temporary MT5 terminal stopped."
 
+      - name: Collect sanitized MT5 logs
+        if: always()
+        shell: pwsh
+        env:
+          MT5_LOGIN: \${{ secrets.MT5_LOGIN }}
+          MT5_PASSWORD: \${{ secrets.MT5_PASSWORD }}
+          MT5_SERVER: \${{ secrets.MT5_SERVER }}
+        run: |
+          $ErrorActionPreference = "Continue"
+          $destination = Join-Path $env:RUNNER_TEMP "veltrix-collector-diagnostics"
+          New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          foreach ($root in @("C:\MT5\Logs", "C:\MT5\MQL5\Logs")) {
+            if (Test-Path $root) {
+              $prefix = if ($root -like "*MQL5*") { "experts_" } else { "terminal_" }
+              Get-ChildItem $root -Filter "*.log" -File -ErrorAction SilentlyContinue |
+                Sort-Object LastWriteTime -Descending | Select-Object -First 3 |
+                ForEach-Object {
+                  $target = Join-Path $destination ($prefix + $_.Name)
+                  $content = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
+                  if ($null -ne $content) {
+                    foreach ($secret in @($env:MT5_LOGIN, $env:MT5_PASSWORD, $env:MT5_SERVER)) {
+                      if ($secret) { $content = $content.Replace($secret, "[REDACTED]") }
+                    }
+                    Set-Content -LiteralPath $target -Value $content -Encoding utf8
+                  }
+                }
+            }
+          }
+          Write-Host "Collected $((Get-ChildItem $destination -File | Measure-Object).Count) sanitized terminal log files."
+
+      - name: Upload sanitized MT5 diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veltrix-exness-collector-diagnostics-\${{ github.run_number }}
+          path: \${{ runner.temp }}/veltrix-collector-diagnostics/
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Upload tick dataset and integrity manifest
         if: always()
         uses: actions/upload-artifact@v4
