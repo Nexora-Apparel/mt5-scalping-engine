@@ -140,6 +140,42 @@ def audit_ticks(path: str | Path, expected_symbols: tuple[str, ...] = CANONICAL_
     }
 
 
+
+def wait_for_fresh_quotes(
+    mt5: Any, symbols: dict[str, str], login: int, server: str, *,
+    timeout_seconds: int = 90, stable_samples_required: int = 5,
+    max_quote_age_ms: int = 15_000, max_spread_points: float = 1_000.0,
+    monotonic=time.monotonic, sleep=time.sleep,
+    now=lambda: datetime.now(timezone.utc),
+) -> list[dict[str, Any]]:
+    """Wait for five consecutive fresh quotes for both metals before timing collection."""
+    started = monotonic()
+    stable = 0
+    last_reason = "no quote samples received"
+    while monotonic() - started < timeout_seconds:
+        validate_account(mt5, login, server)
+        current_ms = int(now().timestamp() * 1000)
+        try:
+            quotes = [
+                validate_quote(mt5, symbols[canonical], current_ms,
+                               max_quote_age_ms, max_spread_points, canonical)
+                for canonical in CANONICAL_SYMBOLS
+            ]
+        except DiagnosticFailure as exc:
+            stable = 0
+            last_reason = str(exc)
+        else:
+            stable += 1
+            if stable >= stable_samples_required:
+                return quotes
+        sleep(min(1.0, max(0.0, timeout_seconds - (monotonic() - started))))
+    raise DiagnosticFailure(
+        f"fresh quote warm-up failed after {timeout_seconds}s; "
+        f"required {stable_samples_required} consecutive samples for both metals; "
+        f"last_reason={last_reason}"
+    )
+
+
 def _collect_symbol_ticks(
     mt5: Any, canonical: str, broker_symbol: str, source_id: str,
     cursor: datetime, records: dict[tuple[Any, ...], dict[str, Any]],
@@ -231,6 +267,11 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
             }
         spread_samples = {name: [] for name in CANONICAL_SYMBOLS}
         source_id = "exness-demo-" + re.sub(r"[^A-Za-z0-9_-]", "-", server)[:70]
+        warmup_quotes = wait_for_fresh_quotes(
+            mt5, symbols, login, server, monotonic=monotonic, sleep=sleep, now=now
+        )
+        for quote in warmup_quotes:
+            spread_samples[quote["canonical"]].append(quote["spread_points"])
         started_utc = now()
         start_mono = monotonic()
         start_time_msc = int(started_utc.timestamp() * 1000)
