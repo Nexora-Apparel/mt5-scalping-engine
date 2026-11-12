@@ -95,6 +95,10 @@ def discover_symbol(mt5: Any, canonical: str) -> str:
         candidates.append(name)
 
     candidates = sorted(set(candidates), key=lambda name: (name.upper() != canonical, len(name), name))
+    # Prefer the exact canonical symbol when the broker publishes it alongside
+    # other suffix variants; otherwise require exactly one suffix candidate.
+    if canonical in candidates:
+        candidates = [canonical]
     if len(candidates) != 1:
         hints = [
             _symbol_name(item) for item in catalogue
