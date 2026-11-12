@@ -28,9 +28,9 @@ jobs:
           MT5_SERVER: ${{ secrets.MT5_SERVER }}
         run: |
           $ErrorActionPreference = "Stop"
-          if (!$env:MT5_LOGIN -or $env:MT5_LOGIN -notmatch '^\\d+$') { throw "MT5_LOGIN is missing or invalid." }
+          if (!$env:MT5_LOGIN -or $env:MT5_LOGIN -notmatch '^\d+$') { throw "MT5_LOGIN is missing or invalid." }
           if (!$env:MT5_PASSWORD) { throw "MT5_PASSWORD is missing." }
-          if (!$env:MT5_SERVER -or $env:MT5_SERVER -match '[\\r\\n=]') { throw "MT5_SERVER is missing or invalid." }
+          if (!$env:MT5_SERVER -or $env:MT5_SERVER -match '[\r\n=]') { throw "MT5_SERVER is missing or invalid." }
           Write-Host "Required credentials are present; values are not printed."
 
       - name: Install official Exness MT5 terminal
@@ -38,7 +38,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $installer = Join-Path $env:RUNNER_TEMP "exness-mt5-setup.exe"
-          $installPath = "C:\\MT5"
+          $installPath = "C:\MT5"
           Invoke-WebRequest -Uri "https://download.terminal.free/cdn/web/exness.technologies.ltd/mt5/exness5setup.exe" -OutFile $installer
           if ((Get-Item $installer).Length -lt 1000000) { throw "Exness MT5 installer download is incomplete." }
           $setup = Start-Process -FilePath $installer -ArgumentList @("/auto", "/path:`"$installPath`"") -Wait -PassThru
@@ -55,7 +55,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $source = (Resolve-Path "MQL5\\Experts\\VeltrixDemoDiagnostics.mq5").Path
+          $source = (Resolve-Path "MQL5\Experts\VeltrixDemoDiagnostics.mq5").Path
           $log = Join-Path (Split-Path $source) "VeltrixDemoDiagnostics.log"
           if (Test-Path $log) { Remove-Item $log -Force }
           $process = Start-Process -FilePath $env:METAEDITOR -ArgumentList @('/compile:"' + $source + '"','/log') -Wait -PassThru
@@ -63,13 +63,13 @@ jobs:
           if (!(Test-Path $log)) { throw "MetaEditor did not create the diagnostic compile log." }
           Get-Content $log
           $text = Get-Content $log -Raw
-          if ($text -notmatch "(?i)0 errors?" -or $text -match "(?i)\\b[1-9]\\d* errors?\\b|\\b[1-9]\\d* warnings?\\b") {
+          if ($text -notmatch "(?i)0 errors?" -or $text -match "(?i)\b[1-9]\d* errors?\b|\b[1-9]\d* warnings?\b") {
             throw "Diagnostic EA compilation failed or reported warnings."
           }
           $ex5 = Join-Path (Split-Path $source) "VeltrixDemoDiagnostics.ex5"
           if (!(Test-Path $ex5)) { throw "Diagnostic EA EX5 output is missing." }
-          New-Item -ItemType Directory -Force -Path "C:\\MT5\\MQL5\\Experts" | Out-Null
-          Copy-Item $ex5 "C:\\MT5\\MQL5\\Experts\\VeltrixDemoDiagnostics.ex5" -Force
+          New-Item -ItemType Directory -Force -Path "C:\MT5\MQL5\Experts" | Out-Null
+          Copy-Item $ex5 "C:\MT5\MQL5\Experts\VeltrixDemoDiagnostics.ex5" -Force
           Write-Host "Read-only diagnostic EA compiled cleanly."
 
       - name: Start diagnostic with trading disabled
@@ -91,7 +91,7 @@ jobs:
           StableSamplesRequired=5||5||2||5||N
           DiagnosticTimeoutSeconds=90||90||15||90||N
           "@
-          Set-Content "C:\\MT5\\MQL5\\Presets\\veltrix-demo-diagnostics.set" $preset -Encoding Unicode
+          Set-Content "C:\MT5\MQL5\Presets\veltrix-demo-diagnostics.set" $preset -Encoding Unicode
           $config = Join-Path $env:RUNNER_TEMP "veltrix-demo-diagnostics.ini"
           $ini = @"
           [Common]
@@ -122,7 +122,7 @@ jobs:
             $failure = $false
             while ((Get-Date) -lt $deadline) {
               if ($proc.HasExited) { throw "MT5 exited before diagnostic completed." }
-              $logDir = "C:\\MT5\\MQL5\\Logs"
+              $logDir = "C:\MT5\MQL5\Logs"
               if (Test-Path $logDir) {
                 $files = Get-ChildItem $logDir -Filter "*.log" -File -ErrorAction SilentlyContinue |
                   Sort-Object LastWriteTime -Descending | Select-Object -First 3
