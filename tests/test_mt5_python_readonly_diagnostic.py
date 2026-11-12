@@ -45,7 +45,7 @@ class FakeMT5:
         return True
 
     def terminal_info(self):
-        return SimpleNamespace(connected=self.connected)
+        return SimpleNamespace(connected=self.connected, trade_allowed=False)
 
     def account_info(self):
         return SimpleNamespace(
@@ -80,6 +80,7 @@ def test_account_identity_accepts_only_exact_demo_login_and_server():
     api = FakeMT5(clock)
     result = validate_account(api, 12345678, "Exness-MT5Trial")
     assert result["connected"] is True
+    assert result["terminal_trade_allowed"] is False
     assert result["login_match"] is True
     assert result["server_match"] is True
     assert result["trade_mode"] == DEMO_TRADE_MODE
