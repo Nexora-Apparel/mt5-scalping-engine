@@ -200,3 +200,49 @@ def test_tick_audit_reports_long_intertick_gaps_without_silently_filling_them(tm
     result = collector.audit_ticks(path)
     assert result["streams"]["XAUUSD"]["max_intertick_gap_ms"] == 7500
     assert result["streams"]["XAUUSD"]["gaps_over_5_seconds"] == 1
+
+
+def test_warmup_waits_for_five_consecutive_fresh_quotes_for_both_symbols():
+    clock = Clock()
+
+    class StaleThenFresh(FakeMT5):
+        def __init__(self, clock):
+            super().__init__(clock)
+            self.stale_reads = 4
+
+        def symbol_info_tick(self, symbol):
+            stamp = self.clock.now_ms()
+            if self.stale_reads:
+                self.stale_reads -= 1
+                stamp -= 30_000
+            return SimpleNamespace(bid=3000.0, ask=3000.2, time_msc=stamp)
+
+    api = StaleThenFresh(clock)
+    symbols = {"XAUUSD": "XAUUSDm", "XAGUSD": "XAGUSDm"}
+    quotes = collector.wait_for_fresh_quotes(
+        api, symbols, 12345678, "Exness-MT5Trial",
+        timeout_seconds=15, stable_samples_required=5,
+        monotonic=clock.monotonic, sleep=clock.sleep, now=clock.now,
+    )
+    assert len(quotes) == 2
+    assert {quote["canonical"] for quote in quotes} == {"XAUUSD", "XAGUSD"}
+    assert clock.mono >= 106.0
+
+
+def test_warmup_fails_closed_when_quotes_never_become_fresh():
+    clock = Clock()
+
+    class AlwaysStale(FakeMT5):
+        def symbol_info_tick(self, symbol):
+            return SimpleNamespace(
+                bid=3000.0, ask=3000.2, time_msc=self.clock.now_ms() - 60_000
+            )
+
+    api = AlwaysStale(clock)
+    symbols = {"XAUUSD": "XAUUSDm", "XAGUSD": "XAGUSDm"}
+    with pytest.raises(collector.DiagnosticFailure, match="fresh quote warm-up failed"):
+        collector.wait_for_fresh_quotes(
+            api, symbols, 12345678, "Exness-MT5Trial",
+            timeout_seconds=3, stable_samples_required=2,
+            monotonic=clock.monotonic, sleep=clock.sleep, now=clock.now,
+        )
