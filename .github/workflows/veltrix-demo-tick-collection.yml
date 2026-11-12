@@ -1,5 +1,5 @@
 name: VELTRIX bounded Exness DEMO tick collection
-run-name: VELTRIX XAUUSD + XAGUSD read-only tick collection (30 min)
+run-name: VELTRIX XAUUSD-only read-only tick collection (30 min)
 
 on:
   workflow_dispatch:
