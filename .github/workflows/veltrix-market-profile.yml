@@ -1,0 +1,100 @@
+name: VELTRIX offline DEMO market-data profile
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: GitHub Actions run ID containing the DEMO tick artifact
+        required: true
+        type: string
+      artifact_name:
+        description: Exact tick dataset artifact name
+        required: true
+        type: string
+  workflow_run:
+    workflows: ["VELTRIX bounded Exness DEMO tick collection"]
+    types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/veltrix-market-profile.yml"
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: veltrix-market-profile-${{ github.event.workflow_run.id || github.event.inputs.source_run_id || 'bootstrap' }}
+  cancel-in-progress: false
+
+jobs:
+  profile:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out profiler
+        uses: actions/checkout@v4
+
+      - name: Resolve source collection artifact
+        id: source
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_RUN_ID: ${{ github.event.workflow_run.id }}
+          EVENT_RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
+          INPUT_RUN_ID: ${{ github.event.inputs.source_run_id }}
+          INPUT_ARTIFACT_NAME: ${{ github.event.inputs.artifact_name }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            run_id="$INPUT_RUN_ID"
+            artifact_name="$INPUT_ARTIFACT_NAME"
+          elif [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            run_id="$EVENT_RUN_ID"
+            artifact_name="veltrix-exness-demo-ticks-$EVENT_RUN_NUMBER"
+          else
+            # Bootstrap profile for the first validated 30-minute dataset.
+            run_id="43194341816"
+            artifact_name="veltrix-exness-demo-ticks-3"
+          fi
+          [[ "$run_id" =~ ^[0-9]+$ ]] || { echo "Invalid source run ID"; exit 2; }
+          [[ -n "$artifact_name" ]] || { echo "Artifact name is missing"; exit 2; }
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
+          echo "Source run: $run_id"
+          echo "Source artifact: $artifact_name"
+
+      - name: Download immutable tick dataset artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.source.outputs.artifact_name }}
+          path: source-artifact
+          run-id: ${{ steps.source.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run offline provenance and microstructure profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/mt5_tick_market_profile.py \
+            --csv source-artifact/veltrix_exness_demo_ticks.csv \
+            --manifest source-artifact/manifest.json \
+            --output veltrix-market-profile.json
+          python -m json.tool veltrix-market-profile.json >/dev/null
+          echo "Offline profile generated. REVIEW is a valid data-quality outcome, not a trading approval."
+
+      - name: Upload offline profile
+        uses: actions/upload-artifact@v4
+        with:
+          name: veltrix-market-profile-${{ steps.source.outputs.run_id }}
+          path: veltrix-market-profile.json
+          if-no-files-found: error
+          retention-days: 30
