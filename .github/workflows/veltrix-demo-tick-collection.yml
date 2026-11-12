@@ -3,6 +3,12 @@ run-name: VELTRIX XAUUSD + XAGUSD read-only tick collection (30 min)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "tools/mt5_demo_tick_collector.py"
+      - "tools/mt5_python_readonly_diagnostic.py"
+      - ".github/workflows/veltrix-demo-tick-collection.yml"
 
 permissions:
   contents: read
