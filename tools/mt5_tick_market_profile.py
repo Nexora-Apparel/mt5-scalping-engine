@@ -1,9 +1,4 @@
-"""Offline market-data profile for a previously collected Veltrix MT5 tick CSV.
-
-This tool never connects to MT5 and never places or manages orders. It verifies
-the dataset against its manifest and reports quote movement, spread, and
-inter-tick microstructure metrics without inferring execution readiness.
-"""
+"""Offline XAUUSD-only market-data profile for a previously collected MT5 tick CSV."""
 from __future__ import annotations
 
 import argparse
@@ -16,12 +11,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-HEADER = [
-    "schema_version", "source_id", "canonical_symbol", "broker_symbol",
-    "time_msc", "time_utc", "bid", "ask", "last", "volume",
-    "volume_real", "flags",
-]
-EXPECTED = ("XAUUSD", "XAGUSD")
+HEADER = ["schema_version", "source_id", "canonical_symbol", "broker_symbol",
+          "time_msc", "time_utc", "bid", "ask", "last", "volume", "volume_real", "flags"]
+EXPECTED = ("XAUUSD",)
 
 
 class ProfileError(ValueError):
@@ -33,11 +25,8 @@ def percentile(values: list[float], fraction: float) -> float | None:
         return None
     ordered = sorted(values)
     index = (len(ordered) - 1) * fraction
-    low = math.floor(index)
-    high = math.ceil(index)
-    if low == high:
-        return ordered[low]
-    return ordered[low] + (ordered[high] - ordered[low]) * (index - low)
+    low, high = math.floor(index), math.ceil(index)
+    return ordered[low] if low == high else ordered[low] + (ordered[high] - ordered[low]) * (index - low)
 
 
 def profile_dataset(csv_path: str | Path, manifest_path: str | Path) -> dict[str, Any]:
@@ -58,7 +47,6 @@ def profile_dataset(csv_path: str | Path, manifest_path: str | Path) -> dict[str
         raise ProfileError("manifest account mode is not DEMO")
     if manifest.get("trading_enabled") is not False or manifest.get("dll_imports_enabled") is not False:
         raise ProfileError("manifest does not prove trading and DLL imports are disabled")
-
     streams: dict[str, list[tuple[int, float, float, float, float]]] = defaultdict(list)
     seen: set[tuple[Any, ...]] = set()
     try:
@@ -73,11 +61,10 @@ def profile_dataset(csv_path: str | Path, manifest_path: str | Path) -> dict[str
         if None in row or any(row.get(key) in (None, "") for key in HEADER):
             raise ProfileError(f"line {line}: missing or extra field")
         if row["schema_version"] != "1" or row["canonical_symbol"] not in EXPECTED:
-            raise ProfileError(f"line {line}: unsupported schema or symbol")
+            raise ProfileError(f"line {line}: unsupported schema or instrument; XAUUSD only")
         try:
             stamp = int(row["time_msc"])
-            bid, ask = float(row["bid"]), float(row["ask"])
-            last = float(row["last"])
+            bid, ask, last = float(row["bid"]), float(row["ask"]), float(row["last"])
             volume, volume_real = float(row["volume"]), float(row["volume_real"])
             int(row["flags"])
         except (TypeError, ValueError) as exc:
@@ -95,11 +82,10 @@ def profile_dataset(csv_path: str | Path, manifest_path: str | Path) -> dict[str
         seen.add(key)
         streams[row["canonical_symbol"]].append((stamp, bid, ask, last, volume_real))
         records += 1
-
     if records != manifest.get("records"):
         raise ProfileError("CSV record count does not match manifest")
-    if set(streams) != set(EXPECTED):
-        raise ProfileError("dataset must contain both XAUUSD and XAGUSD")
+    if set(streams) != {"XAUUSD"}:
+        raise ProfileError("dataset must contain XAUUSD only")
     output: dict[str, Any] = {}
     overall_review = False
     for symbol in EXPECTED:
@@ -109,35 +95,29 @@ def profile_dataset(csv_path: str | Path, manifest_path: str | Path) -> dict[str
             raise ProfileError(f"{symbol}: timestamps moved backwards")
         gaps = [b - a for a, b in zip(stamps, stamps[1:])]
         spreads = [ask - bid for _, bid, ask, _, _ in ticks]
-        quote_pairs = [(bid, ask) for _, bid, ask, _, _ in ticks]
-        quote_changes = sum(a != b for a, b in zip(quote_pairs, quote_pairs[1:]))
+        pairs = [(bid, ask) for _, bid, ask, _, _ in ticks]
+        changes = sum(a != b for a, b in zip(pairs, pairs[1:]))
         spec = manifest.get("instrument_specs", {}).get(symbol, {})
         point = float(spec.get("point", 0))
         if not math.isfinite(point) or point <= 0:
             raise ProfileError(f"{symbol}: missing or invalid instrument point size")
         spread_points = [value / point for value in spreads]
-        unique_spreads = len({round(value, 6) for value in spread_points})
-        zero_last_count = sum(last == 0 for _, _, _, last, _ in ticks)
-        zero_volume_real_count = sum(volume_real == 0 for _, _, _, _, volume_real in ticks)
-        span_seconds = (stamps[-1] - stamps[0]) / 1000 if len(stamps) > 1 else 0.0
-        gaps_over_5s = sum(gap > 5000 for gap in gaps)
-        status = "REVIEW" if gaps_over_5s else "PASS"
+        zero_last = sum(last == 0 for _, _, _, last, _ in ticks)
+        zero_volume = sum(volume_real == 0 for _, _, _, _, volume_real in ticks)
+        span = (stamps[-1] - stamps[0]) / 1000 if len(stamps) > 1 else 0.0
+        gaps5 = sum(gap > 5000 for gap in gaps)
+        status = "REVIEW" if gaps5 else "PASS"
         overall_review = overall_review or status == "REVIEW"
         output[symbol] = {
-            "status": status,
-            "records": len(ticks),
-            "span_seconds": round(span_seconds, 3),
-            "ticks_per_second": round(len(ticks) / span_seconds, 4) if span_seconds else None,
-            "unique_bid_ask_pairs": len(set(quote_pairs)),
-            "quote_change_count": quote_changes,
-            "unique_spread_values": unique_spreads,
-            "zero_last_records": zero_last_count,
-            "zero_last_pct": round(100 * zero_last_count / len(ticks), 3),
-            "zero_volume_real_records": zero_volume_real_count,
-            "zero_volume_real_pct": round(100 * zero_volume_real_count / len(ticks), 3),
+            "status": status, "records": len(ticks), "span_seconds": round(span, 3),
+            "ticks_per_second": round(len(ticks) / span, 4) if span else None,
+            "unique_bid_ask_pairs": len(set(pairs)), "quote_change_count": changes,
+            "unique_spread_values": len({round(value, 6) for value in spread_points}),
+            "zero_last_records": zero_last, "zero_last_pct": round(100 * zero_last / len(ticks), 3),
+            "zero_volume_real_records": zero_volume,
+            "zero_volume_real_pct": round(100 * zero_volume / len(ticks), 3),
             "max_intertick_gap_ms": max(gaps, default=0),
-            "gaps_over_1s": sum(gap > 1000 for gap in gaps),
-            "gaps_over_5s": gaps_over_5s,
+            "gaps_over_1s": sum(gap > 1000 for gap in gaps), "gaps_over_5s": gaps5,
             "gaps_over_10s": sum(gap > 10000 for gap in gaps),
             "intertick_gap_ms_p50": percentile(gaps, 0.50),
             "intertick_gap_ms_p95": percentile(gaps, 0.95),
@@ -146,20 +126,15 @@ def profile_dataset(csv_path: str | Path, manifest_path: str | Path) -> dict[str
             "spread_points_median": round(percentile(spread_points, 0.50), 6),
             "spread_points_p95": round(percentile(spread_points, 0.95), 6),
             "spread_points_max": round(max(spread_points), 6),
-            "point_size": point,
-            "broker_symbol": spec.get("broker_symbol"),
+            "point_size": point, "broker_symbol": spec.get("broker_symbol"),
         }
     return {
         "status": "REVIEW" if overall_review else "PASS",
-        "profile_type": "OFFLINE_DESCRIPTIVE_ONLY",
-        "records": records,
-        "sha256": digest,
-        "account_mode": "DEMO",
-        "trading_enabled": False,
-        "dll_imports_enabled": False,
+        "profile_type": "OFFLINE_DESCRIPTIVE_ONLY", "records": records, "sha256": digest,
+        "account_mode": "DEMO", "trading_enabled": False, "dll_imports_enabled": False,
         "symbols": output,
         "limitations": [
-            "Descriptive tick profile only; not a trading signal or execution-readiness certification.",
+            "Descriptive XAUUSD tick profile only; not a trading signal or execution-readiness certification.",
             "Observed tick gaps can reflect market inactivity, broker feed behavior, or collection transport.",
             "No profitability, slippage, fill quality, or future quote availability is inferred.",
         ],
