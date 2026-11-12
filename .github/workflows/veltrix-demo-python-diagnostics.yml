@@ -89,7 +89,7 @@ jobs:
           python -m pip install --disable-pip-version-check "MetaTrader5==5.0.6231"
           python -c "import MetaTrader5 as mt5; print('MetaQuotes Python package:', mt5.__version__)"
 
-      - name: Verify account identity and fresh XAUUSD/XAGUSD quotes
+      - name: Verify account identity and fresh XAUUSD quote
         shell: pwsh
         env:
           MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
