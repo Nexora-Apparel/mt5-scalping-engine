@@ -64,6 +64,17 @@ def test_rejects_csv_hash_mismatch(tmp_path):
         profile_dataset(csv_path, manifest_path)
 
 
+
+def test_rejects_failed_collector_manifest(tmp_path):
+    csv_path, manifest_path = write_fixture(tmp_path, [
+        row("XAUUSD", 1_800_000_000_000), row("XAGUSD", 1_800_000_000_000)
+    ])
+    manifest = json.loads(manifest_path.read_text())
+    manifest["status"] = "FAIL"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ProfileError, match="overall status"):
+        profile_dataset(csv_path, manifest_path)
+
 def test_rejects_non_demo_or_trading_enabled_manifest(tmp_path):
     csv_path, manifest_path = write_fixture(tmp_path, [
         row("XAUUSD", 1_800_000_000_000), row("XAGUSD", 1_800_000_000_000)
