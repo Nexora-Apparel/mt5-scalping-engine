@@ -149,8 +149,8 @@ def main() -> int:
     try:
         result = certify_sessions(sessions)
     except (ProfileError, OSError) as exc:
-        parser.exit(2, f"CERTIFICATION FAIL: {exc}\\n")
-    rendered = json.dumps(result, indent=2, sort_keys=True) + "\\n"
+        parser.exit(2, f"CERTIFICATION FAIL: {exc}\n")
+    rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:
         args.output.write_text(rendered, encoding="utf-8")
     print(rendered, end="")
