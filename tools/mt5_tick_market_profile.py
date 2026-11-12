@@ -58,7 +58,7 @@ def profile_dataset(csv_path: str | Path, manifest_path: str | Path) -> dict[str
     if manifest.get("trading_enabled") is not False or manifest.get("dll_imports_enabled") is not False:
         raise ProfileError("manifest does not prove trading and DLL imports are disabled")
 
-    streams: dict[str, list[tuple[int, float, float]]] = defaultdict(list)
+    streams: dict[str, list[tuple[int, float, float, float, float]]] = defaultdict(list)
     seen: set[tuple[Any, ...]] = set()
     try:
         text = raw.decode("utf-8-sig")
@@ -92,7 +92,7 @@ def profile_dataset(csv_path: str | Path, manifest_path: str | Path) -> dict[str
         if key in seen:
             raise ProfileError(f"line {line}: duplicate tick row")
         seen.add(key)
-        streams[row["canonical_symbol"]].append((stamp, bid, ask))
+        streams[row["canonical_symbol"]].append((stamp, bid, ask, last, volume_real))
         records += 1
 
     if records != manifest.get("records"):
@@ -107,12 +107,17 @@ def profile_dataset(csv_path: str | Path, manifest_path: str | Path) -> dict[str
         if any(a > b for a, b in zip(stamps, stamps[1:])):
             raise ProfileError(f"{symbol}: timestamps moved backwards")
         gaps = [b - a for a, b in zip(stamps, stamps[1:])]
-        spreads = [ask - bid for _, bid, ask in ticks]
+        spreads = [ask - bid for _, bid, ask, _, _ in ticks]
+        quote_pairs = [(bid, ask) for _, bid, ask, _, _ in ticks]
+        quote_changes = sum(a != b for a, b in zip(quote_pairs, quote_pairs[1:]))
+        unique_spreads = len({round((ask - bid) / point, 6) for _, bid, ask, _, _ in ticks})
         spec = manifest.get("instrument_specs", {}).get(symbol, {})
         point = float(spec.get("point", 0))
         if not math.isfinite(point) or point <= 0:
             raise ProfileError(f"{symbol}: missing or invalid instrument point size")
         spread_points = [value / point for value in spreads]
+        zero_last_count = sum(last == 0 for _, _, _, last, _ in ticks)
+        zero_volume_real_count = sum(volume_real == 0 for _, _, _, _, volume_real in ticks)
         span_seconds = (stamps[-1] - stamps[0]) / 1000 if len(stamps) > 1 else 0.0
         gaps_over_5s = sum(gap > 5000 for gap in gaps)
         status = "REVIEW" if gaps_over_5s else "PASS"
@@ -122,6 +127,13 @@ def profile_dataset(csv_path: str | Path, manifest_path: str | Path) -> dict[str
             "records": len(ticks),
             "span_seconds": round(span_seconds, 3),
             "ticks_per_second": round(len(ticks) / span_seconds, 4) if span_seconds else None,
+            "unique_bid_ask_pairs": len(set(quote_pairs)),
+            "quote_change_count": quote_changes,
+            "unique_spread_values": unique_spreads,
+            "zero_last_records": zero_last_count,
+            "zero_last_pct": round(100 * zero_last_count / len(ticks), 3),
+            "zero_volume_real_records": zero_volume_real_count,
+            "zero_volume_real_pct": round(100 * zero_volume_real_count / len(ticks), 3),
             "max_intertick_gap_ms": max(gaps, default=0),
             "gaps_over_1s": sum(gap > 1000 for gap in gaps),
             "gaps_over_5s": gaps_over_5s,
