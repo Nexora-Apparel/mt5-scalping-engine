@@ -150,12 +150,15 @@ def test_full_bounded_collector_rechecks_demo_and_writes_audited_both_symbol_dat
         monotonic=clock.monotonic, sleep=clock.sleep, now=clock.now,
     )
     assert api.shutdown_called
-    assert manifest["status"] == "PASS"
     assert manifest["duration_seconds"] == 1802.0
     assert manifest["duration_clock"] == "monotonic"
     assert manifest["data_audit_status"] == "PASS"
     assert manifest["status"] == "PASS"
-    assert (datetime.fromisoformat(manifest["collection_ended_utc"]) - datetime.fromisoformat(manifest["collection_started_utc"])).total_seconds() < manifest["duration_seconds"]
+    utc_elapsed = (
+        datetime.fromisoformat(manifest["collection_ended_utc"])
+        - datetime.fromisoformat(manifest["collection_started_utc"])
+    ).total_seconds()
+    assert utc_elapsed < manifest["duration_seconds"]
     assert manifest["account_mode"] == "DEMO"
     assert manifest["trading_enabled"] is False
     assert manifest["dll_imports_enabled"] is False
