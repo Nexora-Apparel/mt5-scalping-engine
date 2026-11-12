@@ -76,7 +76,7 @@ bool VerifyQuote(const string symbol, string &reason, double &bid,
    }
 
    age_ms = now_ms - tick.time_msc;
-   if(age_ms < -5000 || (ulong)age_ms > QuoteMaxAgeMilliseconds)
+   if(age_ms < -5000 || age_ms > (long)QuoteMaxAgeMilliseconds)
    {
       reason = StringFormat("%s quote is stale or timestamp is invalid (age_ms=%I64d)",
                             symbol, age_ms);
