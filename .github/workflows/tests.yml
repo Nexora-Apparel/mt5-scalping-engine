@@ -8,6 +8,7 @@ on:
       - "src/**"
       - "tests/**"
       - "scripts/**"
+      - "tools/**"
       - "MQL5/**"
       - "docs/**"
       - "README.md"
@@ -15,6 +16,7 @@ on:
       - "requirements.txt"
       - ".github/workflows/tests.yml"
       - ".github/workflows/veltrix-demo-diagnostics.yml"
+      - ".github/workflows/veltrix-demo-python-diagnostics.yml"
   push:
     branches:
       - main

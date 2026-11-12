@@ -9,6 +9,7 @@ on:
       - "MQL5/**/*.mqh"
       - ".github/workflows/mql5-compile.yml"
       - ".github/workflows/veltrix-demo-diagnostics.yml"
+      - ".github/workflows/veltrix-demo-python-diagnostics.yml"
   push:
     branches: [main]
     paths:

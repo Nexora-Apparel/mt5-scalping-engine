@@ -1,0 +1,159 @@
+name: VELTRIX Python read-only Exness DEMO diagnostics
+run-name: VELTRIX Python DEMO diagnostics (XAUUSD + XAGUSD)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "tools/mt5_python_readonly_diagnostic.py"
+      - ".github/workflows/veltrix-demo-python-diagnostics.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: veltrix-python-read-only-demo-diagnostics
+  cancel-in-progress: false
+
+jobs:
+  demo-diagnostics:
+    name: Verify Exness DEMO identity and metal quotes (read-only)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Validate credentials without printing them
+        shell: pwsh
+        env:
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (!$env:MT5_LOGIN -or $env:MT5_LOGIN -notmatch '^\d+$') { throw "MT5_LOGIN is missing or invalid." }
+          if (!$env:MT5_PASSWORD) { throw "MT5_PASSWORD is missing." }
+          if (!$env:MT5_SERVER -or $env:MT5_SERVER -match '[\r\n=]') { throw "MT5_SERVER is missing or invalid." }
+          Write-Host "Required credentials are present; values are not printed."
+
+      - name: Install official Exness MT5 terminal
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installer = Join-Path $env:RUNNER_TEMP "exness-mt5-setup.exe"
+          $installPath = "C:\MT5"
+          Invoke-WebRequest -Uri "https://download.terminal.free/cdn/web/exness.technologies.ltd/mt5/exness5setup.exe" -OutFile $installer
+          if ((Get-Item $installer).Length -lt 1000000) { throw "Exness MT5 installer download is incomplete." }
+
+          # Validate installed executables, not the bootstrapper's exit code.
+          $setup = Start-Process -FilePath $installer -ArgumentList @("/auto", "/path:`"$installPath`"") -PassThru
+          $terminal = Join-Path $installPath "terminal64.exe"
+          $editor = Join-Path $installPath "metaeditor64.exe"
+          $deadline = (Get-Date).AddMinutes(3)
+          while ((Get-Date) -lt $deadline -and (!(Test-Path $terminal) -or !(Test-Path $editor))) {
+            Start-Sleep -Seconds 5
+          }
+          if (!(Test-Path $terminal) -or !(Test-Path $editor)) {
+            $exit = "still running"
+            if ($setup.HasExited) { $exit = [string]$setup.ExitCode }
+            Write-Host "Exness installer bootstrapper exit code: $exit"
+            throw "MT5 installation incomplete: terminal64.exe and MetaEditor must both exist."
+          }
+
+          # Disable EAs, live automated trading and DLL imports for this
+          # read-only workflow. No EA is loaded by the Python diagnostic.
+          $configDir = Join-Path $installPath "config"
+          New-Item -ItemType Directory -Force -Path $configDir | Out-Null
+          @"
+          [Experts]
+          Enabled=0
+          AllowLiveTrading=0
+          AllowDllImport=0
+          "@ | Set-Content (Join-Path $configDir "common.ini") -Encoding Unicode
+
+          "MT5_TERMINAL=$terminal" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Official Exness MT5 terminal verified; read-only terminal defaults written."
+
+      - name: Set up 64-bit Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: "x64"
+
+      - name: Install official MetaQuotes Python integration
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          python -m pip install --disable-pip-version-check "MetaTrader5==5.0.6231"
+          python -c "import MetaTrader5 as mt5; print('MetaQuotes Python package:', mt5.__version__)"
+
+      - name: Verify account identity and fresh XAUUSD/XAGUSD quotes
+        shell: pwsh
+        env:
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          python tools/mt5_python_readonly_diagnostic.py
+          if ($LASTEXITCODE -ne 0) { throw "Read-only Python DEMO diagnostic failed." }
+
+      - name: Stop temporary MT5 terminal
+        if: always()
+        shell: pwsh
+        run: |
+          Get-Process -Name terminal64 -ErrorAction SilentlyContinue |
+            Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+          Write-Host "Temporary MT5 terminal stopped."
+
+      - name: Collect MT5 terminal logs
+        if: always()
+        shell: pwsh
+        env:
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
+        run: |
+          $ErrorActionPreference = "Continue"
+          $destination = Join-Path $env:RUNNER_TEMP "veltrix-mt5-python-diagnostic-logs"
+          New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          foreach ($root in @("C:\MT5\Logs", "C:\MT5\MQL5\Logs")) {
+            if (Test-Path $root) {
+              $prefix = if ($root -like "*MQL5*") { "experts_" } else { "terminal_" }
+              Get-ChildItem $root -Filter "*.log" -File -ErrorAction SilentlyContinue |
+                ForEach-Object {
+                  $target = Join-Path $destination ($prefix + $_.Name)
+                  $text = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
+                  if ($null -ne $text) {
+                    foreach ($secret in @($env:MT5_LOGIN, $env:MT5_PASSWORD, $env:MT5_SERVER)) {
+                      if ($secret) { $text = $text.Replace($secret, "[REDACTED]") }
+                    }
+                    Set-Content -LiteralPath $target -Value $text -Encoding utf8
+                  }
+                }
+            }
+          }
+          Write-Host "Collected $((Get-ChildItem $destination -File | Measure-Object).Count) MT5 log files."
+          Get-ChildItem $destination -File | ForEach-Object {
+            Write-Host "----- $($_.Name) (last 100 lines) -----"
+            Get-Content $_.FullName -Tail 100
+          }
+
+      - name: Upload MT5 terminal logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veltrix-mt5-python-diagnostic-logs
+          path: ${{ runner.temp }}/veltrix-mt5-python-diagnostic-logs/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Confirm no trading was enabled
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host "Read-only Python integration: no order submission or position-management calls."
+          Write-Host "Terminal defaults: Enabled=0, AllowLiveTrading=0, AllowDllImport=0."
