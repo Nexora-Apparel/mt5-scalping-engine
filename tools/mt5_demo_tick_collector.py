@@ -19,6 +19,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from tools.mt5_python_readonly_diagnostic import (
     CANONICAL_SYMBOLS, DEMO_TRADE_MODE, DiagnosticFailure,
     discover_symbol, validate_account, validate_quote,
