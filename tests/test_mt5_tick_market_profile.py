@@ -52,6 +52,10 @@ def test_profiles_both_symbols_and_marks_long_silver_gap_for_review(tmp_path):
     assert result["symbols"]["XAUUSD"]["status"] == "PASS"
     assert result["symbols"]["XAGUSD"]["gaps_over_5s"] == 1
     assert result["symbols"]["XAGUSD"]["max_intertick_gap_ms"] == 7000
+    assert result["symbols"]["XAUUSD"]["unique_bid_ask_pairs"] == 1
+    assert result["symbols"]["XAUUSD"]["quote_change_count"] == 0
+    assert result["symbols"]["XAUUSD"]["unique_spread_values"] == 1
+    assert result["symbols"]["XAUUSD"]["zero_last_pct"] == 0
     assert result["profile_type"] == "OFFLINE_DESCRIPTIVE_ONLY"
 
 
