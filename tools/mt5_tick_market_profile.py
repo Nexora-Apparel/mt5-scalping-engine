@@ -51,6 +51,8 @@ def profile_dataset(csv_path: str | Path, manifest_path: str | Path) -> dict[str
     digest = hashlib.sha256(raw).hexdigest()
     if digest != manifest.get("sha256"):
         raise ProfileError("CSV SHA-256 does not match manifest")
+    if manifest.get("status") != "PASS":
+        raise ProfileError("collector manifest overall status is not PASS")
     if manifest.get("account_mode") != "DEMO":
         raise ProfileError("manifest account mode is not DEMO")
     if manifest.get("trading_enabled") is not False or manifest.get("dll_imports_enabled") is not False:
