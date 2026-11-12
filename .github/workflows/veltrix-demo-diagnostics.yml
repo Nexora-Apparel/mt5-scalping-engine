@@ -41,15 +41,30 @@ jobs:
           $installPath = "C:\MT5"
           Invoke-WebRequest -Uri "https://download.terminal.free/cdn/web/exness.technologies.ltd/mt5/exness5setup.exe" -OutFile $installer
           if ((Get-Item $installer).Length -lt 1000000) { throw "Exness MT5 installer download is incomplete." }
-          $setup = Start-Process -FilePath $installer -ArgumentList @("/auto", "/path:`"$installPath`"") -Wait -PassThru
-          if ($setup.ExitCode -ne 0) { throw "Exness MT5 installer exited with code $($setup.ExitCode)." }
+
+          # The Exness bootstrapper may spawn the actual installer and return a
+          # non-zero bootstrapper exit code. Do not treat that code as the
+          # installation result; validate the installed terminal/editor files.
+          $setup = Start-Process -FilePath $installer -ArgumentList @("/auto", "/path:`"$installPath`"") -PassThru
           $terminal = Join-Path $installPath "terminal64.exe"
           $editor = Join-Path $installPath "metaeditor64.exe"
-          for ($i = 0; $i -lt 24 -and (!(Test-Path $terminal) -or !(Test-Path $editor)); $i++) { Start-Sleep -Seconds 5 }
-          if (!(Test-Path $terminal) -or !(Test-Path $editor)) { throw "MT5 terminal or MetaEditor was not installed." }
+          $deadline = (Get-Date).AddMinutes(3)
+          while ((Get-Date) -lt $deadline -and (!(Test-Path $terminal) -or !(Test-Path $editor))) {
+            Start-Sleep -Seconds 5
+          }
+          if (!(Test-Path $terminal) -or !(Test-Path $editor)) {
+            $exit = "still running"
+            if ($setup.HasExited) { $exit = [string]$setup.ExitCode }
+            Write-Host "Exness installer bootstrapper exit code: $exit"
+            if (Test-Path $installPath) {
+              Get-ChildItem $installPath -Force -ErrorAction SilentlyContinue |
+                Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
+            }
+            throw "MT5 installation incomplete: terminal64.exe and MetaEditor must both exist."
+          }
           "MT5_TERMINAL=$terminal" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           "METAEDITOR=$editor" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
-          Write-Host "Official Exness MT5 terminal installed."
+          Write-Host "Official Exness MT5 terminal and MetaEditor files verified."
 
       - name: Compile read-only diagnostic EA
         shell: pwsh
