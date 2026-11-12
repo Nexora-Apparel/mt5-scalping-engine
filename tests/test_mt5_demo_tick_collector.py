@@ -98,7 +98,7 @@ def test_tick_audit_validates_both_symbols_and_hashes_dataset(tmp_path):
     path = tmp_path / "ticks.csv"
     write_rows(path, [valid_row("XAUUSD"), valid_row("XAGUSD")])
     result = collector.audit_ticks(path)
-    assert result["status"] == "PASS"
+    assert result["data_audit_status"] == "PASS"
     assert result["records"] == 2
     assert len(result["sha256"]) == 64
     assert set(result["streams"]) == {"XAUUSD", "XAGUSD"}
@@ -126,10 +126,19 @@ def test_collector_requires_exactly_bounded_30_minute_session():
         collector.collect(object(), 60, Path("unused"))
 
 
+class WallClockDrift(Clock):
+    """Simulate UTC moving backwards by 19ms near the end of collection."""
+    def now(self):
+        value = super().now()
+        if self.mono >= 1901.0:
+            value -= timedelta(milliseconds=19)
+        return value
+
+
 def test_full_bounded_collector_rechecks_demo_and_writes_audited_both_symbol_data(
     tmp_path, monkeypatch
 ):
-    clock = Clock()
+    clock = WallClockDrift()
     api = FakeMT5(clock)
     monkeypatch.setenv("MT5_LOGIN", "12345678")
     monkeypatch.setenv("MT5_PASSWORD", "fake-secret")
@@ -141,16 +150,23 @@ def test_full_bounded_collector_rechecks_demo_and_writes_audited_both_symbol_dat
         monotonic=clock.monotonic, sleep=clock.sleep, now=clock.now,
     )
     assert api.shutdown_called
+    assert manifest["duration_seconds"] == 1802.0
+    assert manifest["duration_clock"] == "monotonic"
+    assert manifest["data_audit_status"] == "PASS"
     assert manifest["status"] == "PASS"
-    assert manifest["duration_seconds"] == 1800.0
+    utc_elapsed = (
+        datetime.fromisoformat(manifest["collection_ended_utc"])
+        - datetime.fromisoformat(manifest["collection_started_utc"])
+    ).total_seconds()
+    assert utc_elapsed < manifest["duration_seconds"]
     assert manifest["account_mode"] == "DEMO"
     assert manifest["trading_enabled"] is False
     assert manifest["dll_imports_enabled"] is False
-    assert manifest["quote_validation_cycles"] == 1800
+    assert manifest["quote_validation_cycles"] == 1802
     assert manifest["instrument_specs"]["XAUUSD"]["point"] == 0.01
-    assert manifest["spread_points"]["XAUUSD"]["samples"] == 1800
-    assert manifest["streams"]["XAUUSD"]["records"] == 1800
-    assert manifest["streams"]["XAGUSD"]["records"] == 1800
+    assert manifest["spread_points"]["XAUUSD"]["samples"] == 1802
+    assert manifest["streams"]["XAUUSD"]["records"] == 1802
+    assert manifest["streams"]["XAGUSD"]["records"] == 1802
     assert (tmp_path / "manifest.json").is_file()
     assert (tmp_path / "veltrix_exness_demo_ticks.csv").is_file()
 

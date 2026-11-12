@@ -120,7 +120,7 @@ def audit_ticks(path: str | Path, expected_symbols: tuple[str, ...] = CANONICAL_
         raise DiagnosticFailure(f"no tick records collected for: {','.join(missing)}")
     raw = source.read_bytes()
     return {
-        "status": "PASS",
+        "data_audit_status": "PASS",
         "schema_version": "1",
         "dataset": source.name,
         "sha256": hashlib.sha256(raw).hexdigest(),
@@ -276,7 +276,11 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
         cursors = {name: started_utc - timedelta(seconds=2) for name in CANONICAL_SYMBOLS}
         records: dict[tuple[Any, ...], dict[str, Any]] = {}
         quote_samples = 0
-        deadline = start_mono + minutes * 60
+        requested_duration_seconds = minutes * 60
+        # Two extra seconds absorb scheduler/sampling granularity. The gate
+        # below uses monotonic elapsed time, never wall-clock subtraction.
+        safety_margin_seconds = 2.0
+        deadline = start_mono + requested_duration_seconds + safety_margin_seconds
         while monotonic() < deadline:
             validate_account(mt5, login, server)
             current_ms = int(now().timestamp() * 1000)
@@ -290,6 +294,7 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
             quote_samples += 1
             sleep(min(1.0, max(0.0, deadline - monotonic())))
 
+        collection_elapsed_seconds = monotonic() - start_mono
         ended_utc = now()
         output_dir.mkdir(parents=True, exist_ok=True)
         csv_path = output_dir / "veltrix_exness_demo_ticks.csv"
@@ -309,7 +314,8 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
             **audit,
             "collection_started_utc": started_utc.isoformat(),
             "collection_ended_utc": ended_utc.isoformat(),
-            "duration_seconds": round((ended_utc - started_utc).total_seconds(), 3),
+            "duration_seconds": round(collection_elapsed_seconds, 3),
+            "duration_clock": "monotonic",
             "requested_duration_minutes": minutes,
             "quote_validation_cycles": quote_samples,
             "account_mode": "DEMO",
@@ -327,11 +333,21 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
             "trading_enabled": False,
             "dll_imports_enabled": False,
             "collection_method": "MetaQuotes copy_ticks_from / COPY_TICKS_ALL",
+            "status": (
+                "PASS" if collection_elapsed_seconds >= requested_duration_seconds
+                else "FAIL"
+            ),
         }
+        if collection_elapsed_seconds < requested_duration_seconds:
+            manifest["error"] = (
+                "collection duration was shorter than the required "
+                f"{requested_duration_seconds} seconds "
+                f"(monotonic_elapsed={collection_elapsed_seconds:.6f})"
+            )
         manifest_path = output_dir / "manifest.json"
         manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        if manifest["duration_seconds"] < 30 * 60:
-            raise DiagnosticFailure("collection duration was shorter than the required 30 minutes")
+        if manifest["status"] != "PASS":
+            raise DiagnosticFailure(manifest["error"])
         return manifest
     finally:
         mt5.shutdown()
