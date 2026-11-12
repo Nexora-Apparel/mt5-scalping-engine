@@ -1,3 +1,5 @@
+> **Scope supersession (2026-11-12):** This architecture document's earlier dual-instrument references are historical. The binding product scope is now **XAUUSD only**. XAGUSD and every other instrument are disabled across active collection, features, strategy research, profiling, certification, and future execution. See [INSTRUMENT_SCOPE.md](INSTRUMENT_SCOPE.md). The legacy EA is audit-only and is now contract-locked to verified XAUUSD.
+
 # VELTRIX MT5 Scalper — Rebuild Architecture
 
 ## Status
