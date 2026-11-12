@@ -3,6 +3,11 @@ run-name: VELTRIX Python DEMO diagnostics (XAUUSD + XAGUSD)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "tools/mt5_python_readonly_diagnostic.py"
+      - ".github/workflows/veltrix-demo-python-diagnostics.yml"
 
 permissions:
   contents: read
