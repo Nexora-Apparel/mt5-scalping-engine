@@ -17,6 +17,7 @@ on:
       - ".github/workflows/tests.yml"
       - ".github/workflows/veltrix-demo-diagnostics.yml"
       - ".github/workflows/veltrix-demo-python-diagnostics.yml"
+      - ".github/workflows/veltrix-demo-tick-collection.yml"
   push:
     branches:
       - main
@@ -31,6 +32,8 @@ on:
       - "requirements.txt"
       - ".github/workflows/tests.yml"
       - ".github/workflows/veltrix-demo-diagnostics.yml"
+      - ".github/workflows/veltrix-demo-python-diagnostics.yml"
+      - ".github/workflows/veltrix-demo-tick-collection.yml"
 
 permissions:
   contents: read
