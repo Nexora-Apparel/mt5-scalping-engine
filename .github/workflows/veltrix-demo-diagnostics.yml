@@ -91,6 +91,7 @@ jobs:
           StableSamplesRequired=5||5||2||5||N
           DiagnosticTimeoutSeconds=90||90||15||90||N
           "@
+          New-Item -ItemType Directory -Force -Path "C:\MT5\MQL5\Presets" | Out-Null
           Set-Content "C:\MT5\MQL5\Presets\veltrix-demo-diagnostics.set" $preset -Encoding Unicode
           $config = Join-Path $env:RUNNER_TEMP "veltrix-demo-diagnostics.ini"
           $ini = @"
