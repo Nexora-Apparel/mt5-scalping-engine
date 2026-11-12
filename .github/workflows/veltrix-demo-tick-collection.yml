@@ -23,9 +23,9 @@ jobs:
       - name: Validate credentials without printing them
         shell: pwsh
         env:
-          MT5_LOGIN: \${{ secrets.MT5_LOGIN }}
-          MT5_PASSWORD: \${{ secrets.MT5_PASSWORD }}
-          MT5_SERVER: \${{ secrets.MT5_SERVER }}
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
         run: |
           $ErrorActionPreference = "Stop"
           if (!$env:MT5_LOGIN -or $env:MT5_LOGIN -notmatch '^\d+$') { throw "MT5_LOGIN is missing or invalid." }
@@ -81,9 +81,9 @@ jobs:
       - name: Run bounded 30-minute DEMO tick collection and integrity audit
         shell: pwsh
         env:
-          MT5_LOGIN: \${{ secrets.MT5_LOGIN }}
-          MT5_PASSWORD: \${{ secrets.MT5_PASSWORD }}
-          MT5_SERVER: \${{ secrets.MT5_SERVER }}
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
         run: |
           $ErrorActionPreference = "Stop"
           python tools/mt5_demo_tick_collector.py --minutes 30 --output-dir session-artifacts
@@ -102,7 +102,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: veltrix-exness-demo-ticks-\${{ github.run_number }}
+          name: veltrix-exness-demo-ticks-${{ github.run_number }}
           path: session-artifacts/
           if-no-files-found: warn
           retention-days: 30
