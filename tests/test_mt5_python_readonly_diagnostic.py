@@ -15,6 +15,7 @@ from tools.mt5_python_readonly_diagnostic import (
     run_diagnostic,
     validate_account,
     validate_quote,
+    discover_symbol,
 )
 
 
@@ -61,8 +62,14 @@ class FakeMT5:
             company="Exness",
         )
 
+    def symbols_get(self):
+        return [
+            SimpleNamespace(name="XAUUSDm", currency_base="XAU", currency_profit="USD"),
+            SimpleNamespace(name="XAGUSDm", currency_base="XAG", currency_profit="USD"),
+        ]
+
     def symbol_select(self, symbol, enabled):
-        return symbol in ("XAUUSD", "XAGUSD") and enabled
+        return symbol in ("XAUUSDm", "XAGUSDm") and enabled
 
     def symbol_info(self, symbol):
         return SimpleNamespace(point=0.01, digits=2)
@@ -112,13 +119,14 @@ def test_account_guard_fails_closed(trade_mode, connected, trade_allowed, messag
 def test_quote_guard_checks_freshness_and_spread():
     clock = FakeClock()
     api = FakeMT5(clock)
-    quote = validate_quote(api, "XAUUSD", clock.now_ms(), 15_000, 1_000)
-    assert quote["symbol"] == "XAUUSD"
+    quote = validate_quote(api, "XAUUSDm", clock.now_ms(), 15_000, 1_000, "XAUUSD")
+    assert quote["broker_symbol"] == "XAUUSDm"
+    assert quote["canonical"] == "XAUUSD"
     assert quote["age_ms"] == 0
     assert quote["spread_points"] == pytest.approx(20.0)
 
     with pytest.raises(DiagnosticFailure, match="stale"):
-        validate_quote(api, "XAUUSD", clock.now_ms() + 30_000, 15_000, 1_000)
+        validate_quote(api, "XAUUSDm", clock.now_ms() + 30_000, 15_000, 1_000)
 
 
 def test_full_diagnostic_passes_only_after_five_stable_samples_and_shuts_down():
@@ -163,3 +171,28 @@ def test_workflow_is_read_only_and_installs_pinned_official_python_package():
     forbidden = (r"\bmt5\.order_send\s*\(", r"\bmt5\.order_check\s*\(", r"\bmt5\.order_send_async\s*\(")
     for pattern in forbidden:
         assert not re.search(pattern, script), pattern
+
+
+def test_broker_suffix_resolution_is_contract_checked_and_unambiguous():
+    api = FakeMT5(FakeClock())
+    assert discover_symbol(api, "XAUUSD") == "XAUUSDm"
+    assert discover_symbol(api, "XAGUSD") == "XAGUSDm"
+
+
+def test_symbol_resolution_rejects_ambiguous_matches():
+    api = FakeMT5(FakeClock())
+    api.symbols_get = lambda: [
+        SimpleNamespace(name="XAUUSDm", currency_base="XAU", currency_profit="USD"),
+        SimpleNamespace(name="XAUUSDpro", currency_base="XAU", currency_profit="USD"),
+    ]
+    with pytest.raises(DiagnosticFailure, match="found 2"):
+        discover_symbol(api, "XAUUSD")
+
+
+def test_symbol_resolution_rejects_wrong_contract_currency():
+    api = FakeMT5(FakeClock())
+    api.symbols_get = lambda: [
+        SimpleNamespace(name="XAUUSDm", currency_base="XAG", currency_profit="USD")
+    ]
+    with pytest.raises(DiagnosticFailure, match="found 0"):
+        discover_symbol(api, "XAUUSD")
