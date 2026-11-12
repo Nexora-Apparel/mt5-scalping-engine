@@ -164,3 +164,26 @@ def test_collector_source_contains_no_order_submission_calls():
     import re
     for pattern in forbidden:
         assert not re.search(pattern, source), pattern
+
+
+def test_incremental_tick_cursor_advances_on_short_batches_and_filters_pre_session_ticks():
+    class TickAPI:
+        COPY_TICKS_ALL = 3
+        def copy_ticks_from(self, symbol, date_from, count, flags):
+            return [SimpleNamespace(
+                time_msc=1_800_000_000_000, bid=3000.0, ask=3000.2,
+                last=3000.1, volume=1, volume_real=1.0, flags=flags,
+            )]
+        def last_error(self):
+            return (1, "fake")
+
+    cursor = datetime.fromtimestamp(1_799_999_998, tz=timezone.utc)
+    records = {}
+    next_cursor = collector._collect_symbol_ticks(
+        TickAPI(), "XAUUSD", "XAUUSDm", "exness-demo-test", cursor,
+        records, 1_800_000_000_000,
+    )
+    assert next_cursor > cursor
+    assert len(records) == 1
+    assert next(iter(records.values()))["time_msc"] == 1_800_000_000_000
+
