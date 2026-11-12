@@ -1,5 +1,5 @@
 """Environment configuration with conservative, fail-closed trading defaults."""
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +16,14 @@ class Settings(BaseSettings):
     max_risk_per_trade_percent: float = 0.25
     max_daily_loss_percent: float = 1.0
     max_open_positions: int = 1
+
+    @field_validator("symbols")
+    @classmethod
+    def enforce_xauusd_only(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if normalized != "XAUUSD":
+            raise ValueError("VELTRIX supports XAUUSD only; all other instruments are disabled")
+        return "XAUUSD"
 
     @property
     def credentials_configured(self) -> bool:
