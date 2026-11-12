@@ -267,11 +267,9 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
             }
         spread_samples = {name: [] for name in CANONICAL_SYMBOLS}
         source_id = "exness-demo-" + re.sub(r"[^A-Za-z0-9_-]", "-", server)[:70]
-        warmup_quotes = wait_for_fresh_quotes(
+        wait_for_fresh_quotes(
             mt5, symbols, login, server, monotonic=monotonic, sleep=sleep, now=now
         )
-        for quote in warmup_quotes:
-            spread_samples[quote["canonical"]].append(quote["spread_points"])
         started_utc = now()
         start_mono = monotonic()
         start_time_msc = int(started_utc.timestamp() * 1000)
