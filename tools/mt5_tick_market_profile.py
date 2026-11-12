@@ -1,7 +1,8 @@
 """Offline market-data profile for a previously collected Veltrix MT5 tick CSV.
 
 This tool never connects to MT5 and never places or manages orders. It verifies
-the dataset against its manifest and reports descriptive microstructure metrics.
+the dataset against its manifest and reports quote movement, spread, and
+inter-tick microstructure metrics without inferring execution readiness.
 """
 from __future__ import annotations
 
