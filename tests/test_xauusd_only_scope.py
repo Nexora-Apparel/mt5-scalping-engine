@@ -30,7 +30,7 @@ def test_mql5_market_and_ai_modules_fail_closed_outside_gold():
     assert 'config.symbol!="XAUUSD"' in strategy
     assert 'config.symbol!="XAUUSD"' in collector
     assert 'snapshot.symbol!="XAUUSD"' in exporter
-    assert 'symbol!="XAUUSD"' in pipeline
+    assert 'IsVerifiedXauContract(broker_symbol)' in pipeline\n    assert 'm_collector.PushQuote("XAUUSD"' in pipeline
     assert "XAGUSD is disabled" in strategy
     assert "XAGUSD is not accepted" in exporter
 
