@@ -1,0 +1,145 @@
+name: VELTRIX offline multi-session DEMO certification
+
+on:
+  workflow_dispatch:
+    inputs:
+      sessions_json:
+        description: 'JSON array of source sessions: [{"run_id":"43194341816","artifact_name":"veltrix-exness-demo-ticks-3"},{"run_id":"...","artifact_name":"..."}]'
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: veltrix-multi-session-certification
+  cancel-in-progress: false
+
+jobs:
+  certify:
+    name: Verify source runs and certify independent sessions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out certification tools
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify source runs, download exact artifacts, and certify
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPOSITORY: ${{ github.repository }}
+          SESSIONS_JSON: ${{ inputs.sessions_json }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          expected_workflow = "VELTRIX bounded Exness DEMO tick collection"
+          raw = os.environ.get("SESSIONS_JSON", "")
+          try:
+              sessions = json.loads(raw)
+          except json.JSONDecodeError as exc:
+              raise SystemExit(f"sessions_json is invalid JSON: {exc}")
+
+          if not isinstance(sessions, list) or len(sessions) < 2:
+              raise SystemExit("At least two source sessions are required.")
+          if len(sessions) > 10:
+              raise SystemExit("A maximum of 10 sessions is supported per certification run.")
+
+          run_ids = []
+          normalized = []
+          for index, item in enumerate(sessions, start=1):
+              if not isinstance(item, dict):
+                  raise SystemExit(f"Session {index} must be a JSON object.")
+              run_id = str(item.get("run_id", ""))
+              artifact_name = item.get("artifact_name")
+              if not re.fullmatch(r"[0-9]+", run_id):
+                  raise SystemExit(f"Session {index} has an invalid numeric run_id.")
+              if not isinstance(artifact_name, str) or not artifact_name.strip():
+                  raise SystemExit(f"Session {index} has a missing artifact_name.")
+              if len(artifact_name) > 200 or any(ord(ch) < 32 for ch in artifact_name):
+                  raise SystemExit(f"Session {index} has an invalid artifact_name.")
+              run_ids.append(run_id)
+              normalized.append((run_id, artifact_name))
+
+          if len(set(run_ids)) != len(run_ids):
+              raise SystemExit("Source run IDs must be distinct; repeated runs are not independent sessions.")
+
+          repository = os.environ["GH_REPOSITORY"]
+          root = Path("certification-sources")
+          root.mkdir(parents=True, exist_ok=True)
+          cert_args = [
+              sys.executable,
+              "tools/mt5_multi_session_certification.py",
+          ]
+
+          def gh(*args):
+              return subprocess.run(
+                  ["gh", *args, "--repo", repository],
+                  check=True,
+                  text=True,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.PIPE,
+              ).stdout
+
+          for index, (run_id, artifact_name) in enumerate(normalized, start=1):
+              metadata = json.loads(gh(
+                  "run", "view", run_id,
+                  "--json", "conclusion,workflowName",
+              ))
+              if metadata.get("conclusion") != "success":
+                  raise SystemExit(f"Source run {run_id} did not complete successfully.")
+              if metadata.get("workflowName") != expected_workflow:
+                  raise SystemExit(
+                      f"Source run {run_id} is not from the expected DEMO collector workflow."
+                  )
+
+              destination = root / f"session-{index}"
+              destination.mkdir(parents=True, exist_ok=True)
+              gh(
+                  "run", "download", run_id,
+                  "--name", artifact_name,
+                  "--dir", str(destination),
+              )
+              csv_path = destination / "veltrix_exness_demo_ticks.csv"
+              manifest_path = destination / "manifest.json"
+              if not csv_path.is_file() or not manifest_path.is_file():
+                  raise SystemExit(
+                      f"Artifact {artifact_name!r} from run {run_id} is missing the required CSV or manifest."
+                  )
+              cert_args.extend([
+                  "--session",
+                  f"{csv_path}={manifest_path}",
+              ])
+              print(f"Verified source run {run_id}, artifact {artifact_name!r}.")
+
+          output = Path("certification-output")
+          output.mkdir(parents=True, exist_ok=True)
+          report = output / "multi-session-certification.json"
+          cert_args.extend(["--output", str(report)])
+          subprocess.run(cert_args, check=True)
+          print(f"Certification report written to {report}.")
+          PY
+
+      - name: Validate certification report JSON
+        run: python -m json.tool certification-output/multi-session-certification.json >/dev/null
+
+      - name: Upload multi-session certification report
+        uses: actions/upload-artifact@v4
+        with:
+          name: veltrix-multi-session-certification-${{ github.run_number }}
+          path: certification-output/multi-session-certification.json
+          if-no-files-found: error
+          retention-days: 90
