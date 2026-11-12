@@ -8,12 +8,14 @@ on:
       - "MQL5/**/*.mq5"
       - "MQL5/**/*.mqh"
       - ".github/workflows/mql5-compile.yml"
+      - ".github/workflows/veltrix-demo-diagnostics.yml"
   push:
     branches: [main]
     paths:
       - "MQL5/**/*.mq5"
       - "MQL5/**/*.mqh"
       - ".github/workflows/mql5-compile.yml"
+      - ".github/workflows/veltrix-demo-diagnostics.yml"
 
 permissions:
   contents: read
