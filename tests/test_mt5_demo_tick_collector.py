@@ -102,6 +102,7 @@ def test_tick_audit_validates_both_symbols_and_hashes_dataset(tmp_path):
     assert result["records"] == 2
     assert len(result["sha256"]) == 64
     assert set(result["streams"]) == {"XAUUSD", "XAGUSD"}
+    assert "max_intertick_gap_ms" in result["streams"]["XAUUSD"]
 
 
 def test_tick_audit_rejects_duplicate_tick(tmp_path):
@@ -146,6 +147,8 @@ def test_full_bounded_collector_rechecks_demo_and_writes_audited_both_symbol_dat
     assert manifest["trading_enabled"] is False
     assert manifest["dll_imports_enabled"] is False
     assert manifest["quote_validation_cycles"] == 1800
+    assert manifest["instrument_specs"]["XAUUSD"]["point"] == 0.01
+    assert manifest["spread_points"]["XAUUSD"]["samples"] == 1800
     assert manifest["streams"]["XAUUSD"]["records"] == 1800
     assert manifest["streams"]["XAGUSD"]["records"] == 1800
     assert (tmp_path / "manifest.json").is_file()
@@ -187,3 +190,12 @@ def test_incremental_tick_cursor_advances_on_short_batches_and_filters_pre_sessi
     assert len(records) == 1
     assert next(iter(records.values()))["time_msc"] == 1_800_000_000_000
 
+
+
+def test_tick_audit_reports_long_intertick_gaps_without_silently_filling_them(tmp_path):
+    path = tmp_path / "gaps.csv"
+    write_rows(path, [valid_row(stamp=1_800_000_000_000),
+                      valid_row(stamp=1_800_000_007_500)])
+    result = collector.audit_ticks(path)
+    assert result["streams"]["XAUUSD"]["max_intertick_gap_ms"] == 7500
+    assert result["streams"]["XAUUSD"]["gaps_over_5_seconds"] == 1
