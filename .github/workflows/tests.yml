@@ -19,6 +19,7 @@ on:
       - ".github/workflows/veltrix-demo-python-diagnostics.yml"
       - ".github/workflows/veltrix-demo-tick-collection.yml"
       - ".github/workflows/veltrix-market-profile.yml"
+      - ".github/workflows/veltrix-multi-session-certification.yml"
   push:
     branches:
       - main
@@ -36,6 +37,7 @@ on:
       - ".github/workflows/veltrix-demo-python-diagnostics.yml"
       - ".github/workflows/veltrix-demo-tick-collection.yml"
       - ".github/workflows/veltrix-market-profile.yml"
+      - ".github/workflows/veltrix-multi-session-certification.yml"
 
 permissions:
   contents: read
