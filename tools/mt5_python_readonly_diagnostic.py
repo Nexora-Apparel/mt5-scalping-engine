@@ -6,6 +6,7 @@ It is designed for Windows runners with the official MetaTrader5 Python package.
 from __future__ import annotations
 
 import json
+import math
 import os
 import sys
 import time
@@ -51,6 +52,8 @@ def validate_account(
         raise DiagnosticFailure("terminal is not connected to a trade server")
     if bool(getattr(terminal, "trade_allowed", True)):
         raise DiagnosticFailure("terminal trading permission is enabled; read-only guard requires it disabled")
+    if bool(getattr(terminal, "dlls_allowed", True)):
+        raise DiagnosticFailure("terminal DLL imports are enabled; read-only guard requires them disabled")
 
     account = mt5.account_info()
     if account is None:
@@ -70,6 +73,7 @@ def validate_account(
     return {
         "connected": True,
         "terminal_trade_allowed": False,
+        "terminal_dlls_allowed": False,
         "login_match": login_match,
         "server_match": server_match,
         "trade_mode": trade_mode,
@@ -99,7 +103,13 @@ def validate_quote(
     bid = float(tick.bid)
     ask = float(tick.ask)
     tick_time_ms = int(tick.time_msc)
-    if point <= 0.0 or bid <= 0.0 or ask <= bid or tick_time_ms <= 0:
+    if (
+        not all(math.isfinite(value) for value in (point, bid, ask))
+        or point <= 0.0
+        or bid <= 0.0
+        or ask <= bid
+        or tick_time_ms <= 0
+    ):
         raise DiagnosticFailure(f"{symbol}: invalid point, bid, ask, or tick timestamp")
 
     age_ms = now_ms - tick_time_ms
@@ -107,7 +117,7 @@ def validate_quote(
         raise DiagnosticFailure(f"{symbol}: quote stale or timestamp invalid (age_ms={age_ms})")
 
     spread_points = (ask - bid) / point
-    if spread_points <= 0.0 or spread_points > max_spread_points:
+    if not math.isfinite(spread_points) or spread_points <= 0.0 or spread_points > max_spread_points:
         raise DiagnosticFailure(
             f"{symbol}: spread outside configured limit (spread_points={spread_points:.2f})"
         )
