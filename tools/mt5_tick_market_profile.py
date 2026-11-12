@@ -110,12 +110,12 @@ def profile_dataset(csv_path: str | Path, manifest_path: str | Path) -> dict[str
         spreads = [ask - bid for _, bid, ask, _, _ in ticks]
         quote_pairs = [(bid, ask) for _, bid, ask, _, _ in ticks]
         quote_changes = sum(a != b for a, b in zip(quote_pairs, quote_pairs[1:]))
-        unique_spreads = len({round((ask - bid) / point, 6) for _, bid, ask, _, _ in ticks})
         spec = manifest.get("instrument_specs", {}).get(symbol, {})
         point = float(spec.get("point", 0))
         if not math.isfinite(point) or point <= 0:
             raise ProfileError(f"{symbol}: missing or invalid instrument point size")
         spread_points = [value / point for value in spreads]
+        unique_spreads = len({round(value, 6) for value in spread_points})
         zero_last_count = sum(last == 0 for _, _, _, last, _ in ticks)
         zero_volume_real_count = sum(volume_real == 0 for _, _, _, _, volume_real in ticks)
         span_seconds = (stamps[-1] - stamps[0]) / 1000 if len(stamps) > 1 else 0.0
