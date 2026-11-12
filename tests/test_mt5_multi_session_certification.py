@@ -25,7 +25,7 @@ def make_session(tmp_path, name, start_ms, *, gap_ms=1000):
                 "volume": "1", "volume_real": "1.0", "flags": "3",
             })
     with csv_path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=HEADER, lineterminator="\\n")
+        writer = csv.DictWriter(handle, fieldnames=HEADER, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
     start = datetime.fromtimestamp(start_ms / 1000, timezone.utc)
