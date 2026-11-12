@@ -134,6 +134,7 @@ def audit_ticks(path: str | Path, expected_symbols: tuple[str, ...] = CANONICAL_
 def _collect_symbol_ticks(
     mt5: Any, canonical: str, broker_symbol: str, source_id: str,
     cursor: datetime, records: dict[tuple[Any, ...], dict[str, Any]],
+    minimum_time_msc: int,
 ) -> datetime:
     next_cursor = cursor
     while True:
@@ -160,6 +161,9 @@ def _collect_symbol_ticks(
                 raise DiagnosticFailure(f"{canonical}: broker returned malformed tick data")
             if bid <= 0 or ask < bid or volume < 0 or volume_real < 0:
                 raise DiagnosticFailure(f"{canonical}: broker returned invalid bid/ask/volume")
+            if stamp < minimum_time_msc:
+                newest = max(newest, stamp)
+                continue
             row = {
                 "schema_version": "1", "source_id": source_id,
                 "canonical_symbol": canonical, "broker_symbol": broker_symbol,
@@ -170,14 +174,16 @@ def _collect_symbol_ticks(
             }
             records[(canonical, *_tick_key(row))] = row
             newest = max(newest, stamp)
-        if len(batch) < BATCH_SIZE or newest <= 0:
+        if newest <= 0:
             break
-        # Overlap by one millisecond; the record key removes duplicates while
-        # preserving ticks sharing the same millisecond.
+        # Advance after every non-empty batch, not only a full batch. The
+        # one-millisecond overlap preserves same-ms ticks; record keys dedupe.
         candidate = datetime.fromtimestamp(newest / 1000, tz=timezone.utc) - timedelta(milliseconds=1)
         if candidate <= next_cursor:
             break
         next_cursor = candidate
+        if len(batch) < BATCH_SIZE:
+            break
     return next_cursor
 
 
@@ -203,6 +209,7 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
         source_id = "exness-demo-" + re.sub(r"[^A-Za-z0-9_-]", "-", server)[:70]
         started_utc = now()
         start_mono = monotonic()
+        start_time_msc = int(started_utc.timestamp() * 1000)
         cursors = {name: started_utc - timedelta(seconds=2) for name in CANONICAL_SYMBOLS}
         records: dict[tuple[Any, ...], dict[str, Any]] = {}
         quote_samples = 0
@@ -214,7 +221,7 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
                 validate_quote(mt5, symbols[canonical], current_ms, 15_000, 1_000, canonical)
                 cursors[canonical] = _collect_symbol_ticks(
                     mt5, canonical, symbols[canonical], source_id,
-                    cursors[canonical], records,
+                    cursors[canonical], records, start_time_msc,
                 )
             quote_samples += 1
             sleep(min(1.0, max(0.0, deadline - monotonic())))
