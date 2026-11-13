@@ -34,6 +34,22 @@ class CVxPositionRegistry
 private:
    VxPositionRecord m_records[];
 
+   bool IsVerifiedXauUsd(const string symbol)
+   {
+      string normalized=symbol;
+      StringToUpper(normalized);
+      if(StringLen(normalized)<6 || StringSubstr(normalized,0,6)!="XAUUSD" ||
+         !SymbolSelect(symbol,true))
+         return false;
+      string base="",profit="";
+      if(!SymbolInfoString(symbol,SYMBOL_CURRENCY_BASE,base) ||
+         !SymbolInfoString(symbol,SYMBOL_CURRENCY_PROFIT,profit))
+         return false;
+      StringToUpper(base);
+      StringToUpper(profit);
+      return (base=="XAU" && profit=="USD");
+   }
+
    int FindByIdentifier(const long identifier) const
    {
       for(int i=0;i<ArraySize(m_records);i++)
@@ -81,6 +97,11 @@ public:
          opened_msc<=0 || hold_seconds<10 || hold_seconds>60)
       {
          reason="Invalid confirmed position data or hold duration outside 10-60 seconds";
+         return false;
+      }
+      if(!IsVerifiedXauUsd(symbol))
+      {
+         reason="Position registry accepts only broker-verified XAUUSD contracts";
          return false;
       }
 
