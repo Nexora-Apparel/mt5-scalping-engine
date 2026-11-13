@@ -205,7 +205,8 @@ def test_walk_forward_cli_writes_explicit_blocked_report_for_empty_catalog(tmp_p
     completed = subprocess.run(
         [
             sys.executable,
-            str(ROOT / "tools/mt5_xauusd_walk_forward.py"),
+            "-m",
+            "tools.mt5_xauusd_walk_forward",
             "--catalog", str(ROOT / "research/xauusd_walk_forward_catalog_template.json"),
             "--stage", "validation",
             "--output", str(output),
