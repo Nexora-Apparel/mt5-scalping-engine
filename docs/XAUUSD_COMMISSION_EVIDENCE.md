@@ -53,12 +53,15 @@ commission has been verified. The evaluator accepts commission evidence only
 as explicit runtime inputs:
 
 ```bash
+# Set this from a separately authenticated reviewer channel; never copy it from the evidence package.
+export VELTRIX_COMMISSION_REVIEW_KEY_SHA256="<out-of-band-pinned-fingerprint>"
 python -m tools.mt5_xauusd_walk_forward \
   --catalog path/to/session-catalog.json \
   --stage validation \
   --commission-evidence path/to/verified-commission-evidence.json \
   --commission-source-artifact path/to/original-broker-schedule.pdf \
-  --commission-verification-artifact path/to/independent-review-record.pdf
+  --commission-verification-artifact path/to/signed-review-attestation.json \
+  --commission-review-public-key path/to/trusted-reviewer-public.pem
 ```
 
 The validator checks both the original source artifact SHA-256 and a separately hashed, scope-bound Ed25519-signed review attestation against the separately pinned trusted key, DEMO account mode,
