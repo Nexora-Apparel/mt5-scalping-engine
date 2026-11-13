@@ -71,7 +71,10 @@ def build_package(path, *, deals=0):
     manifest = {
         "schema": "VELTRIX_XAUUSD_DEMO_EXECUTION_COST_PACKAGE_V1",
         "status": summary["status"], "account_mode": "DEMO",
-        "broker_symbol": "XAUUSDm", "files": files,
+        "broker_symbol": "XAUUSDm",
+        "position_reference_scheme": "PER_PACKAGE_SALTED_SHA256",
+        "position_reference_salt_sha256": "c" * 64,
+        "files": files,
         "commission_schedule_status": "UNVERIFIED_REQUIRED_BROKER_SCHEDULE_AND_INDEPENDENT_REVIEW",
         "net_performance_allowed": False,
     }
@@ -114,7 +117,10 @@ def test_rejects_non_demo_or_trading_enabled_snapshot(tmp_path):
     (package / "manifest.json").write_text(json.dumps({
         "schema": "VELTRIX_XAUUSD_DEMO_EXECUTION_COST_PACKAGE_V1",
         "status": "NEEDS_DEMO_DEAL_HISTORY", "account_mode": "DEMO",
-        "broker_symbol": "XAUUSDm", "files": files,
+        "broker_symbol": "XAUUSDm",
+        "position_reference_scheme": "PER_PACKAGE_SALTED_SHA256",
+        "position_reference_salt_sha256": "c" * 64,
+        "files": files,
         "commission_schedule_status": "UNVERIFIED_REQUIRED_BROKER_SCHEDULE_AND_INDEPENDENT_REVIEW",
         "net_performance_allowed": False,
     }))
