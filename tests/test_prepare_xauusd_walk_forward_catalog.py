@@ -50,6 +50,7 @@ def test_phase8_intake_workflow_is_manual_read_only_and_validation_only():
     assert "permissions:" in workflow and "actions: read" in workflow and "contents: read" in workflow
     assert "--stage validation" in workflow
     assert "veltrix-xauusd-walk-forward-validation" in workflow
+    assert "fetch-depth: 0" in workflow
     assert "XAGUSD" not in workflow
     assert "OrderSend(" not in workflow
 def test_artifact_download_builds_catalog_from_verified_xauusd_artifact(tmp_path, monkeypatch):
