@@ -150,8 +150,7 @@ def _event(
 def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any]:
     registry_result = validate_registry(registry)
     rows, width, window_starts_ms = _validate_features(features)
-    events: list[dict[str, Any]] = []
-    counts = {item["candidate_id"]: 0 for item in registry["candidates"]}
+    # The final observed bucket cannot be proven complete from a closed CSV: only a later bucket\n    # proves that the prior five-second interval has ended. Never signal on the last row.\n    completed_count = max(0, len(rows) - 1)\n    events: list[dict[str, Any]] = []\n    counts = {item["candidate_id"]: 0 for item in registry["candidates"]}
     horizons = registry["evaluation"]["holding_horizons_seconds"]
 
     for candidate in registry["candidates"]:
@@ -161,7 +160,7 @@ def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]
         if family == "momentum_continuation":
             for lookback, threshold in product(grid["lookback_seconds"], grid["standardized_impulse_threshold"]):
                 n = lookback // width
-                for index in range(n, len(rows)):
+                for index in range(n, completed_count):
                     if not _contiguous_windows(window_starts_ms, index - n, index + 1, width):
                         continue
                     scale = _volatility_scale(rows, index - n, index)
@@ -205,7 +204,7 @@ def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]
                 grid["compression_reference_percentile"],
             ):
                 n = lookback // width
-                for index in range(60 + n, len(rows)):
+                for index in range(60 + n, completed_count):
                     if not _contiguous_windows(window_starts_ms, index - 60 - n, index + 1, width):
                         continue
                     scale = _volatility_scale(rows, index - n, index)
