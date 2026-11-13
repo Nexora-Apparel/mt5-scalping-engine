@@ -23,3 +23,4 @@ VELTRIX is an Exness MT5 research and scalping system with a strict **XAUUSD-onl
 Before any demo order testing, validate account identity, XAUUSD broker contract mapping, quote freshness, spread/slippage limits, risk-based sizing, broker volume constraints, protective stops, order preflight, position limits, cooldown, duplicate-order protection, daily equity-loss lockout, emergency stop, and audit logs.
 
 Never commit credentials, tokens, account IDs, or private logs.
+Phase 6 candidate analysis implementation and safety contract: [docs/PHASE6_XAUUSD_CANDIDATE_ANALYSIS.md](docs/PHASE6_XAUUSD_CANDIDATE_ANALYSIS.md).
