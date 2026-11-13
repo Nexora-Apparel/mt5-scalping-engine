@@ -210,6 +210,8 @@ def assess_session_catalog(
             raise WalkForwardError("selection-freeze record is incomplete")
         if selection_freeze.get("registry_sha256") != plan_result["registry_sha256"]:
             raise WalkForwardError("selection-freeze registry hash does not match the frozen registry")
+        if selection_freeze_path is None or validation_report_path is None:
+            raise WalkForwardError("selection-freeze and validation-report files are required for holdout scoring")
         try:
             validation_report = json.loads(validation_report_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
@@ -223,8 +225,6 @@ def assess_session_catalog(
         selected = selection_freeze.get("selected_candidate_configurations")
         if not isinstance(selected, list) or not selected:
             raise WalkForwardError("selection-freeze must select at least one validation configuration")
-        if selection_freeze_path is None or validation_report_path is None:
-            raise WalkForwardError("selection-freeze and validation-report files are required for holdout scoring")
         if selection_freeze.get("validation_report_sha256") != _sha256(validation_report_path):
             raise WalkForwardError("selection-freeze does not bind to the exact validation report")
         freeze_time = _utc(selection_freeze.get("frozen_utc"), "selection_freeze.frozen_utc")
@@ -249,6 +249,8 @@ def assess_session_catalog(
     for sid in sorted(expected_ids):
         item = supplied[sid]
         profile = profile_dataset(item["csv"], item["manifest"])
+        if profile.get("status") != "PASS":
+            raise WalkForwardError(f"{sid}: dataset profile is not PASS")
         manifest = json.loads(item["manifest"].read_text(encoding="utf-8"))
         if manifest.get("account_mode") != "DEMO" or manifest.get("trading_enabled") is not False or manifest.get("dll_imports_enabled") is not False:
             raise WalkForwardError(f"{sid}: source manifest must prove read-only DEMO collection")
