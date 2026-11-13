@@ -39,3 +39,44 @@ itself. The package always leaves `commission_schedule_status` unverified and
 order submission, order checking, position querying, or order-management path.
 If no matching deal history exists, it records
 `NEEDS_DEMO_DEAL_HISTORY` without failing the separate tick-integrity result.
+
+
+## Walk-forward runtime integration
+
+The preregistered walk-forward plan remains locked as
+`UNVERIFIED_REQUIRED_INPUT`; do not edit the plan to self-assert that
+commission has been verified. The evaluator accepts commission evidence only
+as explicit runtime inputs:
+
+```bash
+python -m tools.mt5_xauusd_walk_forward \
+  --catalog path/to/session-catalog.json \
+  --stage validation \
+  --commission-evidence path/to/verified-commission-evidence.json \
+  --commission-source-artifact path/to/original-broker-schedule.pdf
+```
+
+The validator checks the original source artifact SHA-256, DEMO account mode,
+exact broker symbol, USD profit/commission currency, per-side charging basis,
+contract size, and that the schedule's effective period covers the entire
+evaluation partition. The contract size and broker symbol must also match every
+evaluated session manifest. Independent verification may occur after historical
+market data was collected; its timestamp must not be in the future relative to
+the verification run.
+
+When evidence is absent, validation reports remain gross-only and net values
+stay null. When evidence is valid, the evaluator subtracts round-turn commission
+once from every candidate and directional benchmark outcome, using each
+outcome's executable entry price. It reports gross and net separately.
+
+A validation configuration becomes eligible for holdout selection only when it
+passes the sample-size gate and, at **every** registered slippage level (0, 1,
+2, and 5 points per side), has positive mean net return, a positive
+session-clustered 95% lower confidence bound, and positive lower-bound
+outperformance against NO_TRADE, ALWAYS_LONG, and ALWAYS_SHORT. This is a
+research selection gate, not authorization to trade.
+
+Holdout remains sealed unless runtime commission evidence is supplied and the
+committed validation report plus selection-freeze record satisfy the existing
+chronology and hash-binding requirements. The preregistered plan is not
+rewritten to manufacture a verified status.
