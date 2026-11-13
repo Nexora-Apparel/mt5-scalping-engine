@@ -1,0 +1,30 @@
+{
+  "schema": "VELTRIX_XAUUSD_COMMISSION_EVIDENCE_V1",
+  "status": "UNVERIFIED_REQUIRED_INPUT",
+  "instrument": {
+    "canonical_symbol": "XAUUSD",
+    "broker_symbol": "XAUUSDm",
+    "account_mode": "DEMO",
+    "currency_profit": "USD",
+    "contract_size_oz_per_lot": null
+  },
+  "commission": {
+    "currency": "USD",
+    "amount_per_lot_per_side": null,
+    "charging_basis": "PER_SIDE",
+    "effective_from_utc": null,
+    "effective_to_utc": null
+  },
+  "evidence": {
+    "source_type": null,
+    "source_reference": null,
+    "source_sha256": null,
+    "independently_verified": false,
+    "verification_reference": null,
+    "verified_at_utc": null
+  },
+  "limitations": [
+    "Template only; no commission value is asserted or inferred.",
+    "Net scoring must remain disabled until every required field is populated and source evidence is independently verified."
+  ]
+}
