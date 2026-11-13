@@ -160,6 +160,19 @@ def assess_session_catalog(
     if stage not in ("validation", "holdout"):
         raise WalkForwardError("stage must be validation or holdout")
     plan_result = validate_plan(plan, registry)
+    if stage == "holdout" and (
+        plan["evaluation"]["commission_status"] != "VERIFIED_FROM_EXNESS_ACCOUNT_SCHEDULE"
+        or plan["evaluation"].get("net_performance_allowed") is not True
+    ):
+        return {
+            "status": "BLOCKED_COMMISSION_UNVERIFIED",
+            "stage": stage,
+            "candidate_scoring_performed": False,
+            "holdout_opened": False,
+            "commission_status": plan["evaluation"]["commission_status"],
+            "net_performance_allowed": False,
+            "required_manual_evidence": "Applicable Exness DEMO commission schedule or statement, with exact per-side/per-lot charges and currency.",
+        }
     supplied = _load_catalog(catalog, base_dir)
     development = {item["session_id"]: item for item in plan["development_sessions"]}
     validation_ids = list(plan["validation_sessions"])
@@ -197,6 +210,14 @@ def assess_session_catalog(
             raise WalkForwardError("selection-freeze record is incomplete")
         if selection_freeze.get("registry_sha256") != plan_result["registry_sha256"]:
             raise WalkForwardError("selection-freeze registry hash does not match the frozen registry")
+        try:
+            validation_report = json.loads(validation_report_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise WalkForwardError("validation report is unreadable") from exc
+        if validation_report.get("status") != "RESEARCH_EVALUATION_COMPLETE" or validation_report.get("stage") != "validation":
+            raise WalkForwardError("holdout requires a completed validation-stage report")
+        if validation_report.get("registry_sha256") != plan_result["registry_sha256"]:
+            raise WalkForwardError("validation report does not match the frozen strategy registry")
         if selection_freeze.get("selection_rule_id") != plan["selection_freeze_contract"]["selection_rule_id"]:
             raise WalkForwardError("selection-freeze rule does not match the preregistered rule")
         selected = selection_freeze.get("selected_candidate_configurations")
