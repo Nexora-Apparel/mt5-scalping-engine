@@ -13,7 +13,8 @@ from pathlib import Path
 from typing import Any
 
 from tools.mt5_xauusd_strategy_registry import RegistryError, validate_registry
-from tools.mt5_tick_market_profile import ProfileError, percentile\nfrom tools.mt5_xauusd_feature_research import build_features
+from tools.mt5_tick_market_profile import ProfileError, percentile
+from tools.mt5_xauusd_feature_research import build_features
 
 
 class SignalError(ValueError):
@@ -308,8 +309,8 @@ def main() -> int:
         registry = json.loads(args.registry.read_text(encoding="utf-8"))
         result = generate_candidate_events(features, registry)
     except (OSError, json.JSONDecodeError, RegistryError, ProfileError, SignalError) as exc:
-        parser.exit(2, f"CANDIDATE SIGNAL GENERATION FAIL: {exc}\\n")
-    rendered = json.dumps(result, indent=2, sort_keys=True) + "\\n"
+        parser.exit(2, f"CANDIDATE SIGNAL GENERATION FAIL: {exc}\n")
+    rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:
         args.output.write_text(rendered, encoding="utf-8")
     print(rendered, end="")
