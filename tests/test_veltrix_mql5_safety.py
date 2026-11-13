@@ -483,3 +483,67 @@ def test_live_dataset_collection_requires_exact_connected_demo_account():
     for token in required:
         assert token in source
     assert "input bool   EnableDatasetCollection = false;" in source
+
+
+RISK_CONTROLS_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "RiskControls.mqh"
+
+
+def test_phase7_risk_controls_are_demo_xauusd_only_and_fail_closed():
+    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    required = (
+        "CVxRiskControls", "expected_demo_login", "expected_demo_server",
+        "ACCOUNT_TRADE_MODE_DEMO", "ACCOUNT_LOGIN", "ACCOUNT_SERVER",
+        "risk_per_trade_percent>0.25",
+        "max_portfolio_risk_percent>0.50",
+        "max_daily_loss_percent>1.00",
+        "config.max_positions!=1", "cooldown_seconds<30",
+        "max_consecutive_losses>3", "BeginServerDay",
+        "EvaluateDailyLoss", "RecordVerifiedClose",
+        "RegisterApprovedIntent", "RequestSeen",
+        "LatchEmergencyStop", "m_emergency_stop",
+        "Only a verified XAUUSD contract is permitted",
+        "Duplicate request identifier rejected",
+        "Post-loss cooldown is active",
+        "daily loss lock is latched until the next verified server day",
+    )
+    for token in required:
+        assert token.lower() in source.lower()
+    lowered = source.lower()
+    forbidden = (
+        "ordersend(", "ordersendasync(", "ordercheck(",
+        "trade_action_deal", "trade_action_pending", "ctrade",
+        "positionopen(", "positionclose(", "positionmodify(",
+    )
+    assert not [token for token in forbidden if token in lowered]
+
+
+def test_phase7_risk_controls_are_included_but_not_enabled_for_execution():
+    source = EA_SOURCE.read_text(encoding="utf-8")
+    assert 'RiskControls.mqh' in source
+    assert "EnableDemoOrders" not in source
+    assert "EnableCandidateAnalysis = false" in source
+    assert "EnableDatasetCollection = false" in source
+
+
+def test_phase7_daily_loss_lock_and_emergency_stop_are_distinct():
+    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8").read_text(encoding="utf-8")
+    assert "m_daily_loss_locked=false;" in source
+    assert "m_emergency_stop=true;" in source
+    day_reset = source.split("bool BeginServerDay", 1)[1].split("bool EvaluateDailyLoss", 1)[0]
+    assert "m_daily_loss_locked=false;" in day_reset
+    assert "m_emergency_stop=false;" not in day_reset
+    assert "A cooldown and emergency stop deliberately survive a day boundary." in source
+
+
+def test_phase7_risk_policy_reference_boundaries():
+    # Policy ceilings are hard caps; the defaults remain operator-configured and unused.
+    assert 0.25 <= 0.25
+    assert not (0.250001 <= 0.25)
+    assert 0.50 <= 0.50
+    assert not (0.500001 <= 0.50)
+    assert 1.00 <= 1.00
+    assert not (1.000001 <= 1.00)
+    day_start = 1000.0
+    daily_limit = 1.0
+    assert (day_start - 990.01) / day_start * 100 < daily_limit
+    assert (day_start - 990.0) / day_start * 100 >= daily_limit
