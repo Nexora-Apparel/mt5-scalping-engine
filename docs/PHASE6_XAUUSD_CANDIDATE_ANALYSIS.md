@@ -10,7 +10,7 @@ Implement the three frozen Phase 4 formulas as an offline, deterministic event g
 - **Mean reversion:** compare the current completed close with the arithmetic mean of the preceding lookback windows; standardize the log displacement by the same past-only volatility scale and reverse direction.
 - **Volatility breakout:** form prior high/low from preceding windows; require the prior range to be at or below the registered percentile of 60 past-only rolling range observations; confirm a completed close beyond the boundary by the registered volatility fraction.
 
-The exact equations and finite parameter grids are frozen in `research/xauusd_strategy_registry_v1.json`. Missing history, missing volatility, zero volatility, or incomplete compression history suppresses the event. Future-window mutations must not alter earlier events.
+The exact equations and finite parameter grids are frozen in `research/xauusd_strategy_registry_v1.json`. Missing history, missing volatility, zero volatility, incomplete compression history, or a gap in the required five-second window sequence suppresses the event. The engine never treats a later observed window as though it were an immediately preceding five-second window. Future-window mutations must not alter earlier events.
 
 ## Output contract
 
