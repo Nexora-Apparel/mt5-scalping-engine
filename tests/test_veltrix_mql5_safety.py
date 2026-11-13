@@ -613,3 +613,13 @@ def test_phase7_persistent_keys_use_64bit_hashing():
     assert "ulong hash=14695981039346656037" in source
     assert "hash*=1099511628211" in source
     assert "hash^=(ulong)StringGetCharacter(value,i)" in source
+
+
+def test_phase7_position_registry_and_broker_history_are_xauusd_scoped():
+    registry = (ROOT / "MQL5" / "Include" / "Veltrix" / "PositionRegistry.mqh").read_text(encoding="utf-8")
+    reconciler = (ROOT / "MQL5" / "Include" / "Veltrix" / "BrokerReconciler.mqh").read_text(encoding="utf-8")
+    assert "IsVerifiedXauUsd(symbol)" in registry
+    assert "SYMBOL_CURRENCY_BASE" in registry
+    assert "SYMBOL_CURRENCY_PROFIT" in registry
+    assert 'base=="XAU" && profit=="USD"' in registry
+    assert "HistoryDealGetString(deal,DEAL_SYMBOL)!=record.symbol" in reconciler
