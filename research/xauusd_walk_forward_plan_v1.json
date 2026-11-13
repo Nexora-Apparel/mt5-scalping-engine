@@ -32,9 +32,9 @@
   ],
   "validation_sessions": [
     "validation_01",
-    "validation_02",
     "validation_03",
-    "validation_04"
+    "validation_04",
+    "validation_05"
   ],
   "final_holdout_sessions": [
     "holdout_01",
@@ -108,5 +108,12 @@
     "No actual broker fills, market impact, order-book depth, or traded volume are available from tick quotes.",
     "Commission must be verified from the applicable Exness DEMO account schedule or statement before any net-performance claim.",
     "A completed walk-forward report is not permission to execute orders."
+  ],
+  "ineligible_validation_sessions": [
+    {
+      "session_id": "validation_02",
+      "collection_date_utc": "2026-11-13",
+      "reason": "Collected on the same UTC date as validation_01; it is preserved for audit but cannot satisfy a distinct-date validation slot."
+    }
   ]
 }
