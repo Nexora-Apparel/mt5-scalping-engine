@@ -737,6 +737,28 @@ def test_phase7_risk_controls_restore_journal_locks_and_persist_loss_locks():
     assert "m_journal.AppendEmergencyStop(event_time,journal_reason)" in source
 
 
+def test_phase7_terminal_restart_harness_uses_synthetic_identity_and_two_process_stages():
+    seed = (ROOT / "MQL5" / "Scripts" / "RiskControlsRestartSeed.mq5").read_text(encoding="utf-8")
+    verify = (ROOT / "MQL5" / "Scripts" / "RiskControlsRestartVerify.mq5").read_text(encoding="utf-8")
+    assert "TEST_LOGIN 900000007" in seed and "TEST_SERVER" in seed
+    assert "LatchEmergencyStop" in seed and "AppendDailyLock" in seed
+    assert "TEST_LOGIN 900000007" in verify and "TEST_SERVER" in verify
+    assert "IsEmergencyStopped" in verify and "IsDailyLossLocked" in verify
+    assert "terminal process restart" in verify.lower()
+    assert "ACCOUNT_LOGIN" not in seed and "ACCOUNT_LOGIN" not in verify
+    assert "OrderSend(" not in seed and "OrderSend(" not in verify
+
+
+def test_phase7_workflow_runs_seed_and_verify_as_separate_terminal_processes():
+    source = (ROOT / ".github" / "workflows" / "mql5-compile.yml").read_text(encoding="utf-8")
+    assert "Compile terminal process-restart seed script" in source
+    assert "Compile terminal process-restart verification script" in source
+    assert 'Invoke-Mt5RuntimeScript "RiskControlsRestartSeed"' in source
+    assert 'Invoke-Mt5RuntimeScript "RiskControlsRestartVerify"' in source
+    assert "RiskControlsRestartSeed.ex5" in source
+    assert "RiskControlsRestartVerify.ex5" in source
+
+
 def test_phase7_runtime_journal_harness_covers_permanent_locks():
     source = (ROOT / "MQL5" / "Scripts" / "RiskJournalRuntimeTest.mq5").read_text(encoding="utf-8")
     assert "journal.AppendDailyLock" in source
