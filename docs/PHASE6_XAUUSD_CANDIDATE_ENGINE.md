@@ -27,7 +27,8 @@ All preregistered parameter combinations and 5/15/30/60-second outcome horizons 
 
 ```bash
 python -m tools.mt5_xauusd_candidate_signals \
-  --features session-features.json \
+  --csv session.csv \
+  --manifest session-manifest.json \
   --registry research/xauusd_strategy_registry_v1.json \
   --output candidate-events.json
 ```
