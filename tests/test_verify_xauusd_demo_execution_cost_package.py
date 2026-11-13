@@ -126,3 +126,25 @@ def test_verifier_has_no_order_submission_or_management_calls():
     source = SOURCE.read_text()
     for forbidden in ("order_send(", "order_check(", "order_send_async(", "positions_get(", "orders_get("):
         assert forbidden not in source
+
+
+def test_rejects_deal_timestamp_that_does_not_match_epoch(tmp_path):
+    package = build_package(tmp_path / "evidence", deals=1)
+    csv_path = package / "demo_deals_sanitized.csv"
+    content = csv_path.read_text().replace("2027-01-15T08:00:00+00:00", "2027-01-15T09:00:00+00:00")
+    csv_path.write_text(content)
+    manifest = json.loads((package / "manifest.json").read_text())
+    raw = csv_path.read_bytes()
+    manifest["files"][csv_path.name] = {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+    (package / "manifest.json").write_text(json.dumps(manifest))
+    with pytest.raises(verifier.PackageVerificationError, match="UTC timestamp"):
+        verifier.verify_package(package)
+
+
+def test_rejects_summary_manifest_status_disagreement(tmp_path):
+    package = build_package(tmp_path / "evidence")
+    manifest = json.loads((package / "manifest.json").read_text())
+    manifest["status"] = "OBSERVATIONS_CAPTURED"
+    (package / "manifest.json").write_text(json.dumps(manifest))
+    with pytest.raises(verifier.PackageVerificationError, match="differs from the manifest"):
+        verifier.verify_package(package)
