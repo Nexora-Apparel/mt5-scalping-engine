@@ -111,6 +111,8 @@ jobs:
           $ErrorActionPreference = "Stop"
           python tools/mt5_xauusd_demo_execution_cost_collector.py --days 365 --output-dir session-artifacts/execution-cost-evidence
           if ($LASTEXITCODE -ne 0) { throw "Read-only DEMO execution-cost evidence capture failed." }
+          python tools/verify_xauusd_demo_execution_cost_package.py --package-dir session-artifacts/execution-cost-evidence --output session-artifacts/execution-cost-evidence/package-verification.json
+          if ($LASTEXITCODE -ne 0) { throw "DEMO execution-cost evidence package verification failed." }
 
       - name: Stop temporary MT5 terminal
         if: always()
