@@ -33,7 +33,8 @@
 
 6. **Strategy implementation and MQL5 research integration — IN PROGRESS**
    - Implement candidate analysis logic behind strict XAUUSD contract guards; keep collector and diagnostic workflows read-only; separate analysis from any order interface.
-   - Gate: unit/integration tests, deterministic outputs, and no order path in research workflows.
+   - Current evidence: frozen candidate generator and certified-session smoke workflow are passing; MQL5 now has a bounded completed-five-second window adapter and opt-in read-only candidate logging. See `docs/PHASE6_XAUUSD_CANDIDATE_ANALYSIS.md`.
+   - Remaining gate: final Python tests, MQL5 compile after adapter integration, and static confirmation that no order API was added. Live terminal behavior remains off and untested; no execution authorization is implied.
 
 7. **Risk engine and DEMO safety controls**
    - Implement risk-based sizing, maximum exposure, protective stops, loss limits, cooldowns, duplicate-order protection, emergency stop, and reconciliation.
