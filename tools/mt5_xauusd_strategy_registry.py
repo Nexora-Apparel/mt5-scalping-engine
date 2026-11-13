@@ -105,6 +105,8 @@ def validate_registry(data: dict[str, Any]) -> dict[str, Any]:
             raise RegistryError(f"{item['candidate_id']}: falsifiable hypothesis is missing")
         if not isinstance(item.get("signal_definition"), str) or not item["signal_definition"]:
             raise RegistryError(f"{item['candidate_id']}: signal definition is missing")
+        if not isinstance(item.get("calculation_spec"), str) or len(item["calculation_spec"]) < 100:
+            raise RegistryError(f"{item['candidate_id']}: exact calculation formula is missing")
         if not isinstance(item.get("invalidation"), str) or not item["invalidation"]:
             raise RegistryError(f"{item['candidate_id']}: invalidation rules are missing")
         if not isinstance(item.get("exit"), str) or "Fixed holding horizon" not in item["exit"]:
