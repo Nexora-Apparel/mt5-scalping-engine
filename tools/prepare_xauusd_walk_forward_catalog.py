@@ -131,6 +131,13 @@ def download_session_artifacts(
         csv_path, manifest_path = csv_files[0], manifests[0]
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         digest = _sha256(csv_path)
+        development_entry = next((entry for entry in plan["development_sessions"] if entry["session_id"] == sid), None)
+        if development_entry is not None:
+            if _sha256(manifest_path) != development_entry.get("expected_manifest_sha256"):
+                raise ArtifactIntakeError(f"{sid}: development manifest hash differs from the preregistered manifest")
+            for field in ("collection_started_utc", "collection_ended_utc", "duration_seconds"):
+                if manifest.get(field) != development_entry.get(field):
+                    raise ArtifactIntakeError(f"{sid}: development manifest {field} differs from the preregistered value")
         if manifest.get("sha256") != digest:
             raise ArtifactIntakeError(f"{sid}: CSV hash does not match the artifact manifest")
         if manifest.get("status") != "PASS" or manifest.get("data_audit_status") != "PASS":
