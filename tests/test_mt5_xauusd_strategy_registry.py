@@ -91,3 +91,8 @@ def test_rejects_nonresearch_registry_status(registry):
     registry["status"] = "APPROVED"
     with pytest.raises(RegistryError, match="research-only"):
         validate_registry(registry)
+
+def test_rejects_candidate_without_exact_calculation_formula(registry):
+    registry["candidates"][0]["calculation_spec"] = "use recent movement"
+    with pytest.raises(RegistryError, match="exact calculation formula"):
+        validate_registry(registry)
