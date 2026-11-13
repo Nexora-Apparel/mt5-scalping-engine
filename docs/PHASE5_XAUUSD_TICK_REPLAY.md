@@ -27,3 +27,9 @@ The output is deterministic and contains source/registry hashes, entry/exit quot
 ## Scope limitation
 
 The two already inspected sessions remain development-only. Replay smoke tests on them validate mechanics, not strategy performance. No final holdout is opened or scored in this phase.
+
+## Certified-artifact replay workflow
+
+`.github/workflows/phase5-xauusd-replay-validation.yml` downloads the two retained certified collection artifacts by their exact source run IDs. It rebuilds their five-second features, reruns the cross-session diagnostic, creates clearly labelled synthetic smoke events, and replays those events against the original ticks. It asserts that no execution or actual-fill claim is emitted and that commission remains null. The resulting evidence bundle is retained as a 90-day Actions artifact.
+
+The synthetic smoke events are not outputs of the three candidate signal formulas and must not be interpreted as candidate trades or strategy results. This workflow validates replay mechanics and data lineage only.
