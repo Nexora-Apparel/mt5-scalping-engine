@@ -68,9 +68,10 @@ The current VELTRIX EA only includes the module for compilation. No risk-control
 
 - [ ] Python regression tests pass on final commit.
 - [ ] MQL5 compile passes with zero errors and zero warnings.
-- [ ] Risk policy tests cover invalid numeric inputs, account mismatch, symbol mismatch, stop/tick-size/margin preflight, daily-loss lock, cooldown, loss streak, duplicate request, and emergency-stop latch.
+- [ ] Static regression checks verify fail-closed branches for invalid numeric inputs, account mismatch, symbol mismatch, stop/tick-size/margin preflight, daily-loss lock, cooldown, loss streak, duplicate request, and emergency-stop latch. These checks do not substitute for runtime behavior tests.
 - [ ] Static scan confirms no order submission/modification/closure APIs in the VELTRIX risk modules or EA.
-- [ ] Run `MQL5/Scripts/RiskJournalRuntimeTest.mq5` in a desktop MT5 terminal and verify the `PASS` result sentinel for request/close deduplication, daily-lock persistence, emergency-stop persistence, and restart replay. The script uses a synthetic identity and does not connect to a broker.\n- [ ] Controlled MT5 runtime test confirms risk-state checksum restoration, transaction-lock behavior, emergency-stop persistence, and storage-failure handling across terminal restart.
+- [ ] Run `MQL5/Scripts/RiskJournalRuntimeTest.mq5` in a desktop MT5 terminal and verify the `PASS` result sentinel for request/close deduplication, daily-lock persistence, emergency-stop persistence, and restart replay. The script uses a synthetic identity and does not connect to a broker.
+- [ ] Controlled MT5 runtime test confirms risk-state checksum restoration, transaction-lock behavior, emergency-stop persistence, and storage-failure handling across terminal restart.
 - [ ] Durable append-only risk journal passes controlled MT5 runtime tests for replay, duplicate rejection, partial-write detection, restart recovery, and filesystem-loss handling.
 - [ ] Independent review confirms all state persistence and restart behavior before any future DEMO execution.
 - [ ] No production deployment, scheduling, Telegram, or live trading.
