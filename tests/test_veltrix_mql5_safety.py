@@ -657,8 +657,18 @@ def test_phase7_persistent_risk_state_uses_last_written_checksum_commit_marker()
     source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
     persist = source.split("bool PersistRiskState", 1)[1].split("public:", 1)[0]
     assert "string m_state_checksum_name" in source
-    assert "string keys[7]" in source
-    assert "if(present!=0 && present!=7)" in source
+    assert "string keys[8]" in source
+    assert "if(present!=0 && present!=8)" in source
     assert "RiskStateChecksum()" in persist
     assert "GlobalVariableSet(m_state_checksum_name,RiskStateChecksum())" in persist
     assert "Persistent risk-state checksum mismatch" in source
+
+
+def test_phase7_close_accounting_is_serialized_and_abandoned_lock_fails_closed():
+    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    close = source.split("bool RecordVerifiedClose", 1)[1].split("bool CalculateVolume", 1)[0]
+    assert "GlobalVariableSetOnCondition(m_state_lock_name" in source
+    assert "AcquireRiskStateLock(close_time_msc,reason)" in close
+    assert "ReleaseRiskStateLock(close_time_msc)" in close
+    assert "prior risk-state transaction did not finish" in source
+    assert "manual reconciliation required" in source
