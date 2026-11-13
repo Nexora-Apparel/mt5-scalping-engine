@@ -213,7 +213,7 @@ def test_execution_coordinator_is_state_only_and_fail_closed():
         "VX_REQUEST_CANCELLED", "Prepare", "MarkSubmitting",
         "RecordBrokerResponse", "RecordFill", "DealAlreadySeen",
         "BeginReconciliation", "ResolveFromBroker", "SetDisconnected",
-        "SetReconnected", "LatchEmergencyStop", "m_emergency_stop",
+        "SetReconnected", "LatchEmergencyStop", "m_emergency_stop",\n        "GlobalVariableCheck", "GlobalVariableGet", "GlobalVariableSet",\n        "GlobalVariablesFlush", "m_emergency_key",
     )
     for token in required:
         assert token in source
@@ -534,7 +534,11 @@ def test_phase7_daily_loss_lock_and_emergency_stop_are_distinct():
     day_reset = source.split("bool BeginServerDay", 1)[1].split("bool EvaluateDailyLoss", 1)[0]
     assert "m_daily_loss_locked=false;" in day_reset
     assert "m_emergency_stop=false;" not in day_reset
+    assert "GlobalVariableCheck(m_emergency_key)" in source
+    assert "GlobalVariableSet(m_emergency_key,1.0)" in source
+    assert "GlobalVariablesFlush();" in source
     assert "A cooldown and emergency stop deliberately survive a day boundary." in source
+    assert "no reset method" not in source.lower() or "LatchEmergencyStop" in source
 
 
 def test_phase7_risk_policy_reference_boundaries():
