@@ -694,3 +694,16 @@ def test_phase7_risk_controls_initializes_durable_journal_before_approval():
     assert "m_journal.Init(config.expected_demo_login,config.expected_demo_server,reason)" in source
     assert "m_journal.AppendRequest" in source
     assert "m_journal.AppendClose" in source
+
+
+def test_phase7_terminal_runtime_test_exercises_journal_append_replay_and_duplicates():
+    source = (ROOT / "MQL5" / "Scripts" / "RiskJournalRuntimeTest.mq5").read_text(encoding="utf-8")
+    assert "CVxRiskJournal journal" in source
+    assert "journal.AppendRequest" in source
+    assert "journal.AppendClose" in source
+    assert "journal.Close()" in source
+    assert "CVxRiskJournal replay" in source
+    assert "replay.Init(test_login,test_server,reason)" in source
+    assert "duplicate request identifier was accepted" in source
+    assert "duplicate closing-deal identifier was accepted" in source
+    assert "synthetic account only" in source.lower() or "synthetic identity only" in source.lower()
