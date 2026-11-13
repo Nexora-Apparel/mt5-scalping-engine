@@ -182,3 +182,23 @@ def test_candidate_events_never_contain_execution_or_pnl_fields(registry):
         assert event["execution_authorized"] is False
         assert "gross_pnl_price_units" not in event
         assert "net_after_commission" not in event
+
+def test_missing_five_second_window_breaks_lookback_continuity(registry):
+    features = make_features()
+    missing_timestamp = features["features"][9]["window_start_utc"]
+    features["features"].pop(9)
+    features["window_count"] = len(features["features"])
+    features["source_records"] = sum(row["tick_count"] for row in features["features"])
+    # The first observed window after the hole cannot borrow the earlier row
+    # as though it were exactly one five-second interval in the past.
+    target_timestamp = features["features"][9]["window_start_utc"]
+    features["features"][9]["mid_close"] = 100.2
+    features["features"][9]["mid_high"] = 100.201
+    features["features"][9]["mid_low"] = 100.199
+    result = generate_candidate_events(features, registry)
+    assert not [
+        event for event in result["events"]
+        if event["candidate_id"] == "XAU_MOMENTUM_CONTINUATION_V1"
+        and event["signal_window_start_utc"] == target_timestamp
+        and event["parameters"]["lookback_seconds"] == 5
+    ]
