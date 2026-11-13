@@ -89,7 +89,18 @@
     "no_random_row_splits": true,
     "no_forward_fill": true,
     "no_cross_session_feature_history": true,
-    "all_reports_research_only": true
+    "all_reports_research_only": true,
+    "commission_model": {
+      "status": "UNVERIFIED_REQUIRED_INPUT",
+      "fee_model": "LINEAR_PER_LOT_PER_SIDE_NO_MINIMUM",
+      "fee_currency": "USD",
+      "usd_per_lot_per_side": null,
+      "account_type": null,
+      "evidence_reference": null,
+      "evidence_sha256": null,
+      "verified_utc": null,
+      "contract_size_source": "Verified XAUUSD instrument_specs.contract_size from each session manifest"
+    }
   },
   "selection_freeze_contract": {
     "schema": "VELTRIX_XAUUSD_SELECTION_FREEZE_V1",
