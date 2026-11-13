@@ -68,12 +68,12 @@ def test_risk_allocator_is_fail_closed_and_rounds_volume_down():
 
 def _reference_volume(equity, risk_pct, stop_distance, tick_size,
                       tick_value_loss, min_volume, max_volume, step,
-                      open_risk, portfolio_pct, open_positions, max_positions):
+                      open_risk, portfolio_pct, open_positions):
     numeric = (equity, risk_pct, stop_distance, tick_size, tick_value_loss,
                min_volume, max_volume, step, open_risk, portfolio_pct)
     if not all(math.isfinite(value) for value in numeric):
         return 0.0
-    if open_positions >= max_positions or min(equity, risk_pct, stop_distance,
+    if open_positions < 0 or min(equity, risk_pct, stop_distance,
             tick_size, tick_value_loss, min_volume, step, portfolio_pct) <= 0:
         return 0.0
     loss_per_lot = (stop_distance / tick_size) * tick_value_loss
@@ -88,11 +88,11 @@ def _reference_volume(equity, risk_pct, stop_distance, tick_size,
 
 def test_reference_risk_vectors_skip_under_minimum_and_respect_portfolio_cap():
     assert _reference_volume(10, 0.25, 2.0, 0.01, 1.0,
-                             0.01, 100.0, 0.01, 0.0, 1.0, 0, 3) == 0.0
+                             0.01, 100.0, 0.01, 0.0, 1.0, 0) == 0.0
     assert _reference_volume(1000, 1.0, 0.1, 0.01, 1.0,
-                             0.01, 100.0, 0.01, 0.0, 3.0, 0, 3) == 1.0
+                             0.01, 100.0, 0.01, 0.0, 3.0, 0) == 1.0
     assert _reference_volume(1000, 2.0, 0.1, 0.01, 1.0,
-                             0.01, 100.0, 0.01, 25.0, 3.0, 1, 3) == 0.5
+                             0.01, 100.0, 0.01, 25.0, 3.0, 17) == 0.5
 
 
 def test_reference_risk_vectors_reject_nan_and_infinity():
@@ -102,7 +102,7 @@ def test_reference_risk_vectors_reject_nan_and_infinity():
         for invalid in (math.nan, math.inf, -math.inf):
             values = baseline.copy()
             values[index] = invalid
-            assert _reference_volume(*values, 0, 3) == 0.0
+            assert _reference_volume(*values, 0) == 0.0
 
 
 def test_risk_allocator_checks_finite_inputs_and_derived_values():
@@ -498,7 +498,7 @@ def test_phase7_risk_controls_are_demo_xauusd_only_and_fail_closed():
         "risk_per_trade_percent>0.25",
         "max_portfolio_risk_percent>0.50",
         "max_daily_loss_percent>1.00",
-        "config.max_positions!=1", "cooldown_seconds<30",
+        "cooldown_seconds<30",
         "max_consecutive_losses>3", "BeginServerDay",
         "EvaluateDailyLoss", "RecordVerifiedClose", "closing_deal_ticket",
         "VX_CLOSE_", "Duplicate verified closing deal ignored",
@@ -566,7 +566,8 @@ def test_phase7_sizing_and_intent_registration_recheck_live_account_and_daily_lo
     assert "EvaluateDailyLoss(source.equity,guard_reason)" in sizing
     assert "VerifyExactDemoAccount(reason)" in registration
     assert "EvaluateDailyLoss(current_equity,reason)" in registration
-    assert "active_positions>=m_config.max_positions" in registration
+    assert "active_positions>=m_config.max_positions" not in registration
+    assert "there is no count ceiling" in registration
     assert "m_journal.HasRequest(request_key)" in registration
     assert "m_journal.AppendRequest(request_key,now_msc,reason)" in registration
     close_record = source.split("bool RecordVerifiedClose", 1)[1].split("bool CalculateVolume", 1)[0]
