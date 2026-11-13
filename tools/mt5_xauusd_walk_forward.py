@@ -11,6 +11,7 @@ import json
 import math
 import random
 import statistics
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -46,6 +47,27 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _git_commit_utc(path: Path, cwd: Path) -> datetime:
+    root_result = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"], cwd=cwd,
+        capture_output=True, text=True, check=False,
+    )
+    if root_result.returncode or not root_result.stdout.strip():
+        raise WalkForwardError("Git repository metadata is required to verify holdout freeze commits")
+    root = Path(root_result.stdout.strip()).resolve()
+    try:
+        relative = path.resolve().relative_to(root)
+    except ValueError as exc:
+        raise WalkForwardError("selection-freeze and validation-report files must be inside the repository") from exc
+    commit_result = subprocess.run(
+        ["git", "log", "-1", "--format=%cI", "--", str(relative)],
+        cwd=root, capture_output=True, text=True, check=False,
+    )
+    if commit_result.returncode or not commit_result.stdout.strip():
+        raise WalkForwardError(f"{path.name} must be committed before final-holdout collection")
+    return _utc(commit_result.stdout.strip(), f"{path.name} commit timestamp")
 
 
 def validate_plan(plan: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any]:
@@ -237,10 +259,19 @@ def assess_session_catalog(
         if selection_freeze.get("validation_report_sha256") != _sha256(validation_report_path):
             raise WalkForwardError("selection-freeze does not bind to the exact validation report")
         freeze_time = _utc(selection_freeze.get("frozen_utc"), "selection_freeze.frozen_utc")
-        if freeze_time >= min(_utc(json.loads(item["manifest"].read_text(encoding="utf-8")).get("collection_started_utc"),
-                                    f"{item['session_id']}.collection_started_utc")
-                              for sid, item in supplied.items() if sid in holdout_ids):
-            raise WalkForwardError("selection-freeze timestamp must precede every final-holdout collection")
+        validation_report_commit = _git_commit_utc(validation_report_path, base_dir)
+        selection_freeze_commit = _git_commit_utc(selection_freeze_path, base_dir)
+        if validation_report_commit > selection_freeze_commit:
+            raise WalkForwardError("selection-freeze commit must be at or after the validation-report commit")
+        if freeze_time < validation_report_commit or freeze_time > selection_freeze_commit:
+            raise WalkForwardError("selection-freeze timestamp must fall between validation-report and freeze commits")
+        earliest_holdout_start = min(
+            _utc(json.loads(item["manifest"].read_text(encoding="utf-8")).get("collection_started_utc"),
+                 f"{item['session_id']}.collection_started_utc")
+            for sid, item in supplied.items() if sid in holdout_ids
+        )
+        if selection_freeze_commit >= earliest_holdout_start:
+            raise WalkForwardError("selection-freeze commit must precede every final-holdout collection")
         try:
             on_disk_freeze = json.loads(selection_freeze_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
