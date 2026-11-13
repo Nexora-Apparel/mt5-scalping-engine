@@ -165,6 +165,38 @@ jobs:
           if (!(Test-Path $compiled)) { throw "Runtime-test script EX5 artifact was not created." }
           Write-Host "Dataset runtime-test script compiled; terminal file I/O is tested separately."
 
+      - name: Compile risk journal runtime test script
+        shell: pwsh
+        run: |
+          $source = (Resolve-Path "MQL5\\Scripts\\RiskJournalRuntimeTest.mq5").Path
+          $log = Join-Path (Split-Path $source) "RiskJournalRuntimeTest.log"
+          if (Test-Path $log) { Remove-Item $log -Force }
+          $arguments = @('/compile:"' + $source + '"', '/log')
+          Write-Host "Compiling synthetic account-scoped risk-journal runtime test; no broker login or order APIs are used."
+          $process = Start-Process -FilePath $env:METAEDITOR -ArgumentList $arguments -Wait -PassThru
+          Start-Sleep -Seconds 2
+          if (!(Test-Path $log)) { throw "MetaEditor did not produce the risk-journal runtime-test log." }
+          Get-Content $log
+          $logText = Get-Content $log -Raw
+          if ($logText -match "(?i)\\b[1-9]\\d* errors?\\b" -or $logText -notmatch "(?i)0 errors?") {
+            throw "Risk-journal runtime-test script did not compile cleanly."
+          }
+          if ($logText -match "(?i)\\b[1-9]\\d* warnings?\\b") {
+            throw "Risk-journal runtime-test script reported compiler warnings."
+          }
+          $compiled = Join-Path (Split-Path $source) "RiskJournalRuntimeTest.ex5"
+          if (!(Test-Path $compiled)) { throw "Risk-journal runtime-test EX5 artifact was not created." }
+          Write-Host "Risk-journal runtime-test script compiled; actual Common Files behavior still requires terminal execution."
+
+      - name: Upload risk journal runtime-test script artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Veltrix-risk-journal-runtime-test
+          path: MQL5/Scripts/RiskJournalRuntimeTest.ex5
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload dataset runtime-test script artifact
         if: success()
         uses: actions/upload-artifact@v4
