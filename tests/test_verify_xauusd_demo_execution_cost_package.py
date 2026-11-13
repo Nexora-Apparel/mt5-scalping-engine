@@ -154,3 +154,18 @@ def test_rejects_summary_manifest_status_disagreement(tmp_path):
     (package / "manifest.json").write_text(json.dumps(manifest))
     with pytest.raises(verifier.PackageVerificationError, match="differs from the manifest"):
         verifier.verify_package(package)
+
+
+def test_rejects_non_exness_broker_identity(tmp_path):
+    package = build_package(tmp_path / "evidence")
+    account_path = package / "broker_account_snapshot.json"
+    account = json.loads(account_path.read_text())
+    account["company"] = "Other Broker Ltd"
+    account["server"] = "Demo-Server"
+    account_path.write_text(json.dumps(account))
+    manifest = json.loads((package / "manifest.json").read_text())
+    raw = account_path.read_bytes()
+    manifest["files"][account_path.name] = {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+    (package / "manifest.json").write_text(json.dumps(manifest))
+    with pytest.raises(verifier.PackageVerificationError, match="does not identify Exness"):
+        verifier.verify_package(package)
