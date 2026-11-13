@@ -192,7 +192,7 @@ def diagnose_sessions(sessions: list[dict[str, Any]]) -> dict[str, Any]:
             ],
             "relative_median_deltas_pct_from_session_1": [
                 round((value - baseline) / abs(baseline) * 100, 6)
-                if value is not None and baseline is not None and abs(baseline) > 1e-12
+                if value is not None and baseline is not None and abs(baseline) > 1e-3
                 else None
                 for value in medians
             ],
