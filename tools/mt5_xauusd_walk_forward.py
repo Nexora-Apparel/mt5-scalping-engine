@@ -285,6 +285,10 @@ def assess_session_catalog(
     for previous, current in zip(ordered, ordered[1:]):
         if current[0] < previous[1]:
             raise WalkForwardError(f"overlapping sessions: {previous[2]} and {current[2]}")
+        if current[3] != previous[3]:
+            purge_seconds = plan["collection_requirements"]["purge_seconds_at_partition_boundaries"]
+            if (current[0] - previous[1]).total_seconds() < purge_seconds:
+                raise WalkForwardError("partition boundary is shorter than the preregistered purge interval")
         if current[3] == "validation" and previous[3] == "final_holdout":
             raise WalkForwardError("validation sessions cannot occur after final holdout")
         if current[3] == "final_holdout" and previous[3] == "validation":
