@@ -775,6 +775,8 @@ def run_walk_forward(
     commission_evidence: dict[str, Any] | None = None,
     commission_source_artifact_path: Path | None = None,
     commission_verification_artifact_path: Path | None = None,
+    commission_review_public_key_path: Path | None = None,
+    trusted_commission_reviewer_key_sha256: str | None = None,
     commission_verification_time_utc: str | None = None,
 ) -> dict[str, Any]:
     if stage == "holdout" and (
@@ -795,9 +797,11 @@ def run_walk_forward(
         commission_evidence is not None,
         commission_source_artifact_path is not None,
         commission_verification_artifact_path is not None,
+        commission_review_public_key_path is not None,
+        trusted_commission_reviewer_key_sha256 is not None,
     )
     if any(supplied_commission_inputs) and not all(supplied_commission_inputs):
-        raise WalkForwardError("commission evidence JSON, original source artifact, and independent verification artifact must be supplied together")
+        raise WalkForwardError("commission evidence, source, signed review, trusted public key, and pinned key fingerprint must be supplied together")
     ready = assess_session_catalog(plan, registry, catalog, stage=stage, base_dir=base_dir,
                                    selection_freeze=selection_freeze,
                                    selection_freeze_path=selection_freeze_path,
@@ -841,6 +845,8 @@ def run_walk_forward(
                 verification_time_utc=commission_verification_time_utc,
                 source_artifact_path=commission_source_artifact_path,
                 verification_artifact_path=commission_verification_artifact_path,
+                verification_public_key_path=commission_review_public_key_path,
+                trusted_reviewer_key_sha256=trusted_commission_reviewer_key_sha256,
             )
         except CommissionEvidenceError as exc:
             raise WalkForwardError(f"commission evidence rejected: {exc}") from exc
@@ -866,6 +872,8 @@ def main() -> int:
     parser.add_argument("--commission-evidence", type=Path)
     parser.add_argument("--commission-source-artifact", type=Path)
     parser.add_argument("--commission-verification-artifact", type=Path)
+    parser.add_argument("--commission-review-public-key", type=Path)
+    parser.add_argument("--commission-review-key-sha256")
     parser.add_argument("--commission-verification-time-utc")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -883,6 +891,8 @@ def main() -> int:
                                   commission_evidence=commission,
                                   commission_source_artifact_path=args.commission_source_artifact,
                                   commission_verification_artifact_path=args.commission_verification_artifact,
+                                  commission_review_public_key_path=args.commission_review_public_key,
+                                  trusted_commission_reviewer_key_sha256=args.commission_review_key_sha256,
                                   commission_verification_time_utc=args.commission_verification_time_utc)
     except (OSError, json.JSONDecodeError, ProfileError, CandidateError, RegistryError, ReplayError, WalkForwardError, KeyError, TypeError, ValueError) as exc:
         parser.exit(2, f"WALK-FORWARD FAIL: {exc}\n")
