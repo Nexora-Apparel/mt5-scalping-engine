@@ -175,7 +175,10 @@ def validate_commission_evidence(
     }
     for field, expected_value in expected_fields.items():
         actual_value = attestation.get(field)
-        if field in ("contract_size_oz_per_lot", "commission_usd_per_lot_per_side"):
+        if expected_value is None:
+            if actual_value is not None:
+                raise CommissionEvidenceError(f"review attestation {field} does not match commission evidence")
+        elif field in ("contract_size_oz_per_lot", "commission_usd_per_lot_per_side"):
             if actual_value != expected_value:
                 raise CommissionEvidenceError(f"review attestation {field} does not match commission evidence")
         elif not isinstance(actual_value, str) or not actual_value.strip():
