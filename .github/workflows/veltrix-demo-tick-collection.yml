@@ -3,11 +3,10 @@ run-name: VELTRIX XAUUSD-only read-only tick collection (30 min)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "tools/mt5_demo_tick_collector.py"
-      - "tools/mt5_python_readonly_diagnostic.py"
+  schedule:
+    # Four bounded, read-only XAUUSD DEMO validation sessions on four dates.
+    # This temporary research schedule ends after 17 November 2026.
+    - cron: "30 10 14-17 11 *"
 
 permissions:
   contents: read
