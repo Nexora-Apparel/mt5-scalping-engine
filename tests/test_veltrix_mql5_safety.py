@@ -502,7 +502,7 @@ def test_phase7_risk_controls_are_demo_xauusd_only_and_fail_closed():
         "max_consecutive_losses>3", "BeginServerDay",
         "EvaluateDailyLoss", "RecordVerifiedClose", "closing_deal_ticket",
         "VX_CLOSE_", "Duplicate verified closing deal ignored",
-        "RegisterApprovedIntent", "RequestKey", "ReservePersistentKey(request_key",
+        "RegisterApprovedIntent", "RequestKey", "m_journal.HasRequest", "m_journal.AppendRequest",
         "LatchEmergencyStop", "m_emergency_stop",
         "GlobalVariableCheck", "GlobalVariableGet", "GlobalVariableSet",
         "GlobalVariablesFlush", "m_emergency_key",
@@ -567,7 +567,7 @@ def test_phase7_sizing_and_intent_registration_recheck_live_account_and_daily_lo
     assert "VerifyExactDemoAccount(reason)" in registration
     assert "EvaluateDailyLoss(current_equity,reason)" in registration
     assert "active_positions>=m_config.max_positions" in registration
-    assert "ReservePersistentKey(request_key" in registration
+    assert "m_journal.HasRequest(request_key)" in registration\n    assert "m_journal.AppendRequest(request_key,now_msc,reason)" in registration
     close_record = source.split("bool RecordVerifiedClose", 1)[1].split("bool CalculateVolume", 1)[0]
     assert "GlobalVariableCheck(close_key)" in close_record
     assert "ReservePersistentKey(close_key" in close_record
@@ -670,3 +670,26 @@ def test_phase7_close_accounting_is_serialized_and_abandoned_lock_fails_closed()
     assert "ReleaseRiskStateLock(close_time_msc)" in close
     assert "prior risk-state transaction did not finish" in source
     assert "manual reconciliation required" in source
+
+
+def test_phase7_risk_journal_is_append_only_checksum_chained_and_account_scoped():
+    source = (ROOT / "MQL5" / "Include" / "Veltrix" / "RiskJournal.mqh").read_text(encoding="utf-8")
+    assert "FILE_COMMON" in source
+    assert "VELTRIX_XAUUSD_RISK_" in source
+    assert "FileWrite(m_handle" in source
+    assert "FileFlush(m_handle)" in source
+    assert "FileSeek(m_handle,0,SEEK_END)" in source
+    assert "m_previous_hash" in source
+    assert "HashText(payload)" in source
+    assert "m_sequence+1" in source
+    assert "Risk journal checksum chain is invalid" in source
+    assert "Duplicate request identifier rejected by durable journal" in source
+    assert "Duplicate verified closing deal rejected by durable journal" in source
+
+
+def test_phase7_risk_controls_initializes_durable_journal_before_approval():
+    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    assert '#include "RiskJournal.mqh"' in source
+    assert "m_journal.Init(config.expected_demo_login,config.expected_demo_server,reason)" in source
+    assert "m_journal.AppendRequest" in source
+    assert "m_journal.AppendClose" in source
