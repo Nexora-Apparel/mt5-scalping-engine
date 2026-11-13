@@ -6,6 +6,7 @@ import pytest
 from tools.mt5_xauusd_walk_forward import (
     WalkForwardError,
     _validate_selected_configurations,
+    _validate_selection_against_validation_report,
     assess_session_catalog,
     run_walk_forward,
     validate_plan,
@@ -90,6 +91,61 @@ def test_selection_freeze_accepts_only_registered_candidate_parameter_combinatio
     invalid[0]["parameters"]["lookback_seconds"] = 7
     with pytest.raises(WalkForwardError, match="finite grid"):
         _validate_selected_configurations(invalid, REGISTRY)
+
+
+
+def test_selection_freeze_rejects_validation_report_without_verified_commission():
+    selected = [{
+        "candidate_id": "XAU_MOMENTUM_CONTINUATION_V1",
+        "parameters": {"lookback_seconds": 5, "standardized_impulse_threshold": 1.0},
+        "horizon_seconds": 15,
+    }]
+    report = {
+        "commission_status": "UNVERIFIED_REQUIRED_INPUT",
+        "net_performance_allowed": False,
+        "candidate_results": [],
+    }
+    with pytest.raises(WalkForwardError, match="commission is not verified"):
+        _validate_selection_against_validation_report(selected, report)
+
+
+def test_selection_freeze_rejects_gross_only_or_under_sampled_candidate():
+    selected = [{
+        "candidate_id": "XAU_MOMENTUM_CONTINUATION_V1",
+        "parameters": {"lookback_seconds": 5, "standardized_impulse_threshold": 1.0},
+        "horizon_seconds": 15,
+    }]
+    report = {
+        "commission_status": "VERIFIED_FROM_EXNESS_ACCOUNT_SCHEDULE",
+        "net_performance_allowed": True,
+        "candidate_results": [{
+            **selected[0],
+            "sample_size_gate_passed": True,
+            "net_validation_gate_passed": False,
+            "candidate_approval": "NOT_APPROVED",
+        }],
+    }
+    with pytest.raises(WalkForwardError, match="only configurations that passed validation"):
+        _validate_selection_against_validation_report(selected, report)
+
+
+def test_selection_freeze_accepts_only_exact_cost_qualified_validation_configuration():
+    selected = [{
+        "candidate_id": "XAU_MOMENTUM_CONTINUATION_V1",
+        "parameters": {"lookback_seconds": 5, "standardized_impulse_threshold": 1.0},
+        "horizon_seconds": 15,
+    }]
+    report = {
+        "commission_status": "VERIFIED_FROM_EXNESS_ACCOUNT_SCHEDULE",
+        "net_performance_allowed": True,
+        "candidate_results": [{
+            **selected[0],
+            "sample_size_gate_passed": True,
+            "net_validation_gate_passed": True,
+            "candidate_approval": "VALIDATION_ELIGIBLE_FOR_HOLDOUT",
+        }],
+    }
+    _validate_selection_against_validation_report(selected, report)
 
 
 def test_walk_forward_tool_is_research_only_and_has_no_order_api_calls():
