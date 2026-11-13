@@ -743,3 +743,24 @@ def test_phase7_runtime_journal_harness_covers_permanent_locks():
     assert "journal.AppendEmergencyStop" in source
     assert "replay.HasDailyLock" in source
     assert "replay.HasEmergencyStop" in source
+
+
+def test_phase7_risk_controls_runtime_harness_checks_restart_lock_and_checksum_failures():
+    source = (ROOT / "MQL5" / "Scripts" / "RiskControlsRuntimeTest.mq5").read_text(encoding="utf-8")
+    assert "CVxRiskControls" in source
+    assert "SeedEmergencyStop" in source
+    assert "AppendSyntheticDailyLock" in source
+    assert "VerifyRestoredLocks" in source
+    assert "abandoned transaction-lock fail-closed test" in source
+    assert "risk-state checksum fail-closed test" in source
+    assert "GlobalVariableDel" in source
+
+
+def test_phase7_mql5_workflow_executes_terminal_runtime_scripts_without_broker_login():
+    source = (ROOT / ".github" / "workflows" / "mql5-compile.yml").read_text(encoding="utf-8")
+    assert "Execute terminal-side risk runtime tests" in source
+    assert 'Login=0' in source
+    assert "Script=$scriptName" in source
+    assert "ShutdownTerminal=1" in source
+    assert "veltrix_risk_controls_runtime_test.result" in source
+    assert "veltrix_risk_journal_runtime_test.result" in source
