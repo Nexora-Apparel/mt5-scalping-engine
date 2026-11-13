@@ -105,8 +105,8 @@ def main() -> int:
     try:
         result = build_features(args.csv, args.manifest, window_seconds=args.window_seconds)
     except (ProfileError, OSError, KeyError, TypeError, ValueError) as exc:
-        parser.exit(2, f"FEATURE BUILD FAIL: {exc}\\n")
-    rendered = json.dumps(result, indent=2, sort_keys=True) + "\\n"
+        parser.exit(2, f"FEATURE BUILD FAIL: {exc}\n")
+    rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:
         args.output.write_text(rendered, encoding="utf-8")
     print(rendered, end="")
