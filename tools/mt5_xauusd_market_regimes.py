@@ -171,7 +171,10 @@ def classify_regimes(
         # Append the current observation only after classifying it. Keep nulls
         # in the row history so lookback_windows always means prior windows,
         # not an unbounded search for older non-null observations.
-        history.append({metric: row.get(metric) for metric in METRICS})
+        history.append({
+            "window_start_utc": row["window_start_utc"],
+            **{metric: row.get(metric) for metric in METRICS},
+        })
 
     return {
         "status": "PASS",
