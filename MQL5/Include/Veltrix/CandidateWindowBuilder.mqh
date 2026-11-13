@@ -41,10 +41,7 @@ private:
 
    void StartWindow(const long start_msc,const double mid)
    {
-      m_current.symbol="XAUUSD";
-      m_current.start_msc=start_msc;
-      m_current.window_seconds=5;
-      m_current.completed=false;
+      m_current.window_start_msc=start_msc;
       m_current.mid_close=mid;
       m_current.mid_high=mid;
       m_current.mid_low=mid;
