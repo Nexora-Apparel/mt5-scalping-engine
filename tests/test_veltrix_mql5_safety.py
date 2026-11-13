@@ -651,3 +651,14 @@ def test_phase7_safety_modules_and_ea_have_no_order_submission_or_modification_a
     for relative in paths:
         source = (ROOT / relative).read_text(encoding="utf-8").lower()
         assert not [token for token in forbidden if token in source], relative
+
+
+def test_phase7_persistent_risk_state_uses_last_written_checksum_commit_marker():
+    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    persist = source.split("bool PersistRiskState", 1)[1].split("public:", 1)[0]
+    assert "string m_state_checksum_name" in source
+    assert "string keys[7]" in source
+    assert "if(present!=0 && present!=7)" in source
+    assert "RiskStateChecksum()" in persist
+    assert "GlobalVariableSet(m_state_checksum_name,RiskStateChecksum())" in persist
+    assert "Persistent risk-state checksum mismatch" in source
