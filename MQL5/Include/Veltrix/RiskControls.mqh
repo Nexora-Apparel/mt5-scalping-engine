@@ -74,6 +74,24 @@ private:
                           ServerHash(request_id));
    }
 
+   bool ReservePersistentKey(const string key,const double stamp,
+                             const string duplicate_reason,string &reason)
+   {
+      reason="";
+      if(key=="" || StringLen(key)>63 || !MathIsValidNumber(stamp) || stamp<=0.0)
+      { reason="Persistent idempotency key or timestamp is invalid"; return false; }
+      if(!GlobalVariableCheck(key))
+      {
+         if(GlobalVariableSet(key,0.0)==0 && !GlobalVariableCheck(key))
+         { reason="Could not initialize persistent idempotency key"; return false; }
+      }
+      // Atomic compare-and-set: only one EA instance can reserve a given key.
+      if(!GlobalVariableSetOnCondition(key,stamp,0.0))
+      { reason=duplicate_reason; return false; }
+      GlobalVariablesFlush();
+      return true;
+   }
+
    double RiskStateChecksum(void) const
    {
       string serialized=StringFormat("%d|%I64d|%.17g|%d|%I64d|%I64d",
@@ -304,8 +322,9 @@ public:
                                     ServerHash(StringFormat("%I64u",closing_deal_ticket)));
       if(close_key=="" || StringLen(close_key)>63)
       { reason="Closing-deal deduplication key is invalid"; return false; }
-      if(GlobalVariableCheck(close_key))
-      { reason="Duplicate verified closing deal ignored"; return false; }
+      if(!ReservePersistentKey(close_key,(double)close_time_msc,
+                               "Duplicate verified closing deal ignored",reason))
+         return false;
       if(net_profit<0.0)
       {
          m_consecutive_losses++;
@@ -327,14 +346,6 @@ public:
          reason="Could not persist verified close risk state; emergency stop latched";
          return false;
       }
-      if(GlobalVariableSet(close_key,1.0)==0)
-      {
-         m_emergency_stop=true;
-         PersistRiskState();
-         reason="Could not persist closing-deal deduplication; emergency stop latched";
-         return false;
-      }
-      GlobalVariablesFlush();
       return true;
    }
 
@@ -384,11 +395,9 @@ public:
       string request_key=RequestKey(request_id);
       if(request_key=="" || StringLen(request_key)>63)
       { reason="Request deduplication key is invalid"; return false; }
-      if(GlobalVariableCheck(request_key))
-      { reason="Duplicate request identifier rejected"; return false; }
-      if(GlobalVariableSet(request_key,(double)now_msc)==0)
-      { reason="Could not persist request deduplication state; fail closed"; return false; }
-      GlobalVariablesFlush();
+      if(!ReservePersistentKey(request_key,(double)now_msc,
+                               "Duplicate request identifier rejected",reason))
+         return false;
       return true;
    }
 
