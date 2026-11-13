@@ -45,14 +45,8 @@ bool PrepareCleanState(void)
    return true;
 }
 
-void OnStart()
+bool SeedEmergencyStop(string &reason)
 {
-   if(!PrepareCleanState())
-   {
-      Result("FAIL | unable to clear prior synthetic test state");
-      return;
-   }
-
    VxRiskControlConfig config;
    config.expected_demo_login=TEST_LOGIN;
    config.expected_demo_server=TEST_SERVER;
@@ -62,34 +56,38 @@ void OnStart()
    config.max_positions=1;
    config.cooldown_seconds=30;
    config.max_consecutive_losses=3;
-
-   string reason="";
    CVxRiskControls controls;
-   if(!controls.Init(config,reason))
+   if(!controls.Init(config,reason)) return false;
+   return controls.LatchEmergencyStop(reason);
+}
+
+bool AppendSyntheticDailyLock(string &reason)
+{
+   CVxRiskJournal journal;
+   if(!journal.Init(TEST_LOGIN,TEST_SERVER,reason)) return false;
+   bool ok=journal.AppendDailyLock(20261113,(long)TimeLocal()*1000,1.0,reason);
+   journal.Close();
+   return ok;
+}
+
+void OnStart()
+{
+   if(!PrepareCleanState())
    {
-      Result("FAIL | seed initialization: "+reason);
+      Result("FAIL | unable to clear prior synthetic test state");
       return;
    }
-   if(!controls.LatchEmergencyStop(reason))
+   string reason="";
+   if(!SeedEmergencyStop(reason))
    {
       Result("FAIL | emergency-stop seed: "+reason);
       return;
    }
-
-   CVxRiskJournal journal;
-   if(!journal.Init(TEST_LOGIN,TEST_SERVER,reason))
+   if(!AppendSyntheticDailyLock(reason))
    {
-      Result("FAIL | daily-lock journal open: "+reason);
-      return;
-   }
-   if(!journal.AppendDailyLock(20261113,(long)TimeLocal()*1000,1.0,reason))
-   {
-      journal.Close();
       Result("FAIL | daily-lock seed: "+reason);
       return;
    }
-   journal.Close();
-
    Print("RISK RESTART SEED PASS | synthetic identity only; terminal shutdown required before verification");
    Result("PASS | emergency-stop and daily-lock persisted before terminal process restart");
 }
