@@ -189,6 +189,7 @@ def test_validation_evaluator_aggregates_candidate_and_directional_benchmarks(tm
         manifest_path = tmp_path / f"{sid}.json"
         csv_path.write_text("synthetic fixture only", encoding="utf-8")
         manifest = {
+            "session_id": sid,
             "account_mode": "DEMO",
             "trading_enabled": False,
             "dll_imports_enabled": False,
@@ -326,3 +327,9 @@ def test_selection_freeze_rejects_uncommitted_report(tmp_path, monkeypatch):
     monkeypatch.setattr(wf.subprocess, "run", lambda *args, **kwargs: responses.pop(0))
     with pytest.raises(WalkForwardError, match="must be committed"):
         wf._git_commit_utc(report, tmp_path)
+
+
+def test_walk_forward_evaluator_requires_manifest_bound_validation_session_id():
+    source = (ROOT / "tools/mt5_xauusd_walk_forward.py").read_text(encoding="utf-8")
+    assert 'manifest.get("session_id") != sid' in source
+    assert "validation manifest session_id does not match" in source

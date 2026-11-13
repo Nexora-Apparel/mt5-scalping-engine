@@ -62,13 +62,22 @@ class DriftClock(Clock):
 
 def test_full_collector_records_only_gold_and_passes_integrity(tmp_path,monkeypatch):
  c=DriftClock();api=FakeMT5(c)
- for k,v in {"MT5_LOGIN":"12345678","MT5_PASSWORD":"fake","MT5_SERVER":"Exness-MT5Trial","MT5_TERMINAL":r"C:\MT5\terminal64.exe"}.items(): monkeypatch.setenv(k,v)
+ for k,v in {"MT5_LOGIN":"12345678","MT5_PASSWORD":"fake","MT5_SERVER":"Exness-MT5Trial","MT5_TERMINAL":r"C:\MT5\terminal64.exe" ,"VELTRIX_SESSION_ID":"validation_01"}.items(): monkeypatch.setenv(k,v)
  m=collector.collect(api,30,tmp_path,monotonic=c.monotonic,sleep=c.sleep,now=c.now)
  assert api.shutdown_called and m["duration_seconds"]==1802.0 and m["status"]=="PASS"
  assert m["account_mode"]=="DEMO" and m["trading_enabled"] is False and m["dll_imports_enabled"] is False
+ assert m["session_id"]=="validation_01"
  assert set(m["symbols"])=={"XAUUSD"} and set(m["streams"])=={"XAUUSD"}
  assert m["streams"]["XAUUSD"]["records"]==1802
  assert (tmp_path/"manifest.json").is_file() and (tmp_path/"veltrix_exness_demo_ticks.csv").is_file()
+
+def test_collector_rejects_unregistered_validation_session_before_mt5_initialize(monkeypatch):
+ monkeypatch.setenv("VELTRIX_SESSION_ID","holdout_01")
+ api=FakeMT5(Clock())
+ with pytest.raises(collector.DiagnosticFailure,match="preregistered validation IDs"):
+  collector.collect(api,30,Path("unused"))
+ assert api.shutdown_called is False
+
 
 def test_collector_contains_no_order_submission_calls():
  import re

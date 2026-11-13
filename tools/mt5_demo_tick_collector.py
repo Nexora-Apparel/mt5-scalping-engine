@@ -236,6 +236,9 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
             monotonic=time.monotonic, sleep=time.sleep, now=lambda: datetime.now(timezone.utc)) -> dict[str, Any]:
     if minutes != 30:
         raise DiagnosticFailure("only the bounded 30-minute collection is enabled")
+    session_id = os.environ.get("VELTRIX_SESSION_ID", "")
+    if session_id not in {"validation_01", "validation_02", "validation_03", "validation_04"}:
+        raise DiagnosticFailure("VELTRIX_SESSION_ID must be one of the four preregistered validation IDs")
     login = int(os.environ.get("MT5_LOGIN", "0"))
     password = os.environ.get("MT5_PASSWORD", "")
     server = os.environ.get("MT5_SERVER", "")
@@ -312,6 +315,7 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
         audit = audit_ticks(csv_path)
         manifest = {
             **audit,
+            "session_id": session_id,
             "collection_started_utc": started_utc.isoformat(),
             "collection_ended_utc": ended_utc.isoformat(),
             "duration_seconds": round(collection_elapsed_seconds, 3),

@@ -24,6 +24,12 @@
 
 Each new session must be at least 30 minutes, independently hashed, non-overlapping, and have an audited manifest proving Exness DEMO, XAUUSD-only contract metadata, and disabled trading/DLL permissions. The new-data requirement is at least 14 sessions (7 hours of bounded collection) across 14 distinct dates. This is a minimum; low candidate frequency can require additional sessions.
 
+## Controlled validation collection
+
+The 30-minute Exness DEMO collector is manual-dispatch only; no cron schedule or unattended validation-refresh workflow is active. Dispatch `.github/workflows/veltrix-demo-tick-collection.yml` once per distinct preregistered validation date, selecting exactly one of `validation_01` through `validation_04`. Each run writes the selected ID into its manifest. Artifact intake and the walk-forward evaluator both reject a validation manifest whose session ID does not match the preregistered catalog entry. Do not reuse a session ID or relabel a development artifact.
+
+The collection workflow requires the repository's existing Exness DEMO secrets. It runs with MT5 terminal trading and DLL permissions disabled, and the collector contains no order-submission or position-management calls. Collection is not started automatically by this code change.
+
 ## Implementation
 
 - Plan: research/xauusd_walk_forward_plan_v1.json

@@ -332,6 +332,8 @@ def assess_session_catalog(
         if profile.get("status") != "PASS":
             raise WalkForwardError(f"{sid}: dataset profile is not PASS")
         manifest = json.loads(item["manifest"].read_text(encoding="utf-8"))
+        if sid not in development and manifest.get("session_id") != sid:
+            raise WalkForwardError(f"{sid}: validation manifest session_id does not match the preregistered ID")
         if sid in development:
             expected_manifest = development[sid]
             if expected_manifest.get("expected_manifest_sha256") and _sha256(item["manifest"]) != expected_manifest["expected_manifest_sha256"]:

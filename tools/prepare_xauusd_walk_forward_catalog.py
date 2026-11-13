@@ -153,6 +153,8 @@ def download_session_artifacts(
             raise ArtifactIntakeError(f"{sid}: broker contract metadata is not XAUUSD")
         if sid in development and digest != development[sid]:
             raise ArtifactIntakeError(f"{sid}: development artifact hash differs from preregistered hash")
+        if sid not in development and manifest.get("session_id") != sid:
+            raise ArtifactIntakeError(f"{sid}: manifest session_id does not match the preregistered validation ID")
         if sid not in development and digest in set(development.values()):
             raise ArtifactIntakeError(f"{sid}: inspected development artifact cannot be promoted to validation")
 
