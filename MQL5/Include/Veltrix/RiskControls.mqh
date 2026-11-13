@@ -197,12 +197,16 @@ public:
    }
 
    bool RegisterApprovedIntent(const string request_id,const string symbol,
-                               const int active_positions,const long now_msc,
-                               string &reason)
+                               const int active_positions,const double current_equity,
+                               const long now_msc,string &reason)
    {
       reason="";
       if(!m_initialized || m_emergency_stop || m_daily_loss_locked)
       { reason="Risk controls are uninitialized or locked"; return false; }
+      if(!VerifyExactDemoAccount(reason))
+         return false;
+      if(!EvaluateDailyLoss(current_equity,reason))
+         return false;
       if(request_id=="" || now_msc<=0 || active_positions<0)
       { reason="Invalid request identity, timestamp, or position count"; return false; }
       if(!IsXauUsdContract(symbol))
