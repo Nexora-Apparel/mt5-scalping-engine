@@ -133,3 +133,14 @@ def test_invalid_history_window_fails_before_terminal_initialization(tmp_path):
     with pytest.raises(collector.DiagnosticFailure, match="between 1 and 3650"):
         collector.collect_evidence(api, tmp_path, days=0)
     assert not api.shutdown_called
+
+
+def test_position_reference_is_salted_and_not_correlatable_between_exports():
+    first_salt = b"first-run-salt" * 3
+    second_salt = b"second-run-salt" * 3
+    first = collector._position_ref(998877, first_salt)
+    same_export = collector._position_ref(998877, first_salt)
+    second = collector._position_ref(998877, second_salt)
+    assert first == same_export
+    assert first != second
+    assert len(first) == 64
