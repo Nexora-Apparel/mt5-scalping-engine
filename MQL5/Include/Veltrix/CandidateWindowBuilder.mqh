@@ -128,8 +128,9 @@ public:
       { reason="Candidate builder received an invalid bid/ask quote"; m_faulted=true; m_fault_reason=reason; return false; }
       if(tick.time_msc<m_last_tick_msc)
       { reason="Candidate builder received an out-of-order quote"; m_faulted=true; m_fault_reason=reason; return false; }
-      if(tick.time_msc==m_last_tick_msc)
-         return true;
+      // Preserve distinct quote updates that share a millisecond timestamp.
+      // The Python tick pipeline retains these records; dropping them here would
+      // understate intrawindow movement and break feature parity.
       m_last_tick_msc=tick.time_msc;
 
       double mid=(tick.bid+tick.ask)/2.0;
