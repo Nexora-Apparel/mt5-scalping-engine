@@ -1,11 +1,11 @@
 //+------------------------------------------------------------------+
 //| VeltrixDemoDiagnostics.mq5                                       |
-//| Read-only Exness DEMO account and quote verification.            |
+//| Read-only Exness DEMO and XAUUSD contract/quote verification.    |
 //| No trade, position, order, or deal APIs are used.                 |
 //+------------------------------------------------------------------+
 #property strict
-#property version   "1.000"
-#property description "VELTRIX read-only DEMO account and XAUUSD/XAGUSD quote diagnostic."
+#property version   "1.100"
+#property description "VELTRIX read-only DEMO account and XAUUSD-only quote diagnostic."
 
 input long   ExpectedDemoLogin = 0;
 input string ExpectedDemoServer = "";
@@ -14,7 +14,7 @@ input double MaxSpreadPoints = 1000.0;
 input int    StableSamplesRequired = 5;
 input int    DiagnosticTimeoutSeconds = 90;
 
-string g_symbols[2] = {"XAUUSD", "XAGUSD"};
+string g_symbol = "";
 int g_stable_samples = 0;
 ulong g_started_ms = 0;
 bool g_finished = false;
@@ -24,6 +24,16 @@ bool VerifyAccount(string &reason)
    if(!TerminalInfoInteger(TERMINAL_CONNECTED))
    {
       reason = "terminal is disconnected";
+      return false;
+   }
+   if(TerminalInfoInteger(TERMINAL_TRADE_ALLOWED))
+   {
+      reason = "terminal trading permission is enabled";
+      return false;
+   }
+   if(TerminalInfoInteger(TERMINAL_DLLS_ALLOWED))
+   {
+      reason = "terminal DLL imports are enabled";
       return false;
    }
 
@@ -46,184 +56,207 @@ bool VerifyAccount(string &reason)
       reason = "connected server does not exactly match configured server";
       return false;
    }
-
    reason = "";
    return true;
 }
 
-bool VerifyQuote(const string symbol, string &reason, double &bid,
-                 double &ask, double &spread_points, long &age_ms)
+bool ResolveXauUsdSymbol(string &resolved,string &reason)
 {
+   string candidates[];
+   int total=SymbolsTotal(false);
+   for(int i=0;i<total;i++)
+   {
+      string name=SymbolName(i,false);
+      string upper=name;
+      StringToUpper(upper);
+      if(StringLen(upper)<6 || StringSubstr(upper,0,6)!="XAUUSD")
+         continue;
+
+      string base=SymbolInfoString(name,SYMBOL_CURRENCY_BASE);
+      string profit=SymbolInfoString(name,SYMBOL_CURRENCY_PROFIT);
+      if(base!="XAU" || profit!="USD")
+         continue;
+
+      int n=ArraySize(candidates);
+      ArrayResize(candidates,n+1);
+      candidates[n]=name;
+   }
+
+   int count=ArraySize(candidates);
+   if(count<=0)
+   {
+      reason="no broker symbol with XAUUSD prefix and XAU/USD contract metadata";
+      return false;
+   }
+
+   resolved="";
+   for(int i=0;i<count;i++)
+      if(candidates[i]=="XAUUSD") { resolved="XAUUSD"; break; }
+
+   if(resolved=="")
+   {
+      if(count!=1)
+      {
+         reason=StringFormat("ambiguous XAUUSD broker contracts: %d metadata-valid candidates",count);
+         return false;
+      }
+      resolved=candidates[0];
+   }
+
+   if(!SymbolSelect(resolved,true))
+   {
+      reason="verified XAUUSD broker contract could not be selected";
+      resolved="";
+      return false;
+   }
+   reason="";
+   return true;
+}
+
+bool VerifyQuote(string &reason,double &bid,double &ask,
+                 double &spread_points,long &age_ms)
+{
+   if(g_symbol=="")
+   {
+      reason="verified XAUUSD broker symbol is unavailable";
+      return false;
+   }
+
    MqlTick tick;
-   if(!SymbolInfoTick(symbol, tick))
+   if(!SymbolInfoTick(g_symbol,tick))
    {
-      reason = symbol + " has no readable tick";
+      reason="XAUUSD has no readable tick";
       return false;
    }
 
-   double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
-   if(point <= 0.0 || tick.bid <= 0.0 || tick.ask <= tick.bid)
+   double point=SymbolInfoDouble(g_symbol,SYMBOL_POINT);
+   if(point<=0.0 || tick.bid<=0.0 || tick.ask<=tick.bid)
    {
-      reason = symbol + " has invalid point, bid, or ask";
+      reason="XAUUSD has invalid point, bid, or ask";
       return false;
    }
 
-   long now_ms = (long)TimeGMT() * 1000;
-   if(now_ms <= 0 || tick.time_msc <= 0)
+   long now_ms=(long)TimeGMT()*1000;
+   if(now_ms<=0 || tick.time_msc<=0)
    {
-      reason = symbol + " has no valid quote timestamp";
+      reason="XAUUSD has no valid quote timestamp";
       return false;
    }
 
-   age_ms = now_ms - tick.time_msc;
-   if(age_ms < -5000 || age_ms > (long)QuoteMaxAgeMilliseconds)
+   age_ms=now_ms-tick.time_msc;
+   if(age_ms < -5000 || age_ms>(long)QuoteMaxAgeMilliseconds)
    {
-      reason = StringFormat("%s quote is stale or timestamp is invalid (age_ms=%I64d)",
-                            symbol, age_ms);
+      reason=StringFormat("XAUUSD quote is stale or timestamp is invalid (age_ms=%I64d)",age_ms);
       return false;
    }
 
-   bid = tick.bid;
-   ask = tick.ask;
-   spread_points = (ask - bid) / point;
-   if(spread_points <= 0.0 || spread_points > MaxSpreadPoints)
+   bid=tick.bid;
+   ask=tick.ask;
+   spread_points=(ask-bid)/point;
+   if(spread_points<=0.0 || spread_points>MaxSpreadPoints)
    {
-      reason = StringFormat("%s spread outside configured limit (spread_points=%.2f)",
-                            symbol, spread_points);
+      reason=StringFormat("XAUUSD spread outside configured limit (spread_points=%.2f)",spread_points);
       return false;
    }
-
-   reason = "";
+   reason="";
    return true;
 }
 
 void StopWithFailure(const string reason)
 {
-   if(g_finished)
-      return;
-   g_finished = true;
-   Print("VELTRIX DEMO DIAGNOSTIC FAILED | ", reason);
+   if(g_finished) return;
+   g_finished=true;
+   Print("VELTRIX DEMO DIAGNOSTIC FAILED | ",reason);
    EventKillTimer();
    ExpertRemove();
 }
 
 int OnInit()
 {
-   if(ExpectedDemoLogin <= 0 || ExpectedDemoServer == "")
+   if(ExpectedDemoLogin<=0 || ExpectedDemoServer=="")
    {
       Print("VELTRIX DEMO DIAGNOSTIC FAILED | expected demo login/server missing");
       return INIT_PARAMETERS_INCORRECT;
    }
-   if(QuoteMaxAgeMilliseconds < 1000 || QuoteMaxAgeMilliseconds > 60000 ||
-      MaxSpreadPoints <= 0.0 || MaxSpreadPoints > 10000.0 ||
-      StableSamplesRequired < 2 || StableSamplesRequired > 30 ||
-      DiagnosticTimeoutSeconds < 15 || DiagnosticTimeoutSeconds > 300)
+   if(QuoteMaxAgeMilliseconds<1000 || QuoteMaxAgeMilliseconds>60000 ||
+      MaxSpreadPoints<=0.0 || MaxSpreadPoints>10000.0 ||
+      StableSamplesRequired<2 || StableSamplesRequired>30 ||
+      DiagnosticTimeoutSeconds<15 || DiagnosticTimeoutSeconds>300)
    {
       Print("VELTRIX DEMO DIAGNOSTIC FAILED | diagnostic input outside safe bounds");
       return INIT_PARAMETERS_INCORRECT;
    }
 
-   bool connected = false;
-   for(int attempt = 0; attempt < 90; attempt++)
+   bool connected=false;
+   for(int attempt=0;attempt<90;attempt++)
    {
-      if(TerminalInfoInteger(TERMINAL_CONNECTED))
-      {
-         connected = true;
-         break;
-      }
-      if(IsStopped())
-         return INIT_FAILED;
-      if(attempt == 0 || (attempt + 1) % 15 == 0)
-         PrintFormat("VELTRIX DEMO DIAGNOSTIC WAIT | broker connection attempt=%d/90",
-                     attempt + 1);
+      if(TerminalInfoInteger(TERMINAL_CONNECTED)) { connected=true; break; }
+      if(IsStopped()) return INIT_FAILED;
+      if(attempt==0 || (attempt+1)%15==0)
+         PrintFormat("VELTRIX DEMO DIAGNOSTIC WAIT | broker connection attempt=%d/90",attempt+1);
       Sleep(1000);
    }
-
    if(!connected)
    {
       Print("VELTRIX DEMO DIAGNOSTIC FAILED | broker connection timeout");
       return INIT_FAILED;
    }
 
-   string reason;
+   string reason="";
    if(!VerifyAccount(reason))
    {
-      Print("VELTRIX DEMO DIAGNOSTIC FAILED | ", reason);
+      Print("VELTRIX DEMO DIAGNOSTIC FAILED | ",reason);
+      return INIT_FAILED;
+   }
+   if(!ResolveXauUsdSymbol(g_symbol,reason))
+   {
+      Print("VELTRIX DEMO DIAGNOSTIC FAILED | ",reason);
       return INIT_FAILED;
    }
 
-   for(int i = 0; i < 2; i++)
-   {
-      if(!SymbolSelect(g_symbols[i], true))
-      {
-         Print("VELTRIX DEMO DIAGNOSTIC FAILED | could not select exact symbol ",
-               g_symbols[i]);
-         return INIT_FAILED;
-      }
-   }
-
-   g_started_ms = GetTickCount64();
+   g_started_ms=GetTickCount64();
    if(!EventSetTimer(1))
    {
       Print("VELTRIX DEMO DIAGNOSTIC FAILED | timer initialization failed");
       return INIT_FAILED;
    }
-
-   Print("VELTRIX DEMO DIAGNOSTIC STARTED | account mode, login, server, and both metal quotes will be checked; trading disabled");
+   Print("VELTRIX DEMO DIAGNOSTIC STARTED | DEMO identity and XAUUSD-only contract/quote checks; trading disabled");
    return INIT_SUCCEEDED;
 }
 
 void OnTimer()
 {
-   if(g_finished)
-      return;
+   if(g_finished) return;
+   string reason="";
+   if(!VerifyAccount(reason)) { StopWithFailure(reason); return; }
 
-   string reason;
-   if(!VerifyAccount(reason))
+   double bid=0.0,ask=0.0,spread=0.0;
+   long age_ms=-1;
+   if(VerifyQuote(reason,bid,ask,spread,age_ms))
    {
-      StopWithFailure(reason);
-      return;
-   }
-
-   bool all_quotes_valid = true;
-   for(int i = 0; i < 2; i++)
-   {
-      double bid = 0.0;
-      double ask = 0.0;
-      double spread = 0.0;
-      long age_ms = -1;
-      if(!VerifyQuote(g_symbols[i], reason, bid, ask, spread, age_ms))
-      {
-         all_quotes_valid = false;
-         Print("VELTRIX QUOTE BLOCKED | ", reason);
-         break;
-      }
-
-      PrintFormat("VELTRIX QUOTE OK | symbol=%s bid=%.*f ask=%.*f spread_points=%.2f age_ms=%I64d",
-                  g_symbols[i],
-                  (int)SymbolInfoInteger(g_symbols[i], SYMBOL_DIGITS), bid,
-                  (int)SymbolInfoInteger(g_symbols[i], SYMBOL_DIGITS), ask,
-                  spread, age_ms);
-   }
-
-   if(all_quotes_valid)
       g_stable_samples++;
+      PrintFormat("VELTRIX QUOTE OK | symbol=XAUUSD broker_symbol=%s bid=%.*f ask=%.*f spread_points=%.2f age_ms=%I64d",
+                  g_symbol,(int)SymbolInfoInteger(g_symbol,SYMBOL_DIGITS),bid,
+                  (int)SymbolInfoInteger(g_symbol,SYMBOL_DIGITS),ask,spread,age_ms);
+   }
    else
-      g_stable_samples = 0;
-
-   if(g_stable_samples >= StableSamplesRequired)
    {
-      g_finished = true;
-      PrintFormat("VELTRIX DEMO DIAGNOSTIC PASSED | mode=DEMO login_match=true server_match=true terminal_connected=true symbols=XAUUSD,XAGUSD stable_samples=%d trading=disabled",
+      g_stable_samples=0;
+      Print("VELTRIX QUOTE BLOCKED | ",reason);
+   }
+
+   if(g_stable_samples>=StableSamplesRequired)
+   {
+      g_finished=true;
+      PrintFormat("VELTRIX DEMO DIAGNOSTIC PASSED | mode=DEMO login_match=true server_match=true terminal_connected=true symbol=XAUUSD trading=disabled stable_samples=%d",
                   g_stable_samples);
       EventKillTimer();
       ExpertRemove();
       return;
    }
 
-   ulong elapsed_ms = GetTickCount64() - g_started_ms;
-   if(elapsed_ms >= (ulong)DiagnosticTimeoutSeconds * 1000)
-      StopWithFailure("both XAUUSD and XAGUSD did not produce enough consecutive fresh, valid quotes before timeout");
+   if(GetTickCount64()-g_started_ms >= (ulong)DiagnosticTimeoutSeconds*1000)
+      StopWithFailure("XAUUSD did not produce enough consecutive fresh, valid quotes before timeout");
 }
 
 void OnDeinit(const int reason)
