@@ -26,7 +26,7 @@ def feature_input(count=80):
         "feature_schema": "VELTRIX_XAUUSD_TICK_WINDOWS_V1",
         "canonical_symbol": "XAUUSD",
         "source_sha256": "a" * 64,
-        "source_records": count * 4,
+        "source_records": sum(row["tick_count"] for row in rows),
         "window_seconds": 5,
         "window_count": count,
         "features": rows,
@@ -93,4 +93,17 @@ def test_rejects_wrong_instrument_and_non_research_input():
     data = feature_input()
     data["research_only"] = False
     with pytest.raises(RegimeError, match="research-only"):
+        classify_regimes(data)
+
+def test_rejects_feature_windows_that_drop_source_ticks():
+    data = feature_input()
+    data["source_records"] += 1
+    with pytest.raises(RegimeError, match="source_records"):
+        classify_regimes(data)
+
+
+def test_rejects_out_of_range_trend_efficiency():
+    data = feature_input()
+    data["features"][10]["trend_efficiency"] = 1.5
+    with pytest.raises(RegimeError, match="between 0 and 1"):
         classify_regimes(data)
