@@ -144,6 +144,11 @@ def test_validation_evaluator_aggregates_candidate_and_directional_benchmarks(tm
     monkeypatch.setattr(wf, "profile_dataset", lambda csv, manifest: {
         "status": "PASS", "sha256": hashes[Path(manifest).stem], "records": 100
     })
+    pinned_manifest_hashes = {
+        item["session_id"]: item["expected_manifest_sha256"]
+        for item in PLAN["development_sessions"]
+    }
+    monkeypatch.setattr(wf, "_sha256", lambda path: pinned_manifest_hashes.get(Path(path).parent.name, "b" * 64))
     features = {
         "features": [
             {"window_start_utc": "2026-11-14T00:00:00+00:00"},
