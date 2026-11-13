@@ -6,10 +6,10 @@ from __future__ import annotations
 
 import argparse
 import csv
-import hashlib
 import json
 import math
 from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -82,9 +82,7 @@ def build_features(
         realized_vol_bps = math.sqrt(sum(value * value for value in log_returns)) * 10000
         range_bps = (max(mids) - min(mids)) / mids[0] * 10000
         windows.append({
-            "window_start_utc": __import__("datetime").datetime.fromtimestamp(
-                start_ms / 1000, tz=__import__("datetime").timezone.utc
-            ).isoformat(),
+            "window_start_utc": datetime.fromtimestamp(start_ms / 1000, tz=timezone.utc).isoformat(),
             "window_seconds": window_seconds,
             "tick_count": len(ticks),
             "observed_span_ms": stamps[-1] - stamps[0],
