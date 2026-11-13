@@ -514,6 +514,43 @@ def evaluate_partition(ready: dict[str, Any], registry: dict[str, Any]) -> dict[
             "horizon_seconds": horizon,
             **_summarize_group(by_session, slippage_grid),
         })
+    benchmark_lookup = {
+        (item["benchmark"], item["horizon_seconds"]): item
+        for item in benchmarks
+    }
+    for candidate in candidate_report:
+        relative = {}
+        for points in slippage_grid:
+            scenario_key = str(points)
+            candidate_means = {
+                sid: row["cost_sensitivity"][scenario_key]["mean_return_before_commission_bps"]
+                for sid, row in candidate["sessions"].items()
+                if row["cost_sensitivity"][scenario_key]["mean_return_before_commission_bps"] is not None
+            }
+            comparisons = {}
+            for baseline_name in ("NO_TRADE", "ALWAYS_LONG", "ALWAYS_SHORT"):
+                if baseline_name == "NO_TRADE":
+                    baseline_means = {sid: 0.0 for sid in candidate_means}
+                else:
+                    baseline = benchmark_lookup.get((baseline_name, candidate["horizon_seconds"]))
+                    baseline_means = {} if baseline is None else {
+                        sid: row["cost_sensitivity"][scenario_key]["mean_return_before_commission_bps"]
+                        for sid, row in baseline["sessions"].items()
+                        if row["cost_sensitivity"][scenario_key]["mean_return_before_commission_bps"] is not None
+                    }
+                common = sorted(set(candidate_means) & set(baseline_means))
+                differences = [candidate_means[sid] - baseline_means[sid] for sid in common]
+                ci = _session_cluster_ci(differences)
+                comparisons[baseline_name] = {
+                    "sessions_compared": len(common),
+                    "mean_difference_before_commission_bps": round(statistics.mean(differences), 8) if differences else None,
+                    "session_clustered_difference_ci_95": ci,
+                    "gross_after_slippage_outperformance": bool(ci["lower_95"] is not None and ci["lower_95"] > 0),
+                    "net_comparison_status": "BLOCKED_COMMISSION_UNVERIFIED",
+                }
+            relative[scenario_key] = comparisons
+        candidate["relative_benchmark_comparison"] = relative
+
     return {
         "status": "RESEARCH_EVALUATION_COMPLETE",
         "stage": ready["stage"],
