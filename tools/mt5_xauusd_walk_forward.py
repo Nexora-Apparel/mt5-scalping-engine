@@ -113,8 +113,38 @@ def validate_plan(plan: dict[str, Any], registry: dict[str, Any]) -> dict[str, A
         raise WalkForwardError("registered holding horizons changed")
     if evaluation.get("slippage_sensitivity_points_per_side") != [0, 1, 2, 5]:
         raise WalkForwardError("registered slippage sensitivity grid changed")
-    if evaluation.get("commission_status") != "UNVERIFIED_REQUIRED_INPUT" or evaluation.get("net_performance_allowed") is not False:
-        raise WalkForwardError("commission and net-performance lock changed")
+    commission_status = evaluation.get("commission_status")
+    commission_model = evaluation.get("commission_model")
+    if not isinstance(commission_model, dict):
+        raise WalkForwardError("an explicit commission evidence model is required")
+    if commission_status == "UNVERIFIED_REQUIRED_INPUT":
+        if evaluation.get("net_performance_allowed") is not False:
+            raise WalkForwardError("net performance cannot be enabled while commission is unverified")
+        if commission_model.get("status") != "UNVERIFIED_REQUIRED_INPUT":
+            raise WalkForwardError("commission model status must match the unverified plan status")
+        if any(commission_model.get(field) is not None for field in (
+            "usd_per_lot_per_side", "account_type", "evidence_reference", "evidence_sha256", "verified_utc"
+        )):
+            raise WalkForwardError("unverified commission model cannot contain purported verified fee evidence")
+    elif commission_status == "VERIFIED_FROM_EXNESS_ACCOUNT_SCHEDULE":
+        if evaluation.get("net_performance_allowed") is not True:
+            raise WalkForwardError("verified commission evidence must explicitly enable net evaluation")
+        if commission_model.get("status") != commission_status:
+            raise WalkForwardError("commission model status does not match the verified plan status")
+        if commission_model.get("fee_model") != "LINEAR_PER_LOT_PER_SIDE_NO_MINIMUM" or commission_model.get("fee_currency") != "USD":
+            raise WalkForwardError("only a verified USD per-lot-per-side commission model without minimum fees is supported")
+        fee = commission_model.get("usd_per_lot_per_side")
+        if isinstance(fee, bool) or not isinstance(fee, (int, float)) or not math.isfinite(fee) or fee < 0:
+            raise WalkForwardError("verified commission fee must be a finite nonnegative USD amount per lot per side")
+        for field in ("account_type", "evidence_reference"):
+            if not isinstance(commission_model.get(field), str) or not commission_model[field].strip():
+                raise WalkForwardError(f"verified commission model requires {field}")
+        digest = commission_model.get("evidence_sha256")
+        if not isinstance(digest, str) or len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest.lower()):
+            raise WalkForwardError("verified commission evidence must include a SHA-256 digest")
+        _utc(commission_model.get("verified_utc"), "commission_model.verified_utc")
+    else:
+        raise WalkForwardError("unsupported commission status; net performance remains locked")
     return {
         "status": "PASS",
         "plan_schema": plan["plan_schema"],
@@ -123,7 +153,7 @@ def validate_plan(plan: dict[str, Any], registry: dict[str, Any]) -> dict[str, A
         "validation_session_ids": validation,
         "final_holdout_session_ids": holdout,
         "commission_status": evaluation["commission_status"],
-        "net_performance_allowed": False,
+        "net_performance_allowed": evaluation["net_performance_allowed"] is True,
     }
 
 
@@ -417,9 +447,38 @@ def assess_session_catalog(
         "selected_candidate_configurations": selected_configurations if stage == "holdout" else None,
         "plan": plan,
         "commission_status": plan["evaluation"]["commission_status"],
-        "net_performance_allowed": False,
+        "net_performance_allowed": plan["evaluation"]["net_performance_allowed"] is True,
         "research_only": True,
     }
+
+
+def _apply_verified_commission(outcome: dict[str, Any], manifest: dict[str, Any], plan: dict[str, Any]) -> dict[str, Any]:
+    """Attach a verified round-trip commission charge to each quote-marked outcome."""
+    evaluation = plan["evaluation"]
+    if evaluation.get("commission_status") != "VERIFIED_FROM_EXNESS_ACCOUNT_SCHEDULE":
+        return outcome
+    if outcome.get("status") != "OUTCOME_AVAILABLE":
+        return outcome
+    model = evaluation["commission_model"]
+    spec = manifest.get("instrument_specs", {}).get("XAUUSD", {})
+    contract_size = spec.get("trade_contract_size", spec.get("contract_size"))
+    entry_price = outcome.get("entry_executable_price")
+    if isinstance(contract_size, bool) or not isinstance(contract_size, (int, float)) or not math.isfinite(contract_size) or contract_size <= 0:
+        raise WalkForwardError("verified commission calculation requires positive XAUUSD contract size from the session manifest")
+    if isinstance(entry_price, bool) or not isinstance(entry_price, (int, float)) or not math.isfinite(entry_price) or entry_price <= 0:
+        raise WalkForwardError("verified commission calculation requires a positive executable entry price")
+    round_turn_usd_per_lot = 2.0 * float(model["usd_per_lot_per_side"])
+    commission_bps = round_turn_usd_per_lot / (float(entry_price) * float(contract_size)) * 10000.0
+    for item in outcome.get("slippage_sensitivity", []):
+        gross_after_slippage = float(item["return_before_commission_bps"])
+        item["commission_round_turn_usd_per_lot"] = round(round_turn_usd_per_lot, 8)
+        item["commission_bps"] = round(commission_bps, 10)
+        item["net_return_bps"] = round(gross_after_slippage - commission_bps, 8)
+        item["net_after_commission"] = True
+    outcome["commission_status"] = "VERIFIED_FROM_EXNESS_ACCOUNT_SCHEDULE"
+    outcome["commission_bps"] = round(commission_bps, 10)
+    outcome["net_after_commission"] = True
+    return outcome
 
 
 def _group_key(event: dict[str, Any]) -> tuple[str, str, int]:
@@ -504,7 +563,10 @@ def _summarize_group(outcomes_by_session: dict[str, list[dict[str, Any]]], slipp
     return {
         "sessions": sessions,
         "aggregate_cost_sensitivity": aggregate,
-        "commission_status": "UNVERIFIED_REQUIRED_INPUT",
+        "commission_status": "VERIFIED_FROM_EXNESS_ACCOUNT_SCHEDULE" if any(
+            outcome.get("commission_status") == "VERIFIED_FROM_EXNESS_ACCOUNT_SCHEDULE"
+            for rows in outcomes_by_session.values() for outcome in rows
+        ) else "UNVERIFIED_REQUIRED_INPUT",
         "net_after_commission": None,
         "candidate_approval": "NOT_APPROVED",
         "total_timeouts": total_timeouts,
@@ -538,7 +600,8 @@ def evaluate_partition(ready: dict[str, Any], registry: dict[str, Any]) -> dict[
                 }, sort_keys=True, separators=(",", ":")) in selected_signatures
             ]
         replay = replay_events(ticks, events, manifest, registry, source_profile=profile)
-        for event, outcome in zip(events, replay["outcomes"]):
+        for event, raw_outcome in zip(events, replay["outcomes"]):
+            outcome = _apply_verified_commission(raw_outcome, manifest, ready["plan"])
             key = _group_key(event)
             candidate_results.setdefault(key, {}).setdefault(session["session_id"], []).append(outcome)
 
@@ -559,6 +622,7 @@ def evaluate_partition(ready: dict[str, Any], registry: dict[str, Any]) -> dict[
                                              slippage_grid=slippage_grid,
                                              entry_max_wait_ms=registry["evaluation"]["entry_max_wait_seconds"] * 1000,
                                              exit_tolerance_ms=2000)
+                    outcome = _apply_verified_commission(outcome, manifest, ready["plan"])
                     benchmark_results.setdefault((direction, horizon), {}).setdefault(session["session_id"], []).append(outcome)
 
     candidate_report = []
