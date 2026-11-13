@@ -188,6 +188,86 @@ jobs:
           if (!(Test-Path $compiled)) { throw "Risk-journal runtime-test EX5 artifact was not created." }
           Write-Host "Risk-journal runtime-test script compiled; actual Common Files behavior still requires terminal execution."
 
+      - name: Compile risk controls runtime test script
+        shell: pwsh
+        run: |
+          $source = (Resolve-Path "MQL5\\Scripts\\RiskControlsRuntimeTest.mq5").Path
+          $log = Join-Path (Split-Path $source) "RiskControlsRuntimeTest.log"
+          if (Test-Path $log) { Remove-Item $log -Force }
+          $arguments = @('/compile:"' + $source + '"', '/log')
+          Write-Host "Compiling synthetic risk-state runtime test; no broker login or order APIs are used."
+          $process = Start-Process -FilePath $env:METAEDITOR -ArgumentList $arguments -Wait -PassThru
+          Start-Sleep -Seconds 2
+          if (!(Test-Path $log)) { throw "MetaEditor did not produce the risk-controls runtime-test log." }
+          Get-Content $log
+          $logText = Get-Content $log -Raw
+          if ($logText -match "(?i)\\b[1-9]\\d* errors?\\b" -or $logText -notmatch "(?i)0 errors?") {
+            throw "Risk-controls runtime-test script did not compile cleanly."
+          }
+          if ($logText -match "(?i)\\b[1-9]\\d* warnings?\\b") {
+            throw "Risk-controls runtime-test script reported compiler warnings."
+          }
+          $compiled = Join-Path (Split-Path $source) "RiskControlsRuntimeTest.ex5"
+          if (!(Test-Path $compiled)) { throw "Risk-controls runtime-test EX5 artifact was not created." }
+          Write-Host "Risk-controls runtime-test script compiled."
+
+      - name: Execute terminal-side risk runtime tests
+        shell: pwsh
+        timeout-minutes: 8
+        run: |
+          $installPath = Split-Path $env:METAEDITOR
+          $terminal = Join-Path $installPath "terminal64.exe"
+          if (!(Test-Path $terminal)) { throw "MetaTrader terminal executable was not found." }
+
+          function Invoke-Mt5RuntimeScript([string]$scriptName, [string]$resultName) {
+            $resultPath = Join-Path $installPath ("MQL5\\Files\\" + $resultName)
+            if (Test-Path $resultPath) { Remove-Item $resultPath -Force }
+            $ini = Join-Path $env:RUNNER_TEMP ($scriptName + ".ini")
+            @"
+          [Common]
+          Login=0
+          Symbol=EURUSD
+          Period=M1
+          Script=$scriptName
+          ShutdownTerminal=1
+          "@ | Set-Content -Path $ini -Encoding ASCII
+
+            Get-Process terminal64 -ErrorAction SilentlyContinue | Stop-Process -Force
+            $process = Start-Process -FilePath $terminal -ArgumentList @("/portable", "/config:$ini") -PassThru
+            $deadline = [DateTime]::UtcNow.AddMinutes(3)
+            while (!(Test-Path $resultPath) -and [DateTime]::UtcNow -lt $deadline) {
+              Start-Sleep -Seconds 2
+            }
+            if (!(Test-Path $resultPath)) {
+              Get-Process terminal64 -ErrorAction SilentlyContinue | Stop-Process -Force
+              throw "$scriptName did not write its runtime result sentinel within three minutes."
+            }
+            $result = (Get-Content $resultPath -Raw).Trim()
+            Write-Host "$scriptName result: $result"
+            if ($result -notmatch "^PASS \\|") {
+              Get-Process terminal64 -ErrorAction SilentlyContinue | Stop-Process -Force
+              throw "$scriptName reported failure: $result"
+            }
+            if (!$process.HasExited) {
+              [void]$process.WaitForExit(30000)
+            }
+            Get-Process terminal64 -ErrorAction SilentlyContinue | Stop-Process -Force
+          }
+
+          Invoke-Mt5RuntimeScript "RiskJournalRuntimeTest" "veltrix_risk_journal_runtime_test.result"
+          Invoke-Mt5RuntimeScript "RiskControlsRuntimeTest" "veltrix_risk_controls_runtime_test.result"
+
+      - name: Upload terminal-side risk runtime results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Veltrix-risk-runtime-results
+          path: |
+            C:\\MT5\\MQL5\\Files\\veltrix_risk_journal_runtime_test.result
+            C:\\MT5\\MQL5\\Files\\veltrix_risk_controls_runtime_test.result
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Upload risk journal runtime-test script artifact
         if: success()
         uses: actions/upload-artifact@v4
