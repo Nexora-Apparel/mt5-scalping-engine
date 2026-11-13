@@ -145,7 +145,9 @@ def test_position_registry_reference_lifecycle_and_deadline_vectors():
 def test_execution_guard_is_demo_only_preflight_without_submission():
     source = EXECUTION_SOURCE.read_text(encoding="utf-8")
     required = (
-        "ValidateDemoIntent", "expected_demo_login", "expected_demo_server",\n        "ACCOUNT_LOGIN", "ACCOUNT_SERVER", "XAUUSD",\n        "SYMBOL_CURRENCY_BASE", "SYMBOL_CURRENCY_PROFIT", "ACCOUNT_TRADE_MODE_DEMO",
+        "ValidateDemoIntent", "expected_demo_login", "expected_demo_server",
+        "ACCOUNT_LOGIN", "ACCOUNT_SERVER", "XAUUSD",
+        "SYMBOL_CURRENCY_BASE", "SYMBOL_CURRENCY_PROFIT", "ACCOUNT_TRADE_MODE_DEMO",
         "ACCOUNT_MARGIN_MODE_RETAIL_HEDGING", "TERMINAL_CONNECTED",
         "TERMINAL_TRADE_ALLOWED", "MQL_TRADE_ALLOWED",
         "ACCOUNT_TRADE_ALLOWED", "SYMBOL_TRADE_STOPS_LEVEL",
