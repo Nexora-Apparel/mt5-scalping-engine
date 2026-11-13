@@ -234,7 +234,7 @@ def main() -> int:
         result = diagnose_sessions(sessions)
     except (OSError, json.JSONDecodeError, DiagnosticsError) as exc:
         parser.exit(2, f"FEATURE DIAGNOSTICS FAIL: {exc}\\n")
-    rendered = json.dumps(result, indent=2, sort_keys=True) + "\\n"
+    rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:
         args.output.write_text(rendered, encoding="utf-8")
     print(rendered, end="")
