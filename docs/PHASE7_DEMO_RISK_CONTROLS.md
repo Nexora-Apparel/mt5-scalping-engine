@@ -37,7 +37,7 @@ These are upper bounds, not claims of safety or profitability. Actual operating 
 - Reaching the configured consecutive-loss limit latches the daily lock.
 - Cooldown and emergency stop survive a server-day rollover.
 - The emergency stop is persisted under an account/server-scoped terminal Global Variable, flushed to terminal storage, restored on initialization, and fails closed if the stored value is corrupt. There is intentionally no emergency-stop reset method. Clearing it requires a separate reviewed operator/session-control procedure.
-- Request IDs and verified closing deal tickets are represented by account/server-scoped persistent Global Variable keys. Hash collisions can only cause a conservative false rejection; they cannot permit a repeated identical ID. If terminal Global Variable storage is full or a write fails, new intents fail closed.
+- Request IDs and verified closing deal tickets are represented by account/server-scoped persistent Global Variable keys. Keys use deterministic 64-bit FNV-1a hashes. A hash collision can only cause a conservative false rejection; it cannot permit a repeated identical ID. If terminal Global Variable storage is full or a write fails, new intents fail closed.
 
 ## Integration contract
 
