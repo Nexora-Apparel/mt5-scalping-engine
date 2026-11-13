@@ -501,7 +501,8 @@ def test_phase7_risk_controls_are_demo_xauusd_only_and_fail_closed():
         "config.max_positions!=1", "cooldown_seconds<30",
         "max_consecutive_losses>3", "BeginServerDay",
         "EvaluateDailyLoss", "RecordVerifiedClose",
-        "RegisterApprovedIntent", "RequestKey", "GlobalVariableCheck(request_key)",\n        "GlobalVariableSet(request_key",
+        "RegisterApprovedIntent", "RequestKey", "GlobalVariableCheck(request_key)",
+        "GlobalVariableSet(request_key",
         "LatchEmergencyStop", "m_emergency_stop",
         "GlobalVariableCheck", "GlobalVariableGet", "GlobalVariableSet",
         "GlobalVariablesFlush", "m_emergency_key",
@@ -566,7 +567,8 @@ def test_phase7_sizing_and_intent_registration_recheck_live_account_and_daily_lo
     assert "VerifyExactDemoAccount(reason)" in registration
     assert "EvaluateDailyLoss(current_equity,reason)" in registration
     assert "active_positions>=m_config.max_positions" in registration
-    assert "GlobalVariableCheck(request_key)" in registration\n    assert "GlobalVariableSet(request_key" in registration
+    assert "GlobalVariableCheck(request_key)" in registration
+    assert "GlobalVariableSet(request_key" in registration
 
 
 def test_phase7_execution_preflight_binds_account_and_symbol_contract():
