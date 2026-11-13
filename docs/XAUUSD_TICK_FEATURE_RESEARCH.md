@@ -23,7 +23,7 @@ Each populated window contains:
 - Maximum inter-tick gap and count of gaps exceeding one second.
 - Mid-price change ratio, based on consecutive midpoint changes (spread-only changes are not counted).
 
-A window with one tick has no measurable within-window tick rate and receives null. Boundary windows can be partial. These are intentional properties, not filled or extrapolated observations.
+A window with one tick retains its observed midpoint and spread, but movement-derived metrics (tick rate, return, range, realized volatility, trend efficiency, and midpoint-change ratio) are null because no within-window movement interval exists. Boundary windows can be partial. These are intentional properties, not filled or extrapolated observations.
 
 ## Run locally
 
