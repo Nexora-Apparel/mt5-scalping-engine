@@ -50,6 +50,7 @@ def test_future_changes_do_not_change_earlier_classifications():
     prefix = copy.deepcopy(full)
     prefix["features"] = prefix["features"][:50]
     prefix["window_count"] = 50
+    prefix["source_records"] = sum(row["tick_count"] for row in prefix["features"])
     baseline = classify_regimes(prefix, lookback_windows=30, min_history=20)
     full["features"][70]["realized_volatility_bps"] = 99999.0
     full["features"][70]["trend_efficiency"] = 0.999
@@ -67,6 +68,7 @@ def test_single_tick_feature_window_remains_unclassified():
         "trend_efficiency": None,
         "return_bps": None,
     })
+    data["source_records"] = sum(item["tick_count"] for item in data["features"])
     result = classify_regimes(data, lookback_windows=30, min_history=20)
     assert result["regimes"][39]["regime_label"] == "UNCLASSIFIED_CURRENT_DATA"
     assert result["regimes"][39]["thresholds"] is None
