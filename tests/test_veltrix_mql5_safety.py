@@ -537,8 +537,8 @@ def test_phase7_daily_loss_lock_and_emergency_stop_are_distinct():
     day_reset = source.split("bool BeginServerDay", 1)[1].split("bool EvaluateDailyLoss", 1)[0]
     assert "m_daily_loss_locked=false;" in day_reset
     assert "m_emergency_stop=false;" not in day_reset
-    assert "GlobalVariableCheck(m_emergency_key)" in source
-    assert "GlobalVariableSet(m_emergency_key,1.0)" in source
+    assert "GlobalVariableCheck(keys[i])" in source
+    assert "GlobalVariableSet(m_emergency_key,(m_emergency_stop ? 1.0 : 0.0))" in source
     assert "GlobalVariablesFlush();" in source
     assert "A cooldown and emergency stop deliberately survive a day boundary." in source
     assert "no reset method" not in source.lower() or "LatchEmergencyStop" in source
