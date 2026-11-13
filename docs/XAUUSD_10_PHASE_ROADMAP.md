@@ -19,9 +19,9 @@
    - Build descriptive features; classify volatility/trend/direction/activity using trailing prior windows only; preserve warm-up and missing-data states; test no-lookahead invariance and provenance reconciliation.
    - Evidence: regime research merged in PR #34; 117 tests passed; two certified sessions classified independently with 330 windows each and explicit warm-up windows.
 
-3. **Cross-session feature stability and research diagnostics — IN PROGRESS**
+3. **Cross-session feature stability and research diagnostics — COMPLETE**
    - Compare independent sessions without pooling away session identity; report distributions, null coverage, correlations, and median drift; reject duplicate or overlapping sessions and incompatible schemas.
-   - Gate: reproducible diagnostics on at least two certified XAUUSD sessions; no strategy or profitability claims.
+   - Evidence: PR #35 merged; 124 tests passed; both certified datasets processed into 721 five-second windows (12,838 source ticks). Provenance hashes, per-session distributions, null coverage, descriptive correlations, and median drift are recorded in `docs/PHASE3_XAUUSD_CROSS_SESSION_REPORT.md`. Median spread was 240 points (0.240 XAUUSD price units), a material cost constraint for short-horizon scalping.
 
 4. **Strategy hypotheses and candidate specification**
    - Define explicit, falsifiable XAUUSD-only hypotheses; specify entry context, invalidation, exit logic, holding horizon, and required data; freeze hypotheses before evaluation.
@@ -55,5 +55,6 @@
 
 - Phase 1: complete.
 - Phase 2: complete.
-- Phase 3: in progress.
-- Phases 4–10: locked until preceding phase gates pass.
+- Phase 3: complete.
+- Phase 4: in progress.
+- Phases 5–10: locked until preceding phase gates pass.
