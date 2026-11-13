@@ -16,7 +16,8 @@
       "artifact_id": 13997174371,
       "collection_started_utc": "2026-11-13T00:00:09.575620+00:00",
       "collection_ended_utc": "2026-11-13T00:30:11.496689+00:00",
-      "duration_seconds": 1802
+      "duration_seconds": 1802,
+      "expected_manifest_sha256": "55c246840ae466a48100e49e71917723664686f414e01f8a657564297eb9f663"
     },
     {
       "session_id": "session9",
@@ -25,7 +26,8 @@
       "artifact_id": 13999059160,
       "collection_started_utc": "2026-11-13T00:34:53.923845+00:00",
       "collection_ended_utc": "2026-11-13T01:04:55.899531+00:00",
-      "duration_seconds": 1802
+      "duration_seconds": 1802,
+      "expected_manifest_sha256": "b336edd572eabb42f7a1f980bc42ae9e7d463623f5a6aab20ccea4c8e00ab280"
     }
   ],
   "validation_sessions": [
