@@ -46,9 +46,9 @@ def validate_session_map(
     sessions = mapping.get("sessions") if isinstance(mapping, dict) else None
     if not isinstance(sessions, list):
         raise ArtifactIntakeError("session map must contain a sessions array")
-    development = {item["session_id"] for item in plan["development_sessions"]}
+    development = {item["session_id"]: item for item in plan["development_sessions"]}
     validation = set(plan["validation_sessions"])
-    allowed = development | validation
+    allowed = set(development) | validation
     seen: set[str] = set()
     normalized = []
     for item in sessions:
@@ -61,6 +61,8 @@ def validate_session_map(
             raise ArtifactIntakeError(f"duplicate session ID: {sid}")
         if isinstance(run_id, bool) or not isinstance(run_id, int) or run_id <= 0:
             raise ArtifactIntakeError(f"{sid}: run_id must be a positive integer")
+        if sid in development and run_id != development[sid].get("workflow_run_id"):
+            raise ArtifactIntakeError(f"{sid}: run_id differs from the preregistered development workflow run")
         seen.add(sid)
         normalized.append({"session_id": sid, "run_id": run_id})
     return normalized
@@ -103,6 +105,12 @@ def download_session_artifacts(
         if len(matches) != 1:
             raise ArtifactIntakeError(f"{sid}: expected exactly one unexpired XAUUSD tick artifact")
         artifact_name = matches[0]["name"]
+        expected_artifact_id = next(
+            (entry.get("artifact_id") for entry in plan["development_sessions"] if entry["session_id"] == sid),
+            None,
+        )
+        if expected_artifact_id is not None and matches[0].get("id") != expected_artifact_id:
+            raise ArtifactIntakeError(f"{sid}: artifact ID differs from the preregistered development artifact")
         destination = session_root / sid
         if destination.exists():
             shutil.rmtree(destination)
