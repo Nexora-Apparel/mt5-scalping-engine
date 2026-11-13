@@ -15,6 +15,7 @@
 #include "..\\Include\\Veltrix\\ExecutionCoordinator.mqh"
 #include "..\\Include\\Veltrix\\StrategyResearch.mqh"
 #include "..\\Include\\Veltrix\\CandidateAnalysis.mqh"
+#include "..\\Include\\Veltrix\\CandidateWindowBuilder.mqh"
 #include "..\\Include\\Veltrix\\FeatureCollector.mqh"
 #include "..\\Include\\Veltrix\\FeatureDatasetExporter.mqh"
 #include "..\\Include\\Veltrix\\FeaturePipeline.mqh"
@@ -23,6 +24,8 @@ input ulong  MaxQuoteAgeMilliseconds = 2500;
 input double MaxSpreadPoints        = 50.0;
 input uint   HealthPollMilliseconds = 250;
 input bool   EnableDatasetCollection = false;
+input bool   EnableCandidateAnalysis = false;
+input int    CandidateHistoryCapacity = 120;
 input uint   FeatureLookbackSeconds = 60;
 input int    FeatureMinObservations = 10;
 input int    FeatureBufferCapacity = 10000;
@@ -32,6 +35,8 @@ input string ExpectedDemoServer = "";
 
 CVxMarketGuard g_market;
 CVxCandidateAnalysis g_candidate_analysis;
+CVxCandidateWindowBuilder g_candidate_window_builder;
+bool g_candidate_faulted=false;
 CVxFeaturePipeline g_feature_pipeline;
 bool g_dataset_fault_reported=false;
 bool g_last_health_state=false;
@@ -124,6 +129,22 @@ int OnInit()
                spec.freeze_level_points,spec.trade_mode,spec.execution_mode,
                spec.filling_mode);
 
+   if(EnableCandidateAnalysis)
+   {
+      if(CandidateHistoryCapacity<80 || CandidateHistoryCapacity>100000)
+      {
+         Print("CANDIDATE ANALYSIS INIT FAILED: history capacity must be between 80 and 100000");
+         return INIT_PARAMETERS_INCORRECT;
+      }
+      if(!g_candidate_window_builder.Init(_Symbol,CandidateHistoryCapacity,reason))
+      {
+         Print("CANDIDATE ANALYSIS INIT FAILED: ",reason);
+         return INIT_FAILED;
+      }
+      PrintFormat("CANDIDATE ANALYSIS ENABLED | symbol=XAUUSD broker_symbol=%s completed_window_seconds=5 history_capacity=%d orders=false",
+                  _Symbol,CandidateHistoryCapacity);
+   }
+
    if(EnableDatasetCollection)
    {
       if(FeatureLookbackSeconds<1 || FeatureLookbackSeconds>600)
@@ -162,6 +183,87 @@ int OnInit()
    Print("VELTRIX CANDIDATE RESEARCH MODULE: XAUUSD-only formulas loaded; completed-window adapter required; no order APIs are called.");
    Print("VELTRIX SAFE MODE: market health, read-only reconciliation, and state-only execution coordination. No order APIs are called.");
    return INIT_SUCCEEDED;
+}
+
+void EmitCandidateSignal(const VxCandidateResearchSignal &signal)
+{
+   string direction=(signal.direction==VX_SIGNAL_LONG ? "LONG" :
+                     (signal.direction==VX_SIGNAL_SHORT ? "SHORT" : "NONE"));
+   PrintFormat("VELTRIX RESEARCH CANDIDATE | candidate=%s direction=%s horizon=%d lookback=%d threshold=%.4f compression_pct=%.1f strength=%.6f signal_end_msc=%I64d execution_authorized=false",
+               signal.candidate_id,direction,signal.horizon_seconds,
+               signal.lookback_seconds,signal.parameter_threshold,
+               signal.compression_percentile,signal.signal_strength,
+               signal.signal_window_end_msc);
+}
+
+void EvaluateCompletedCandidateWindow(const long evaluation_time_msc)
+{
+   VxCompletedFeatureWindow windows[];
+   if(!g_candidate_window_builder.CopyCompletedWindows(windows))
+      return;
+   int count=ArraySize(windows);
+   if(count<2) return;
+   int current=count-1;
+   int horizons[4]={5,15,30,60};
+   int momentum_lookbacks[3]={5,10,15};
+   double momentum_thresholds[3]={0.5,1.0,1.5};
+   int mean_lookbacks[3]={15,30,60};
+   double mean_thresholds[3]={1.0,1.5,2.0};
+   int breakout_lookbacks[2]={30,60};
+   double breakout_fractions[3]={0.25,0.5,1.0};
+   double compression_percentiles[2]={25.0,35.0};
+   VxCandidateResearchSignal signal;
+   string reason;
+
+   for(int a=0;a<3;a++)
+      for(int b=0;b<3;b++)
+         for(int h=0;h<4;h++)
+         {
+            if(g_candidate_analysis.EvaluateMomentum("XAUUSD",windows,current,
+               momentum_lookbacks[a],momentum_thresholds[b],horizons[h],
+               evaluation_time_msc,signal,reason) && signal.emitted)
+               EmitCandidateSignal(signal);
+         }
+
+   for(int a=0;a<3;a++)
+      for(int b=0;b<3;b++)
+         for(int h=0;h<4;h++)
+         {
+            if(g_candidate_analysis.EvaluateMeanReversion("XAUUSD",windows,current,
+               mean_lookbacks[a],mean_thresholds[b],horizons[h],
+               evaluation_time_msc,signal,reason) && signal.emitted)
+               EmitCandidateSignal(signal);
+         }
+
+   for(int a=0;a<2;a++)
+      for(int b=0;b<3;b++)
+         for(int p=0;p<2;p++)
+            for(int h=0;h<4;h++)
+            {
+               if(g_candidate_analysis.EvaluateVolatilityBreakout("XAUUSD",windows,current,
+                  breakout_lookbacks[a],breakout_fractions[b],compression_percentiles[p],
+                  horizons[h],evaluation_time_msc,signal,reason) && signal.emitted)
+                  EmitCandidateSignal(signal);
+            }
+}
+
+void OnTick()
+{
+   if(!EnableCandidateAnalysis || g_candidate_faulted)
+      return;
+   VxQuoteSnapshot quote;
+   string reason;
+   if(!g_market.ReadQuote(quote,reason))
+      return;
+   bool window_completed=false;
+   if(!g_candidate_window_builder.PushQuote(_Symbol,quote.tick,window_completed,reason))
+   {
+      g_candidate_faulted=true;
+      Print("CANDIDATE ANALYSIS FAULTED | ",reason);
+      return;
+   }
+   if(window_completed)
+      EvaluateCompletedCandidateWindow(quote.tick.time_msc);
 }
 
 void OnTimer()
@@ -205,6 +307,10 @@ void OnTimer()
 void OnDeinit(const int reason)
 {
    EventKillTimer();
+   if(EnableCandidateAnalysis)
+      PrintFormat("CANDIDATE ANALYSIS STOPPED | completed_windows=%d faulted=%s",
+                  g_candidate_window_builder.Count(),
+                  (g_candidate_faulted ? "true" : "false"));
    if(EnableDatasetCollection)
       PrintFormat("DATASET COLLECTION STOPPED | rows=%I64d faulted=%s",
                   g_feature_pipeline.RowsWritten(),
