@@ -66,6 +66,9 @@ def verify_package(package_dir: Path) -> dict[str, Any]:
     summary = _read_json(package_dir / "round_trip_cost_summary.json")
     if account.get("account_mode") != "DEMO" or account.get("login_persisted") is not False:
         raise PackageVerificationError("account snapshot is not sanitized Exness DEMO evidence")
+    broker_identity = " ".join((str(account.get("company", "")), str(account.get("server", "")))).lower()
+    if "exness" not in broker_identity:
+        raise PackageVerificationError("account snapshot does not identify Exness as the broker")
     if account.get("terminal_connected") is not True or account.get("terminal_trade_allowed") is not False or account.get("terminal_dlls_allowed") is not False:
         raise PackageVerificationError("terminal read-only controls are not proven by account snapshot")
     if manifest.get("position_reference_scheme") != "PER_PACKAGE_SALTED_SHA256" or not _SHA256.fullmatch(manifest.get("position_reference_salt_sha256", "")):
