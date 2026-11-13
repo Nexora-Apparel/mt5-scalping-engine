@@ -31,11 +31,13 @@ The output package is written under
 - `demo_deals_sanitized.csv`: XAUUSD deal observations with ticket/order/comment identifiers omitted.
 - `round_trip_cost_summary.json`: position-grouped commission/fee/swap/profit observations. Incomplete or ambiguous positions are excluded from per-side estimates.
 - `manifest.json`: SHA-256 and byte length for each other package file.
+- `package-verification.json`: independent verifier result confirming the package hashes, DEMO/read-only account state, XAUUSD contract, sanitized deal schema, and summary counts. It never marks the commission schedule verified.
 
 A completed DEMO position can corroborate the commission charged on that account
 and instrument. It does not establish the broker's applicable schedule by
-itself. The package always leaves `commission_schedule_status` unverified and
-`net_performance_allowed` false. The collector is read-only and contains no
+itself. The workflow runs `tools/verify_xauusd_demo_execution_cost_package.py` before
+uploading the package. The package always leaves `commission_schedule_status`
+unverified and `net_performance_allowed` false. The collector is read-only and contains no
 order submission, order checking, position querying, or order-management path.
 If no matching deal history exists, it records
 `NEEDS_DEMO_DEAL_HISTORY` without failing the separate tick-integrity result.
