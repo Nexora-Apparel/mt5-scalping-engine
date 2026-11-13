@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 import pytest
-from tools.mt5_xauusd_tick_replay import ReplayError, replay_dataset
+from tools.mt5_tick_market_profile import ProfileError\nfrom tools.mt5_xauusd_tick_replay import ReplayError, replay_dataset
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,7 +28,7 @@ def write_ticks(tmp_path, *, count=420, symbol="XAUUSD"):
             "bid":f"{price:.3f}","ask":f"{price+0.200:.3f}","last":"0","volume":"0","volume_real":"0","flags":"3",
         })
     with csv_path.open("w",encoding="utf-8",newline="") as handle:
-        writer=csv.DictWriter(handle,fieldnames=header,lineterminator="\\n")
+        writer=csv.DictWriter(handle,fieldnames=header,lineterminator="\n")
         writer.writeheader(); writer.writerows(rows)
     manifest={
         "sha256":hashlib.sha256(csv_path.read_bytes()).hexdigest(),"records":len(rows),
@@ -54,7 +54,7 @@ def test_replay_is_deterministic_and_execution_disabled(tmp_path):
     assert first["status"]=="PASS"
     assert first["research_only"] is True
     assert first["trade_execution"] is False
-    assert first["source_records"]==420
+    assert first["source_records"]==420\n    assert first["event_count"] > 0
     assert first["holding_horizons_seconds"]==[5,10,15,30,60]
     assert all(event["threshold_history_end_utc"] < event["feature_window_start_utc"] for event in first["events"])
 
