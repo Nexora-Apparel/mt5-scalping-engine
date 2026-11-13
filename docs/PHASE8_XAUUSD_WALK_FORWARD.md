@@ -33,9 +33,10 @@ Each new session must be at least 30 minutes, independently hashed, non-overlapp
 
 The evaluator verifies the frozen registry hash, exact development hashes, DEMO/XAUUSD manifest contract, session duration, independent source hashes, non-overlap, chronological partition order, and distinct dates. It generates candidate events and quote-crossed replay outcomes, applies a one-position filter, reports slippage sensitivity, and calculates session-clustered bootstrap confidence intervals. It also reports always-long, always-short, and no-trade benchmarks. It never submits orders.
 
-Validation command:
+Copy the catalog template to a working catalog, then add one entry per collected session with its fixed session_id and local CSV/manifest paths. The two development entries must use the pinned Sessions 8 and 9 artifacts; validation entries use only the four preregistered validation IDs.
 
 ~~~powershell
+Copy-Item research/xauusd_walk_forward_catalog_template.json research/xauusd_walk_forward_catalog.json
 python tools/mt5_xauusd_walk_forward.py --catalog research/xauusd_walk_forward_catalog.json --stage validation --output research/xauusd_validation_report.json
 ~~~
 
