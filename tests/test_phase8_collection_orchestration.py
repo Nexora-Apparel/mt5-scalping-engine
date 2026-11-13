@@ -7,7 +7,7 @@ def test_phase8_collection_is_manual_only_and_session_id_bound():
     source = (ROOT / ".github/workflows/veltrix-demo-tick-collection.yml").read_text(encoding="utf-8")
     assert "workflow_dispatch:" in source
     assert "validation_session_id:" in source
-    for session_id in ("validation_01", "validation_02", "validation_03", "validation_04"):
+    for session_id in ("validation_01", "validation_03", "validation_04", "validation_05"):
         assert session_id in source
     assert "\\n  schedule:" not in source
     assert "\\n  push:" not in source
@@ -28,6 +28,8 @@ def test_phase8_intake_requires_manifest_bound_validation_session_id():
     source = (ROOT / "tools/prepare_xauusd_walk_forward_catalog.py").read_text(encoding="utf-8")
     assert 'manifest.get("session_id") != sid' in source
     assert "manifest session_id does not match" in source
+    assert "distinct dates required" in source
+    assert "requires all preregistered eligible sessions together" in source
 
 
 def test_phase8_collection_workflow_has_no_trade_execution_or_scheduled_trigger():
