@@ -30,7 +30,7 @@ def make_session(start_ms, source_id, width=5):
         "canonical_symbol": "XAUUSD",
         "source_sha256": (source_id * 64)[:64],
         "source_records": sum(row["tick_count"] for row in rows),
-        "window_seconds": 5,
+        "window_seconds": width,
         "window_count": len(rows),
         "features": rows,
     }
