@@ -26,6 +26,7 @@
   },
   "limitations": [
     "Template only; no commission value is asserted or inferred.",
-    "Net scoring must remain disabled until every required field is populated and source evidence is independently verified."
+    "Net scoring must remain disabled until every required field is populated and source evidence is independently verified.",
+    "The independent-review artifact must be a scope-bound Ed25519-signed JSON attestation verified against an out-of-band pinned reviewer public-key fingerprint."
   ]
 }
