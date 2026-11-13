@@ -144,3 +144,13 @@ def test_position_reference_is_salted_and_not_correlatable_between_exports():
     assert first == same_export
     assert first != second
     assert len(first) == 64
+
+
+def test_rejects_non_exness_account_identity(tmp_path, monkeypatch):
+    configure(monkeypatch)
+    api = FakeMT5([])
+    api.account_info = lambda: SimpleNamespace(login=12345678, server="Other-Demo", trade_mode=0,
+                                               company="Other Broker", currency="USD")
+    with pytest.raises(collector.DiagnosticFailure, match="does not identify Exness"):
+        collector.collect_evidence(api, tmp_path)
+    assert api.shutdown_called
