@@ -19,13 +19,13 @@
    - Build descriptive features; classify volatility/trend/direction/activity using trailing prior windows only; preserve warm-up and missing-data states; test no-lookahead invariance and provenance reconciliation.
    - Evidence: regime research merged in PR #34; 117 tests passed; two certified sessions classified independently with 330 windows each and explicit warm-up windows.
 
-3. **Cross-session feature stability and research diagnostics — IN PROGRESS**
+3. **Cross-session feature stability and research diagnostics — COMPLETE**
    - Compare independent sessions without pooling away session identity; report distributions, null coverage, correlations, and median drift; reject duplicate or overlapping sessions and incompatible schemas.
-   - Gate: reproducible diagnostics on at least two certified XAUUSD sessions; no strategy or profitability claims.
+   - Evidence: cross-session diagnostics merged in PR #35; 124 tests passed; both certified sessions compared; session identity and source hashes retained.
 
-4. **Strategy hypotheses and candidate specification**
-   - Define explicit, falsifiable XAUUSD-only hypotheses; specify entry context, invalidation, exit logic, holding horizon, and required data; freeze hypotheses before evaluation.
-   - Gate: documented hypotheses and pre-registered evaluation plan; no tuning on final holdout data.
+4. **Strategy hypotheses and candidate specification — IN PROGRESS**
+   - Freeze falsifiable XAUUSD-only hypotheses, entry context, direction, invalidation, 5–60 second evaluation horizons, and cost-aware outcomes before any candidate testing.
+   - Gate: versioned pre-registration and validation of registry constraints; no threshold tuning on holdout data.
 
 5. **Tick replay and deterministic research simulator**
    - Replay chronological bid/ask ticks; model spread-aware entries/exits, quote freshness, latency assumptions, and conservative execution constraints.
@@ -55,5 +55,6 @@
 
 - Phase 1: complete.
 - Phase 2: complete.
-- Phase 3: in progress.
-- Phases 4–10: locked until preceding phase gates pass.
+- Phase 3: complete.
+- Phase 4: in progress.
+- Phases 5–10: locked until preceding phase gates pass.
