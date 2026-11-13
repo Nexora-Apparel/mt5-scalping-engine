@@ -12,7 +12,7 @@ def make_session(start_ms, source_id, width=5):
             "window_seconds": width,
             "tick_count": 4 + (i % 5),
             "ticks_per_second": 1.0 + (i % 7) / 3,
-            "return_bps": 0.000001 + ((i % 9) - 4) / 10,
+            "return_bps": 0.000001,
             "range_bps": 0.2 + (i % 6) / 10,
             "realized_volatility_bps": 0.1 + (i % 8) / 10,
             "trend_efficiency": (i % 10) / 10,
