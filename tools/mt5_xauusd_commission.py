@@ -35,6 +35,7 @@ def validate_commission_evidence(
     account_mode: str,
     evaluation_time_utc: str,
     source_artifact_path: Path,
+    verification_artifact_path: Path,
     evaluation_start_utc: str | None = None,
     evaluation_end_utc: str | None = None,
     verification_time_utc: str | None = None,
@@ -101,6 +102,22 @@ def validate_commission_evidence(
         raise CommissionEvidenceError("commission source artifact cannot be read") from exc
     if digest_calculator.hexdigest() != digest:
         raise CommissionEvidenceError("commission source artifact SHA-256 does not match the evidence record")
+    verification_digest = source.get("verification_sha256")
+    if not isinstance(verification_digest, str) or not _SHA256.fullmatch(verification_digest):
+        raise CommissionEvidenceError("verification_sha256 must be a lowercase SHA-256 digest")
+    if verification_digest == digest:
+        raise CommissionEvidenceError("independent verification must be a separate artifact")
+    if not isinstance(verification_artifact_path, Path) or not verification_artifact_path.is_file():
+        raise CommissionEvidenceError("the independent verification artifact must be supplied for hash verification")
+    verification_calculator = hashlib.sha256()
+    try:
+        with verification_artifact_path.open("rb") as verification_file:
+            for chunk in iter(lambda: verification_file.read(1024 * 1024), b""):
+                verification_calculator.update(chunk)
+    except OSError as exc:
+        raise CommissionEvidenceError("independent verification artifact cannot be read") from exc
+    if verification_calculator.hexdigest() != verification_digest:
+        raise CommissionEvidenceError("independent verification artifact SHA-256 does not match the evidence record")
     return {
         "status": "VERIFIED",
         "broker_symbol": broker_symbol,
@@ -108,6 +125,7 @@ def validate_commission_evidence(
         "contract_size_oz_per_lot": float(contract),
         "commission_usd_per_lot_per_side": float(amount),
         "source_sha256": digest,
+        "verification_sha256": verification_digest,
         "source_reference": source["source_reference"],
         "verification_reference": source["verification_reference"],
         "effective_from_utc": effective_from.isoformat(),
