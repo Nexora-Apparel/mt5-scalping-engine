@@ -392,3 +392,13 @@ def test_holdout_requires_runtime_commission_evidence_before_catalog_inspection(
     assert result["status"] == "BLOCKED_COMMISSION_UNVERIFIED"
     assert result["holdout_opened"] is False
     assert result["candidate_scoring_performed"] is False
+
+
+def test_partial_commission_review_inputs_fail_closed_before_scoring():
+    with pytest.raises(WalkForwardError, match="trusted public key"):
+        run_walk_forward(
+            PLAN, REGISTRY, {"sessions": []}, stage="validation", base_dir=ROOT,
+            commission_evidence={},
+            commission_source_artifact_path=ROOT / "source.pdf",
+            commission_verification_artifact_path=ROOT / "review.json",
+        )
