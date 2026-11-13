@@ -773,9 +773,14 @@ def run_walk_forward(
     validation_report_path: Path | None = None,
     commission_evidence: dict[str, Any] | None = None,
     commission_source_artifact_path: Path | None = None,
+    commission_verification_artifact_path: Path | None = None,
     commission_verification_time_utc: str | None = None,
 ) -> dict[str, Any]:
-    if stage == "holdout" and (commission_evidence is None or commission_source_artifact_path is None):
+    if stage == "holdout" and (
+        commission_evidence is None
+        or commission_source_artifact_path is None
+        or commission_verification_artifact_path is None
+    ):
         return {
             "status": "BLOCKED_COMMISSION_UNVERIFIED",
             "stage": stage,
@@ -783,10 +788,15 @@ def run_walk_forward(
             "holdout_opened": False,
             "commission_status": "UNVERIFIED_REQUIRED_INPUT",
             "net_performance_allowed": False,
-            "required_manual_evidence": "Applicable Exness DEMO XAUUSD commission schedule or statement, original source artifact, and independent verification record.",
+            "required_manual_evidence": "Applicable Exness DEMO XAUUSD commission schedule, original source artifact, and separately hashed independent verification artifact.",
         }
-    if (commission_evidence is None) != (commission_source_artifact_path is None):
-        raise WalkForwardError("commission evidence JSON and original source artifact must be supplied together")
+    supplied_commission_inputs = (
+        commission_evidence is not None,
+        commission_source_artifact_path is not None,
+        commission_verification_artifact_path is not None,
+    )
+    if any(supplied_commission_inputs) and not all(supplied_commission_inputs):
+        raise WalkForwardError("commission evidence JSON, original source artifact, and independent verification artifact must be supplied together")
     ready = assess_session_catalog(plan, registry, catalog, stage=stage, base_dir=base_dir,
                                    selection_freeze=selection_freeze,
                                    selection_freeze_path=selection_freeze_path,
@@ -829,6 +839,7 @@ def run_walk_forward(
                 evaluation_end_utc=max(ends).isoformat(),
                 verification_time_utc=commission_verification_time_utc,
                 source_artifact_path=commission_source_artifact_path,
+                verification_artifact_path=commission_verification_artifact_path,
             )
         except CommissionEvidenceError as exc:
             raise WalkForwardError(f"commission evidence rejected: {exc}") from exc
@@ -853,6 +864,7 @@ def main() -> int:
     parser.add_argument("--validation-report", type=Path)
     parser.add_argument("--commission-evidence", type=Path)
     parser.add_argument("--commission-source-artifact", type=Path)
+    parser.add_argument("--commission-verification-artifact", type=Path)
     parser.add_argument("--commission-verification-time-utc")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -869,6 +881,7 @@ def main() -> int:
                                   validation_report_path=args.validation_report,
                                   commission_evidence=commission,
                                   commission_source_artifact_path=args.commission_source_artifact,
+                                  commission_verification_artifact_path=args.commission_verification_artifact,
                                   commission_verification_time_utc=args.commission_verification_time_utc)
     except (OSError, json.JSONDecodeError, ProfileError, CandidateError, RegistryError, ReplayError, WalkForwardError, KeyError, TypeError, ValueError) as exc:
         parser.exit(2, f"WALK-FORWARD FAIL: {exc}\n")
