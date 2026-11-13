@@ -184,7 +184,7 @@ def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]
         elif family == "mean_reversion":
             for lookback, threshold in product(grid["lookback_seconds"], grid["standardized_displacement_threshold"]):
                 n = lookback // width
-                for index in range(n, len(rows)):
+                for index in range(n, completed_count):
                     if not _contiguous_windows(window_starts_ms, index - n, index + 1, width):
                         continue
                     scale = _volatility_scale(rows, index - n, index)
