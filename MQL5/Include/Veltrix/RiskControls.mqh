@@ -16,7 +16,6 @@ struct VxRiskControlConfig
    double risk_per_trade_percent;
    double max_portfolio_risk_percent;
    double max_daily_loss_percent;
-   int    max_positions;
    int    cooldown_seconds;
    int    max_consecutive_losses;
 };
@@ -186,10 +185,11 @@ public:
          config.max_daily_loss_percent<=0.0 ||
          config.max_daily_loss_percent>1.00)
       { reason="Risk configuration exceeds hard policy ceilings"; return false; }
-      if(config.max_positions!=1 ||
-         config.cooldown_seconds<30 || config.cooldown_seconds>3600 ||
+      if(config.cooldown_seconds<30 || config.cooldown_seconds>3600 ||
          config.max_consecutive_losses<1 || config.max_consecutive_losses>3)
-      { reason="Policy requires one position, 30-3600s cooldown, and 1-3 consecutive-loss limit"; return false; }
+      { reason="Policy requires a 30-3600s cooldown and 1-3 consecutive-loss limit"; return false; }
+      // There is deliberately no simultaneous-position count limit. Every
+      // new intent must still fit the aggregate open-risk and margin budgets.
 
       m_config=config;
       if(!m_journal.Init(config.expected_demo_login,config.expected_demo_server,reason))
