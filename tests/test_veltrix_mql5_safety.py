@@ -597,3 +597,12 @@ def test_phase7_public_state_mutations_require_exact_connected_demo_identity():
     assert "VerifyExactDemoAccount(reason)" in close
     assert "ACCOUNT_TRADE_MODE_DEMO" in source
     assert "TERMINAL_CONNECTED" in source
+
+
+def test_phase7_execution_preflight_enforces_broker_tick_size_for_protection():
+    source = EXECUTION_SOURCE.read_text(encoding="utf-8")
+    assert "SYMBOL_TRADE_TICK_SIZE" in source
+    assert "stop_ticks=intent.stop_loss/tick_size" in source
+    assert "MathAbs(stop_ticks-MathRound(stop_ticks))>1e-6" in source
+    assert "target_ticks=intent.take_profit/tick_size" in source
+    assert "MathAbs(target_ticks-MathRound(target_ticks))>1e-6" in source
