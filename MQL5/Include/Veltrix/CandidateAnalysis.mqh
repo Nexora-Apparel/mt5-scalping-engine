@@ -236,8 +236,11 @@ public:
                       windows,current_index,signal,
                       "XAU_MOMENTUM_CONTINUATION_V1",reason))
          return false;
+      bool registered_threshold=(standardized_threshold==0.5 ||
+                                 standardized_threshold==1.0 ||
+                                 standardized_threshold==1.5);
       if((lookback_seconds!=5 && lookback_seconds!=10 && lookback_seconds!=15) ||
-         !MathIsValidNumber(standardized_threshold) || standardized_threshold<=0.0)
+         !MathIsValidNumber(standardized_threshold) || !registered_threshold)
       { reason="Momentum lookback or threshold is invalid"; signal.reason=reason; return false; }
       int n=lookback_seconds/5;
       if(current_index<n ||
@@ -275,8 +278,11 @@ public:
                       windows,current_index,signal,
                       "XAU_MEAN_REVERSION_V1",reason))
          return false;
+      bool registered_threshold=(standardized_threshold==1.0 ||
+                                 standardized_threshold==1.5 ||
+                                 standardized_threshold==2.0);
       if((lookback_seconds!=15 && lookback_seconds!=30 && lookback_seconds!=60) ||
-         !MathIsValidNumber(standardized_threshold) || standardized_threshold<=0.0)
+         !MathIsValidNumber(standardized_threshold) || !registered_threshold)
       { reason="Mean-reversion lookback or threshold is invalid"; signal.reason=reason; return false; }
       int n=lookback_seconds/5;
       if(current_index<n ||
@@ -318,7 +324,8 @@ public:
                       "XAU_VOLATILITY_BREAKOUT_V1",reason))
          return false;
       if((lookback_seconds!=30 && lookback_seconds!=60) ||
-         !MathIsValidNumber(distance_fraction) || distance_fraction<=0.0 ||
+         !MathIsValidNumber(distance_fraction) ||
+         (distance_fraction!=0.25 && distance_fraction!=0.5 && distance_fraction!=1.0) ||
          !MathIsValidNumber(compression_percentile) ||
          (compression_percentile!=25.0 && compression_percentile!=35.0))
       { reason="Breakout lookback or registered thresholds are invalid"; signal.reason=reason; return false; }
