@@ -88,6 +88,26 @@ void OnStart()
       Result("FAIL | daily-lock seed: "+reason);
       return;
    }
+
+   // Bind the journal's server-day lock to the matching persistent snapshot.
+   string suffix=Suffix();
+   long day_key=20261113;
+   double equity=10000.0;
+   string serialized=StringFormat("1|%I64d|%.17g|1|0|0",day_key,equity);
+   double checksum=(double)(HashText64(serialized)%9007199254740991);
+   if(GlobalVariableSet("VX_DAY_"+suffix,(double)day_key)==0 ||
+      GlobalVariableSet("VX_EQ_"+suffix,equity)==0 ||
+      GlobalVariableSet("VX_LOCK_"+suffix,1.0)==0 ||
+      GlobalVariableSet("VX_LS_"+suffix,0.0)==0 ||
+      GlobalVariableSet("VX_CD_"+suffix,0.0)==0 ||
+      GlobalVariableSet("VX_ESTOP_"+suffix,1.0)==0 ||
+      GlobalVariableSet("VX_LOCKTX_"+suffix,0.0)==0 ||
+      GlobalVariableSet("VX_CSUM_"+suffix,checksum)==0)
+   {
+      Result("FAIL | could not persist the synthetic server-day lock snapshot");
+      return;
+   }
+   GlobalVariablesFlush();
    Print("RISK RESTART SEED PASS | synthetic identity only; terminal shutdown required before verification");
    Result("PASS | emergency-stop and daily-lock persisted before terminal process restart");
 }
