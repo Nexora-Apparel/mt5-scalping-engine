@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from tools.mt5_xauusd_strategy_registry import RegistryError, validate_registry
-from tools.mt5_tick_market_profile import percentile
+from tools.mt5_tick_market_profile import ProfileError, percentile\nfrom tools.mt5_xauusd_feature_research import build_features
 
 
 class SignalError(ValueError):
@@ -146,7 +146,8 @@ def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]
         close = _number(current, "mid_close")
         high = _number(current, "mid_high")
         low = _number(current, "mid_low")
-        if close is None or high is None or low is None or min(close, low) <= 0 or high < low:
+        if (close is None or high is None or low is None or min(close, low) <= 0 or
+                high < low or close < low or close > high):
             skipped["missing_features"] += 1
             continue
 
