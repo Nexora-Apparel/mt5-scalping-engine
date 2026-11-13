@@ -201,10 +201,10 @@ jobs:
           if (!(Test-Path $log)) { throw "MetaEditor did not produce the risk-controls runtime-test log." }
           Get-Content $log
           $logText = Get-Content $log -Raw
-          if ($logText -match "(?i)\\b[1-9]\\d* errors?\\b" -or $logText -notmatch "(?i)0 errors?") {
+          if ($logText -match "(?i)\b[1-9]\d* errors?\b" -or $logText -notmatch "(?i)0 errors?") {
             throw "Risk-controls runtime-test script did not compile cleanly."
           }
-          if ($logText -match "(?i)\\b[1-9]\\d* warnings?\\b") {
+          if ($logText -match "(?i)\b[1-9]\d* warnings?\b") {
             throw "Risk-controls runtime-test script reported compiler warnings."
           }
           $compiled = Join-Path (Split-Path $source) "RiskControlsRuntimeTest.ex5"
@@ -244,7 +244,7 @@ jobs:
             }
             $result = (Get-Content $resultPath -Raw).Trim()
             Write-Host "$scriptName result: $result"
-            if ($result -notmatch "^PASS \\|") {
+            if ($result -notmatch "^PASS \|") {
               Get-Process terminal64 -ErrorAction SilentlyContinue | Stop-Process -Force
               throw "$scriptName reported failure: $result"
             }
@@ -267,6 +267,15 @@ jobs:
             C:\\MT5\\MQL5\\Files\\veltrix_risk_controls_runtime_test.result
           if-no-files-found: warn
           retention-days: 30
+
+      - name: Upload risk controls runtime-test script artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Veltrix-risk-controls-runtime-test
+          path: MQL5/Scripts/RiskControlsRuntimeTest.ex5
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload risk journal runtime-test script artifact
         if: success()
