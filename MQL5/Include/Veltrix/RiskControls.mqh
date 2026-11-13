@@ -7,6 +7,7 @@
 #define VELTRIX_RISK_CONTROLS_MQH
 
 #include "RiskAllocator.mqh"
+#include "RiskJournal.mqh"
 
 struct VxRiskControlConfig
 {
@@ -24,6 +25,7 @@ class CVxRiskControls
 {
 private:
    VxRiskControlConfig m_config;
+   CVxRiskJournal m_journal;
    bool m_initialized;
    bool m_emergency_stop;
    bool m_daily_loss_locked;
@@ -93,24 +95,6 @@ private:
       bool released=GlobalVariableSetOnCondition(m_state_lock_name,0.0,(double)token);
       GlobalVariablesFlush();
       return released;
-   }
-
-   bool ReservePersistentKey(const string key,const double stamp,
-                             const string duplicate_reason,string &reason)
-   {
-      reason="";
-      if(key=="" || StringLen(key)>63 || !MathIsValidNumber(stamp) || stamp<=0.0)
-      { reason="Persistent idempotency key or timestamp is invalid"; return false; }
-      if(!GlobalVariableCheck(key))
-      {
-         if(GlobalVariableSet(key,0.0)==0 && !GlobalVariableCheck(key))
-         { reason="Could not initialize persistent idempotency key"; return false; }
-      }
-      // Atomic compare-and-set: only one EA instance can reserve a given key.
-      if(!GlobalVariableSetOnCondition(key,stamp,0.0))
-      { reason=duplicate_reason; return false; }
-      GlobalVariablesFlush();
-      return true;
    }
 
    double RiskStateChecksum(void) const
@@ -189,6 +173,8 @@ public:
       { reason="Policy requires one position, 30-3600s cooldown, and 1-3 consecutive-loss limit"; return false; }
 
       m_config=config;
+      if(!m_journal.Init(config.expected_demo_login,config.expected_demo_server,reason))
+      { reason="Risk journal initialization failed: "+reason; return false; }
       string suffix=StringFormat("%I64d_%I64u",
                                  config.expected_demo_login,
                                  ServerHash(config.expected_demo_server));
@@ -351,7 +337,7 @@ public:
       { reason="Closing-deal deduplication key is invalid"; return false; }
       if(!AcquireRiskStateLock(close_time_msc,reason))
          return false;
-      if(GlobalVariableCheck(close_key))
+      if(m_journal.HasClose(close_key))
       {
          ReleaseRiskStateLock(close_time_msc);
          reason="Duplicate verified closing deal ignored";
@@ -378,12 +364,11 @@ public:
          reason="Could not persist verified close risk state; emergency stop latched";
          return false;
       }
-      if(!ReservePersistentKey(close_key,(double)close_time_msc,
-                               "Duplicate verified closing deal ignored",reason))
+      if(!m_journal.AppendClose(close_key,close_time_msc,net_profit,reason))
       {
          m_emergency_stop=true;
          PersistRiskState();
-         reason="Could not commit closing-deal idempotency after state update; manual reconciliation required";
+         reason="Could not commit closing-deal journal record after state update; manual reconciliation required";
          return false;
       }
       if(!ReleaseRiskStateLock(close_time_msc))
@@ -442,9 +427,28 @@ public:
       string request_key=RequestKey(request_id);
       if(request_key=="" || StringLen(request_key)>63)
       { reason="Request deduplication key is invalid"; return false; }
-      if(!ReservePersistentKey(request_key,(double)now_msc,
-                               "Duplicate request identifier rejected",reason))
+      if(!AcquireRiskStateLock(now_msc,reason))
          return false;
+      if(m_journal.HasRequest(request_key))
+      {
+         ReleaseRiskStateLock(now_msc);
+         reason="Duplicate request identifier rejected";
+         return false;
+      }
+      if(!m_journal.AppendRequest(request_key,now_msc,reason))
+      {
+         m_emergency_stop=true;
+         PersistRiskState();
+         reason="Request journal append failed; risk transaction remains locked for manual reconciliation";
+         return false;
+      }
+      if(!ReleaseRiskStateLock(now_msc))
+      {
+         m_emergency_stop=true;
+         PersistRiskState();
+         reason="Could not release request journal transaction lock; manual reconciliation required";
+         return false;
+      }
       return true;
    }
 
