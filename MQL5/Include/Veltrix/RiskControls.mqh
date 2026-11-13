@@ -110,7 +110,7 @@ public:
       if(GlobalVariableCheck(m_emergency_key))
       {
          double stored=GlobalVariableGet(m_emergency_key);
-         if(!MathIsValidNumber(stored) || stored<0.0)
+         if(!MathIsValidNumber(stored) || (stored!=0.0 && stored!=1.0))
          { reason="Persistent emergency-stop state is corrupt; refusing initialization"; return false; }
          m_emergency_stop=(stored>0.5);
       }
