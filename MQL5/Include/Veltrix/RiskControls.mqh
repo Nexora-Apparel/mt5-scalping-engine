@@ -207,6 +207,8 @@ public:
       if(!m_initialized || day_key<=0 ||
          !MathIsValidNumber(starting_equity) || starting_equity<=0.0)
       { reason="Invalid risk state, server-day key, or starting equity"; return false; }
+      if(!VerifyExactDemoAccount(reason))
+         return false;
       if(m_server_day_key>0 && day_key<m_server_day_key)
       { reason="Server-day key moved backwards; refusing to reset risk state"; return false; }
       if(day_key==m_server_day_key)
@@ -236,6 +238,8 @@ public:
       if(!m_initialized || m_server_day_key<=0 || m_day_start_equity<=0.0 ||
          !MathIsValidNumber(current_equity) || current_equity<=0.0)
       { reason="Daily equity baseline or current equity is unavailable"; return false; }
+      if(!VerifyExactDemoAccount(reason))
+         return false;
       if(m_daily_loss_locked)
       { reason="Daily loss lock is latched until the next verified server day"; return false; }
       double loss_percent=(m_day_start_equity-current_equity)/m_day_start_equity*100.0;
@@ -264,6 +268,8 @@ public:
       if(!m_initialized || closing_deal_ticket==0 ||
          !MathIsValidNumber(net_profit) || close_time_msc<=0)
       { reason="Only a unique verified closing deal with finite net P/L and valid time may update loss controls"; return false; }
+      if(!VerifyExactDemoAccount(reason))
+         return false;
       string close_key=StringFormat("VX_CLOSE_%I64d_%I64u_%I64u",
                                     m_config.expected_demo_login,
                                     ServerHash(m_config.expected_demo_server),
