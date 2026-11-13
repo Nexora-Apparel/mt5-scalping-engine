@@ -31,6 +31,11 @@ def test_artifact_intake_rejects_unregistered_sessions_and_invalid_run_ids(item)
         validate_session_map({"sessions": [item]}, PLAN, stage="validation")
 
 
+def test_artifact_intake_rejects_explicitly_ineligible_validation_02():
+    with pytest.raises(ArtifactIntakeError, match="explicitly ineligible"):
+        validate_session_map({"sessions": [{"session_id": "validation_02", "run_id": 43390000002}]}, PLAN, stage="validation")
+
+
 def test_artifact_intake_rejects_duplicate_session_ids():
     mapping = {"sessions": [
         {"session_id": "validation_01", "run_id": 43390000001},
@@ -64,6 +69,8 @@ def test_artifact_download_builds_catalog_from_verified_xauusd_artifact(tmp_path
         "data_audit_status": "PASS",
         "duration_clock": "monotonic",
         "duration_seconds": 1802.0,
+        "collection_started_utc": "2026-11-14T00:01:00Z",
+        "collection_ended_utc": "2026-11-14T00:31:02Z",
         "session_id": "validation_01",
         "account_mode": "DEMO",
         "trading_enabled": False,

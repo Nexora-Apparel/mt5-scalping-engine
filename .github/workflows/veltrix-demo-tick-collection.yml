@@ -10,9 +10,9 @@ on:
         type: choice
         options:
           - validation_01
-          - validation_02
           - validation_03
           - validation_04
+          - validation_05
 
 permissions:
   contents: read
