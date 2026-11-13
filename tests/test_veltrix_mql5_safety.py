@@ -765,6 +765,7 @@ def test_phase7_mql5_workflow_executes_terminal_runtime_scripts_without_broker_l
     assert source.index("[StartUp]") < source.index("Script=$scriptName")
     assert "AllowLiveTrading=0" in source
     assert "AllowDllImport=0" in source
+    assert "Symbol=XAUUSD" in source
     assert "Script=$scriptName" in source
     assert "ShutdownTerminal=1" in source
     assert "veltrix_risk_controls_runtime_test.result" in source
