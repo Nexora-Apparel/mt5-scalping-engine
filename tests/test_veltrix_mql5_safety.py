@@ -606,3 +606,10 @@ def test_phase7_execution_preflight_enforces_broker_tick_size_for_protection():
     assert "MathAbs(stop_ticks-MathRound(stop_ticks))>1e-6" in source
     assert "target_ticks=intent.take_profit/tick_size" in source
     assert "MathAbs(target_ticks-MathRound(target_ticks))>1e-6" in source
+
+
+def test_phase7_persistent_keys_use_64bit_hashing():
+    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    assert "ulong hash=14695981039346656037" in source
+    assert "hash*=1099511628211" in source
+    assert "hash^=(ulong)StringGetCharacter(value,i)" in source
