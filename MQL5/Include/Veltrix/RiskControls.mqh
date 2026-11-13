@@ -202,6 +202,10 @@ public:
          if(GlobalVariableCheck(keys[i])) present++;
       if(present!=0 && present!=8)
       { reason="Persistent risk state is incomplete; refusing to reset partial state"; return false; }
+      if(present==0 && !m_journal.WasCreatedNew())
+      { reason="Risk-state variables are missing while an existing journal remains; manual recovery required"; return false; }
+      if(present==8 && m_journal.WasCreatedNew())
+      { reason="Risk journal is missing while persistent risk state remains; refusing silent journal recreation"; return false; }
       if(present==0)
       {
          if(GlobalVariableSet(m_state_lock_name,0.0)==0 ||
