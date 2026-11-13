@@ -6,8 +6,8 @@ This directory contains the schema contract for broker-cost evidence. The templa
 - Account mode must be DEMO and the broker symbol must match the collected instrument.
 - Contract size must be confirmed from the applicable Exness instrument specification.
 - Commission must be stated in USD per lot per side, with effective dates and an explicit charging basis.
-- The source artifact must be retained securely; only a sanitized reference and SHA-256 belong in the repository.
-- Independent verification must be documented with a separate reference and timestamp.
+- The original source artifact must be retained securely; only a sanitized reference and SHA-256 belong in the repository.
+- Independent verification must be a separate artifact with its own sanitized reference, SHA-256, and timestamp. The verification artifact hash must differ from the source artifact hash.
 
 ## Fail-closed rule
 A template, missing field, stale schedule, mismatched account/symbol/currency, malformed hash, or unverified source is invalid. Never infer a commission rate from spread, swap, generic broker marketing pages, or another account type.
@@ -53,10 +53,11 @@ python -m tools.mt5_xauusd_walk_forward \
   --catalog path/to/session-catalog.json \
   --stage validation \
   --commission-evidence path/to/verified-commission-evidence.json \
-  --commission-source-artifact path/to/original-broker-schedule.pdf
+  --commission-source-artifact path/to/original-broker-schedule.pdf \
+  --commission-verification-artifact path/to/independent-review-record.pdf
 ```
 
-The validator checks the original source artifact SHA-256, DEMO account mode,
+The validator checks both the original source artifact SHA-256 and a separately hashed independent verification artifact, DEMO account mode,
 exact broker symbol, USD profit/commission currency, per-side charging basis,
 contract size, and that the schedule's effective period covers the entire
 evaluation partition. The contract size and broker symbol must also match every
