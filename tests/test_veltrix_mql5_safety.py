@@ -214,8 +214,6 @@ def test_execution_coordinator_is_state_only_and_fail_closed():
         "RecordBrokerResponse", "RecordFill", "DealAlreadySeen",
         "BeginReconciliation", "ResolveFromBroker", "SetDisconnected",
         "SetReconnected", "LatchEmergencyStop", "m_emergency_stop",
-        "GlobalVariableCheck", "GlobalVariableGet", "GlobalVariableSet",
-        "GlobalVariablesFlush", "m_emergency_key",
     )
     for token in required:
         assert token in source
@@ -505,6 +503,8 @@ def test_phase7_risk_controls_are_demo_xauusd_only_and_fail_closed():
         "EvaluateDailyLoss", "RecordVerifiedClose",
         "RegisterApprovedIntent", "RequestSeen",
         "LatchEmergencyStop", "m_emergency_stop",
+        "GlobalVariableCheck", "GlobalVariableGet", "GlobalVariableSet",
+        "GlobalVariablesFlush", "m_emergency_key",
         "Only a verified XAUUSD contract is permitted",
         "Duplicate request identifier rejected",
         "Post-loss cooldown is active",
