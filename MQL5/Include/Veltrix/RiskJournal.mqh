@@ -192,6 +192,8 @@ public:
       m_handle=FileOpen(m_filename,FILE_READ|FILE_WRITE|FILE_CSV|FILE_ANSI|FILE_COMMON|FILE_SHARE_READ,',');
       if(m_handle==INVALID_HANDLE)
       {
+         if(file_existed)
+         { reason="Existing risk journal cannot be opened; refusing to recreate or truncate it"; return false; }
          ResetLastError();
          int create_handle=FileOpen(m_filename,FILE_WRITE|FILE_CSV|FILE_ANSI|FILE_COMMON,',');
          if(create_handle==INVALID_HANDLE)
