@@ -240,7 +240,28 @@ jobs:
             $configText | Set-Content -Path $ini -Encoding ASCII
 
             Get-Process terminal64 -ErrorAction SilentlyContinue | Stop-Process -Force
+            # First launch initializes MT5's data directory. If MT5 selected its
+            # standard AppData directory instead of portable mode, install the
+            # compiled scripts there as well, then restart with the same config.
             $process = Start-Process -FilePath $terminal -ArgumentList @("/portable", "/config:$ini") -PassThru
+            Start-Sleep -Seconds 15
+            if (!(Test-Path $resultPath)) {
+              $dataRoot = Join-Path $env:APPDATA "MetaQuotes\\Terminal"
+              if (Test-Path $dataRoot) {
+                foreach ($dataFolder in (Get-ChildItem $dataRoot -Directory -ErrorAction SilentlyContinue)) {
+                  $dataMql = Join-Path $dataFolder.FullName "MQL5"
+                  if (Test-Path $dataMql) {
+                    $dataScripts = Join-Path $dataMql "Scripts"
+                    $dataFiles = Join-Path $dataMql "Files"
+                    New-Item -ItemType Directory -Force -Path $dataScripts,$dataFiles | Out-Null
+                    Copy-Item "MQL5\\Scripts\\RiskJournalRuntimeTest.ex5" $dataScripts -Force
+                    Copy-Item "MQL5\\Scripts\\RiskControlsRuntimeTest.ex5" $dataScripts -Force
+                  }
+                }
+              }
+              Get-Process terminal64 -ErrorAction SilentlyContinue | Stop-Process -Force
+              $process = Start-Process -FilePath $terminal -ArgumentList @("/portable", "/config:$ini") -PassThru
+            }
             $deadline = [DateTime]::UtcNow.AddMinutes(3)
             while (!(Test-Path $resultPath) -and [DateTime]::UtcNow -lt $deadline) {
               Start-Sleep -Seconds 2
