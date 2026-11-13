@@ -55,9 +55,13 @@ private:
 
    ulong ServerHash(const string value) const
    {
-      ulong hash=2166136261;
+      // FNV-1a 64-bit; unsigned overflow is intentional and deterministic.
+      ulong hash=14695981039346656037;
       for(int i=0;i<StringLen(value);i++)
-         hash=(hash*16777619+(ulong)StringGetCharacter(value,i))%4294967291;
+      {
+         hash^=(ulong)StringGetCharacter(value,i);
+         hash*=1099511628211;
+      }
       return hash;
    }
 
