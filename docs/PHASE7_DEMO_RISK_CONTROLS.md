@@ -58,7 +58,7 @@ The current VELTRIX EA only includes the module for compilation. No risk-control
 
 - The module does not infer the server-day key or starting equity; the caller must obtain both from a verified broker session and preserve the baseline for the day.
 - Daily equity loss includes floating P/L but does not replace reconciliation of commissions, swaps, fees, deposits, withdrawals, or broker corrections.
-- Daily baseline, daily lock, consecutive-loss count, cooldown, request-ID deduplication, verified closing-deal deduplication, and emergency-stop state are persisted and restored at initialization. A checksum commit marker detects partial risk-state writes and makes initialization fail closed on mismatch. A transaction lock serializes close accounting across EA instances; a nonzero lock after a crash is deliberately not auto-cleared. This storage behavior still requires controlled MT5 runtime/restart and forced-write-failure testing; Global Variable storage limits or corruption cause initialization or intent registration to fail closed.
+- Daily baseline, daily lock, consecutive-loss count, cooldown, request-ID deduplication, verified closing-deal deduplication, and emergency-stop state are persisted and restored at initialization. A checksum commit marker detects partial risk-state writes and makes initialization fail closed on mismatch. A transaction lock serializes verified-close accounting across EA instances; a nonzero lock after a crash is deliberately not auto-cleared. This storage behavior still requires controlled MT5 runtime/restart and forced-write-failure testing. Terminal Global Variables are finite terminal-local state, not an immutable audit archive; expiry, storage exhaustion, or corruption must be handled by the future durable journal layer before any order execution is enabled.
 - Position registry/reconciler provide primitives, not a complete durable transaction journal.
 - The existing EA is not authorized to execute. Compilation and static tests do not prove runtime broker behavior.
 - No live/real-money execution, production deployment, or scheduling is enabled.
@@ -69,6 +69,7 @@ The current VELTRIX EA only includes the module for compilation. No risk-control
 - [ ] MQL5 compile passes with zero errors and zero warnings.
 - [ ] Risk policy tests cover invalid numeric inputs, account mismatch, symbol mismatch, stop/tick-size/margin preflight, daily-loss lock, cooldown, loss streak, duplicate request, and emergency-stop latch.
 - [ ] Static scan confirms no order submission/modification/closure APIs in the VELTRIX risk modules or EA.
-- [ ] Controlled MT5 runtime test confirms risk-state checksum restoration, transaction-lock behavior, and emergency-stop persistence across terminal restart.
+- [ ] Controlled MT5 runtime test confirms risk-state checksum restoration, transaction-lock behavior, emergency-stop persistence, and Global Variable expiry/storage-failure handling across terminal restart.
+- [ ] A durable append-only execution/risk journal is implemented and independently tested before any order execution is enabled.
 - [ ] Independent review confirms all state persistence and restart behavior before any future DEMO execution.
 - [ ] No production deployment, scheduling, Telegram, or live trading.
