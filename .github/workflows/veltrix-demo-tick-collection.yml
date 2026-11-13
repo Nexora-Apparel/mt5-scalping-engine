@@ -100,6 +100,18 @@ jobs:
           python tools/mt5_demo_tick_collector.py --minutes 30 --output-dir session-artifacts
           if ($LASTEXITCODE -ne 0) { throw "DEMO tick collection or integrity audit failed." }
 
+      - name: Capture read-only DEMO execution-cost observations
+        shell: pwsh
+        env:
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
+          MT5_TERMINAL: ${{ env.MT5_TERMINAL }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          python tools/mt5_xauusd_demo_execution_cost_collector.py --days 365 --output-dir session-artifacts/execution-cost-evidence
+          if ($LASTEXITCODE -ne 0) { throw "Read-only DEMO execution-cost evidence capture failed." }
+
       - name: Stop temporary MT5 terminal
         if: always()
         shell: pwsh
