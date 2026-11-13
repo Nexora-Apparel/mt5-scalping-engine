@@ -37,6 +37,7 @@ private:
    string m_daily_lock_name;
    string m_loss_streak_name;
    string m_cooldown_name;
+   string m_state_checksum_name;
 
    bool IsXauUsdContract(const string symbol)
    {
@@ -73,11 +74,22 @@ private:
                           ServerHash(request_id));
    }
 
+   double RiskStateChecksum(void) const
+   {
+      string serialized=StringFormat("%d|%I64d|%.17g|%d|%I64d|%I64d",
+                                     (m_emergency_stop ? 1 : 0),
+                                     m_server_day_key,m_day_start_equity,
+                                     (m_daily_loss_locked ? 1 : 0),
+                                     m_consecutive_losses,m_cooldown_until_msc);
+      return (double)(ServerHash(serialized)%9007199254740991);
+   }
+
    bool PersistRiskState(void)
    {
       if(m_emergency_key=="" || m_day_key_name=="" ||
          m_day_equity_name=="" || m_daily_lock_name=="" ||
-         m_loss_streak_name=="" || m_cooldown_name=="")
+         m_loss_streak_name=="" || m_cooldown_name=="" ||
+         m_state_checksum_name=="")
          return false;
       if(GlobalVariableSet(m_emergency_key,(m_emergency_stop ? 1.0 : 0.0))==0 ||
          GlobalVariableSet(m_day_key_name,(double)m_server_day_key)==0 ||
@@ -85,6 +97,10 @@ private:
          GlobalVariableSet(m_daily_lock_name,(m_daily_loss_locked ? 1.0 : 0.0))==0 ||
          GlobalVariableSet(m_loss_streak_name,(double)m_consecutive_losses)==0 ||
          GlobalVariableSet(m_cooldown_name,(double)m_cooldown_until_msc)==0)
+         return false;
+      // Commit marker is written last. A crash or partial write is detected
+      // as a checksum mismatch on the next initialization.
+      if(GlobalVariableSet(m_state_checksum_name,RiskStateChecksum())==0)
          return false;
       GlobalVariablesFlush();
       return true;
@@ -106,6 +122,7 @@ public:
       m_daily_lock_name="";
       m_loss_streak_name="";
       m_cooldown_name="";
+      m_state_checksum_name="";
    }
 
    bool Init(const VxRiskControlConfig &config,string &reason)
@@ -141,19 +158,22 @@ public:
       m_daily_lock_name="VX_LOCK_"+suffix;
       m_loss_streak_name="VX_LS_"+suffix;
       m_cooldown_name="VX_CD_"+suffix;
+      m_state_checksum_name="VX_CSUM_"+suffix;
       if(StringLen(m_emergency_key)>63 || StringLen(m_day_key_name)>63 ||
          StringLen(m_day_equity_name)>63 || StringLen(m_daily_lock_name)>63 ||
-         StringLen(m_loss_streak_name)>63 || StringLen(m_cooldown_name)>63)
+         StringLen(m_loss_streak_name)>63 || StringLen(m_cooldown_name)>63 ||
+         StringLen(m_state_checksum_name)>63)
       { reason="Risk-state persistence key is invalid"; return false; }
 
-      string keys[6];
+      string keys[7];
       keys[0]=m_emergency_key; keys[1]=m_day_key_name;
       keys[2]=m_day_equity_name; keys[3]=m_daily_lock_name;
       keys[4]=m_loss_streak_name; keys[5]=m_cooldown_name;
+      keys[6]=m_state_checksum_name;
       int present=0;
-      for(int i=0;i<6;i++)
+      for(int i=0;i<7;i++)
          if(GlobalVariableCheck(keys[i])) present++;
-      if(present!=0 && present!=6)
+      if(present!=0 && present!=7)
       { reason="Persistent risk state is incomplete; refusing to reset partial state"; return false; }
       if(present==0)
       {
@@ -182,6 +202,10 @@ public:
          m_daily_loss_locked=(daily_lock>0.5);
          m_consecutive_losses=(int)losses;
          m_cooldown_until_msc=(long)cooldown;
+         double stored_checksum=GlobalVariableGet(m_state_checksum_name);
+         if(!MathIsValidNumber(stored_checksum) ||
+            stored_checksum!=RiskStateChecksum())
+         { reason="Persistent risk-state checksum mismatch; refusing initialization"; return false; }
          if(m_consecutive_losses>=m_config.max_consecutive_losses)
             m_daily_loss_locked=true;
       }
