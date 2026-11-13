@@ -1,0 +1,94 @@
+name: Phase 6 XAUUSD candidate-generation smoke validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/mt5_xauusd_candidate_signals.py"
+      - "tools/mt5_xauusd_feature_research.py"
+      - "tools/mt5_tick_market_profile.py"
+      - "tools/mt5_xauusd_strategy_registry.py"
+      - "research/xauusd_strategy_registry_v1.json"
+      - ".github/workflows/phase6-xauusd-candidate-smoke.yml"
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  candidate-generation-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install project dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download certified Exness DEMO Session 8
+        uses: actions/download-artifact@v4
+        with:
+          name: veltrix-exness-demo-ticks-8
+          run-id: 43333365050
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: data/phase6/session8
+
+      - name: Download certified Exness DEMO Session 9
+        uses: actions/download-artifact@v4
+        with:
+          name: veltrix-exness-demo-ticks-9
+          run-id: 43338046880
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: data/phase6/session9
+
+      - name: Generate candidate events from verified source ticks
+        run: |
+          python -m tools.mt5_xauusd_candidate_signals --csv data/phase6/session8/veltrix_exness_demo_ticks.csv --manifest data/phase6/session8/manifest.json --output data/phase6/session8/candidate-events.json
+          python -m tools.mt5_xauusd_candidate_signals --csv data/phase6/session9/veltrix_exness_demo_ticks.csv --manifest data/phase6/session9/manifest.json --output data/phase6/session9/candidate-events.json
+
+      - name: Assert research-only and holdout safeguards
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          required = {
+              "XAU_MOMENTUM_CONTINUATION_V1",
+              "XAU_MEAN_REVERSION_V1",
+              "XAU_VOLATILITY_BREAKOUT_V1",
+          }
+          for session in ("session8", "session9"):
+              result = json.loads(Path(f"data/phase6/{session}/candidate-events.json").read_text())
+              assert result["status"] == "PASS"
+              assert result["research_only"] is True
+              assert result["canonical_symbol"] == "XAUUSD"
+              assert result["data_role"] == "DEVELOPMENT_ONLY"
+              assert result["final_holdout_eligible"] is False
+              assert set(result["candidate_event_counts"]) == required
+              assert sum(result["candidate_event_counts"].values()) == result["candidate_event_count"]
+              for event in result["events"]:
+                  assert event["research_only"] is True
+                  assert event["execution_authorized"] is False
+                  assert event["event_origin"] == "CANDIDATE_RESEARCH_SIGNAL_NOT_TRADE"
+                  assert event["candidate_id"] in required
+                  assert event["horizon_seconds"] in [5, 15, 30, 60]
+                  assert "gross_pnl_price_units" not in event
+                  assert "net_after_commission" not in event
+          PY
+
+      - name: Upload Phase 6 candidate-generation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase6-xauusd-candidate-smoke-${{ github.run_id }}
+          path: data/phase6/
+          if-no-files-found: error
+          retention-days: 90
