@@ -38,8 +38,8 @@
 
 7. **Risk engine and DEMO safety controls — IN PROGRESS**
    - Implement risk-based sizing, maximum exposure, protective stops, loss limits, cooldowns, duplicate-order protection, emergency stop, and reconciliation.
-   - Current implementation: `RiskControls.mqh` adds exact DEMO login/server and XAUUSD contract checks, hard risk ceilings (0.25% per trade, 0.50% aggregate, 1.00% daily equity loss), one-position policy, daily lock, verified-close loss streak/cooldown, duplicate request IDs, and a latched emergency stop. `ExecutionGuard.mqh` now independently requires exact DEMO identity and verified XAUUSD metadata before its non-submitting preflight. See `docs/PHASE7_DEMO_RISK_CONTROLS.md`.
-   - Remaining gates: tests and compile on final PR head; independent review of persistent emergency-stop/deduplication state and broker runtime behavior. No order path is wired or authorized.
+   - Current implementation: `RiskControls.mqh` adds exact DEMO login/server and XAUUSD contract checks, hard risk ceilings (0.25% per trade, 0.50% aggregate, 1.00% daily equity loss), one-position policy, daily lock, verified-close loss streak/cooldown, duplicate request IDs, and an emergency-stop latch persisted in terminal Global Variables. `ExecutionGuard.mqh` now independently requires exact DEMO identity and verified XAUUSD metadata before its non-submitting preflight. See `docs/PHASE7_DEMO_RISK_CONTROLS.md`.
+   - Remaining gates: tests and compile on final PR head; controlled MT5 restart test of emergency-stop persistence; durable loss-streak and request-deduplication state; independent review of broker runtime behavior. No order path is wired or authorized.
 
 8. **Chronological walk-forward and robustness evaluation**
    - Use time-ordered train/validation/test partitions, untouched holdouts, multiple sessions/dates, cost sensitivity, and benchmark comparisons.
