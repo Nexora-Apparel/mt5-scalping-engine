@@ -42,3 +42,12 @@ def test_artifact_intake_rejects_duplicate_session_ids():
 def test_artifact_intake_cannot_open_holdout_partition():
     with pytest.raises(ArtifactIntakeError, match="sealed"):
         validate_session_map({"sessions": []}, PLAN, stage="holdout")
+def test_phase8_intake_workflow_is_manual_read_only_and_validation_only():
+    workflow = (ROOT / ".github/workflows/xauusd-walk-forward-validation.yml").read_text(encoding="utf-8")
+    assert "workflow_dispatch:" in workflow
+    assert "schedule:" not in workflow
+    assert "permissions:" in workflow and "actions: read" in workflow and "contents: read" in workflow
+    assert "--stage validation" in workflow
+    assert "veltrix-xauusd-walk-forward-validation" in workflow
+    assert "XAGUSD" not in workflow
+    assert "OrderSend(" not in workflow
