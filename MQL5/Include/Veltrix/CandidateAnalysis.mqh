@@ -254,7 +254,8 @@ public:
       if(MathAbs(z)<standardized_threshold)
       { reason="Momentum threshold not met"; signal.reason=reason; return true; }
       SetSignal(signal,windows[current_index],evaluation_time_msc,
-                (z>0.0 ? VX_SIGNAL_LONG : VX_SIGNAL_SHORT),z,
+                (z>0.0 ? VX_SIGNAL_LONG : VX_SIGNAL_SHORT),lookback_seconds,
+                standardized_threshold,0.0,z,
                 "Research candidate only; not an execution instruction");
       reason="";
       return true;
@@ -294,7 +295,8 @@ public:
       if(MathAbs(z)<standardized_threshold)
       { reason="Mean-reversion threshold not met"; signal.reason=reason; return true; }
       SetSignal(signal,windows[current_index],evaluation_time_msc,
-                (z>0.0 ? VX_SIGNAL_SHORT : VX_SIGNAL_LONG),MathAbs(z),
+                (z>0.0 ? VX_SIGNAL_SHORT : VX_SIGNAL_LONG),lookback_seconds,
+                standardized_threshold,0.0,MathAbs(z),
                 "Research candidate only; not an execution instruction");
       reason="";
       return true;
@@ -354,9 +356,11 @@ public:
       double required=distance_fraction*scale;
       if(long_distance>=required)
          SetSignal(signal,windows[current_index],evaluation_time_msc,VX_SIGNAL_LONG,
+                   lookback_seconds,distance_fraction,compression_percentile,
                    long_distance/scale,"Research candidate only; not an execution instruction");
       else if(short_distance>=required)
          SetSignal(signal,windows[current_index],evaluation_time_msc,VX_SIGNAL_SHORT,
+                   lookback_seconds,distance_fraction,compression_percentile,
                    short_distance/scale,"Research candidate only; not an execution instruction");
       else
       { reason="Breakout distance threshold not met"; signal.reason=reason; return true; }
