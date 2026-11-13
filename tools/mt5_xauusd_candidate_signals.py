@@ -152,7 +152,8 @@ def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]
     rows, width, window_starts_ms = _validate_features(features)
     # The final observed bucket cannot be proven complete from a closed CSV: only a later bucket
     # proves that the prior five-second interval has ended. Never signal on the last row.
-    completed_count = max(0, len(rows) - 1)\n    events: list[dict[str, Any]] = []\n    counts = {item["candidate_id"]: 0 for item in registry["candidates"]}
+    completed_count = max(0, len(rows) - 1)
+    events: list[dict[str, Any]] = []\n    counts = {item["candidate_id"]: 0 for item in registry["candidates"]}
     horizons = registry["evaluation"]["holding_horizons_seconds"]
 
     for candidate in registry["candidates"]:
