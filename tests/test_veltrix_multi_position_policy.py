@@ -1,0 +1,69 @@
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+ALLOCATOR = ROOT / "MQL5/Include/Veltrix/RiskAllocator.mqh"
+CONTROLS = ROOT / "MQL5/Include/Veltrix/RiskControls.mqh"
+REGISTRY = ROOT / "MQL5/Include/Veltrix/PositionRegistry.mqh"
+GUARD = ROOT / "MQL5/Include/Veltrix/ExecutionGuard.mqh"
+POLICY = ROOT / "docs/XAUUSD_MULTI_POSITION_SCALPING_V1.md"
+
+
+def test_risk_allocator_has_no_simultaneous_position_count_ceiling():
+    source = ALLOCATOR.read_text(encoding="utf-8")
+    assert "int    open_positions;" in source
+    assert "int    max_positions;" not in source
+    assert "request.open_positions>=request.max_positions" not in source
+    assert "Position count is intentionally uncapped" in source
+    assert "current_open_risk_money" in source
+    assert "max_portfolio_risk_percent" in source
+    assert "MathFloor" in source
+
+
+def test_risk_controls_no_longer_require_exactly_one_position():
+    source = CONTROLS.read_text(encoding="utf-8")
+    assert "max_positions" not in source
+    assert "config.max_positions!=1" not in source
+    assert "no simultaneous-position count limit" in source
+
+
+def test_position_registry_tracks_independent_scalp_lifecycles():
+    source = REGISTRY.read_text(encoding="utf-8")
+    assert "RegisterConfirmedOpen" in source
+    assert "m_records[]" in source
+    assert "hold_seconds<10 || hold_seconds>60" in source
+    assert "EvaluateCloseDeadlines" in source
+    assert "ConfirmClosed" in source
+
+
+def test_broker_margin_and_hedging_constraints_remain_mandatory():
+    source = GUARD.read_text(encoding="utf-8")
+    assert "ACCOUNT_MARGIN_MODE_RETAIL_HEDGING" in source
+    assert "OrderCalcMargin" in source
+    assert "ACCOUNT_MARGIN_FREE" in source
+    assert "margin_reserve_money" in source
+    assert "SYMBOL_VOLUME_MIN" in source or "SYMBOL_VOLUME_MIN" in (ROOT / "MQL5/Include/Veltrix/MarketGuard.mqh").read_text(encoding="utf-8")
+
+
+def test_multi_position_policy_preserves_phase8_and_daily_loss_safety_boundary():
+    source = POLICY.read_text(encoding="utf-8")
+    assert "Phase 8" in source
+    assert "one open position per candidate configuration" in source
+    assert "0.50% of equity" in source
+    assert "1.00% daily equity loss" in source
+    assert "50-60%" in source
+    assert "No daily minimum trade count" in source
+    assert "No fixed simultaneous-position count ceiling" in source
+
+
+def test_future_execution_apis_remain_absent_from_risk_components():
+    paths = (
+        ALLOCATOR,
+        CONTROLS,
+        REGISTRY,
+        GUARD,
+    )
+    forbidden = ("ordersend(", "ordersendasync(", "positionopen(",
+                 "positionclose(", "positionmodify(", "ctrade")
+    for path in paths:
+        lowered = path.read_text(encoding="utf-8").lower()
+        assert not [token for token in forbidden if token in lowered], path
