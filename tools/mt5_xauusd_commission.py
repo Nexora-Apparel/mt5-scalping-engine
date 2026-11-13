@@ -154,6 +154,11 @@ def validate_commission_evidence(
     except (OSError, ValueError, TypeError, json.JSONDecodeError, InvalidSignature) as exc:
         raise CommissionEvidenceError("review attestation signature or encoding is invalid") from exc
 
+    for required_text in ("reviewer_identity", "reviewer_organization", "reviewer_role", "reviewed_at_utc", "independence_statement"):
+        value = attestation.get(required_text)
+        if not isinstance(value, str) or not value.strip():
+            raise CommissionEvidenceError(f"review attestation {required_text} is required")
+
     expected_fields = {
         "schema": "VELTRIX_COMMISSION_REVIEW_ATTESTATION_V1",
         "review_status": "APPROVED",
