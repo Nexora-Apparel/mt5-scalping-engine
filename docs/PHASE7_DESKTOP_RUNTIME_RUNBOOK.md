@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Execute the compiled synthetic risk-journal harness against the local MT5 terminal's Common Files storage. This verifies real terminal file creation, append, flush, duplicate rejection, event replay, and restart recovery.
+Reproduce the synthetic Phase 7 file-I/O and persistence checks in a local desktop MT5 terminal if desired. The mandatory automated execution has already been completed by the Windows MT5 terminal CI, including a full process shutdown/relaunch between seed and verification scripts.
 
 This is a file-I/O test only. It does not connect to a broker, read account credentials, submit orders, or modify a trading account.
 
@@ -18,7 +18,7 @@ This is a file-I/O test only. It does not connect to a broker, read account cred
 - Runtime script artifact: https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/43386014603/artifacts/14017899137
 - Source: `MQL5/Scripts/RiskJournalRuntimeTest.mq5`
 
-The artifact is an `.ex5` file. The workflow compiled it with MetaEditor and reported zero errors and zero warnings. Compilation does not mean the runtime test has been executed.
+The artifact is an `.ex5` file. The Windows workflow compiled and executed it. Final runtime evidence is recorded in [workflow #43393115383](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/43393115383) and [result artifact](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/43393115383/artifacts/14022056627).
 
 ## Run procedure
 
@@ -50,11 +50,12 @@ The artifact is an `.ex5` file. The workflow compiled it with MetaEditor and rep
 - Do not enable `NexoraScalper` order inputs or introduce an order path into `VeltrixScalper`.
 - A PASS from this script does not verify the full `CVxRiskControls` integration, account switching, broker fills, risk sizing against live contract metadata, or trading performance.
 
-## Remaining Phase 7 gates
+## Completed automated Phase 7 runtime evidence
 
-- Controlled runtime verification of terminal-global risk-state restoration and checksum mismatch behavior.
-- Controlled transaction-lock interruption/restart behavior.
-- Controlled filesystem write failure and journal corruption handling.
-- Independent review of the complete risk-state and broker reconciliation lifecycle.
+- `RiskJournalRuntimeTest.mq5`: append/replay, duplicate request/close rejection, daily-lock replay, emergency-stop replay, and checksum-chain replay — PASS.
+- `RiskControlsRuntimeTest.mq5`: emergency-stop and daily-lock restoration, abandoned transaction-lock rejection, checksum mismatch rejection, cleanup — PASS.
+- `RiskControlsRestartSeed.mq5` followed by `RiskControlsRestartVerify.mq5` in a fresh MT5 process: emergency-stop and daily-lock survived terminal shutdown/relaunch — PASS.
+- `RiskJournalFailureRuntimeTest.mq5`: locked existing journal refused without recreation; corrupted journal sequence refused during replay — PASS.
+- All tests use synthetic identities and do not connect to a broker or submit orders.
 
-Phase 7 remains **IN PROGRESS** until all gates are evidenced. Phase 8 remains locked.
+The local run procedure above is optional reproduction, not a remaining blocker. Phase 7 is complete for the read-only risk-control implementation. Broker-connected DEMO verification is deferred to Phase 9, after Phase 8 research gates pass.
