@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import itertools
 import json
 import math
 import random
@@ -117,6 +118,31 @@ def _load_catalog(catalog: dict[str, Any], base_dir: Path) -> dict[str, dict[str
     return result
 
 
+def _validate_selected_configurations(selected: list[Any], registry: dict[str, Any]) -> list[dict[str, Any]]:
+    allowed_horizons = set(registry["evaluation"]["holding_horizons_seconds"])
+    candidates = {item["candidate_id"]: item for item in registry["candidates"]}
+    normalized: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in selected:
+        if not isinstance(item, dict):
+            raise WalkForwardError("each selected configuration must be an object")
+        cid, params, horizon = item.get("candidate_id"), item.get("parameters"), item.get("horizon_seconds")
+        if cid not in candidates or not isinstance(params, dict) or horizon not in allowed_horizons:
+            raise WalkForwardError("selection-freeze contains an unregistered candidate, parameter set, or horizon")
+        grid = candidates[cid]["parameter_grid"]
+        if set(params) != set(grid) or any(params[key] not in grid[key] for key in grid):
+            raise WalkForwardError("selection-freeze parameters are outside the preregistered finite grid")
+        signature = json.dumps({"candidate_id": cid, "parameters": params, "horizon_seconds": horizon},
+                               sort_keys=True, separators=(",", ":"))
+        if signature in seen:
+            raise WalkForwardError("selection-freeze contains duplicate candidate configurations")
+        seen.add(signature)
+        normalized.append({"candidate_id": cid, "parameters": params, "horizon_seconds": horizon})
+    if not normalized:
+        raise WalkForwardError("selection-freeze must contain at least one configuration")
+    return normalized
+
+
 def assess_session_catalog(
     plan: dict[str, Any],
     registry: dict[str, Any],
@@ -182,8 +208,13 @@ def assess_session_catalog(
                                     f"{item['session_id']}.collection_started_utc")
                               for sid, item in supplied.items() if sid in holdout_ids):
             raise WalkForwardError("selection-freeze timestamp must precede every final-holdout collection")
-        if _sha256(selection_freeze_path) == "":
-            raise WalkForwardError("selection-freeze file hash unavailable")
+        try:
+            on_disk_freeze = json.loads(selection_freeze_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise WalkForwardError("selection-freeze file is unreadable") from exc
+        if on_disk_freeze != selection_freeze:
+            raise WalkForwardError("selection-freeze object differs from the committed file")
+        selected_configurations = _validate_selected_configurations(selected, registry)
 
     expected_ids = set(development) | set(validation_ids)
     if stage == "holdout":
@@ -243,7 +274,8 @@ def assess_session_catalog(
         if not role_sessions:
             continue
         dates = {row["started_utc"][:10] for row in role_sessions}
-        minimum = plan["collection_requirements"][f"minimum_{role}_distinct_dates"]
+        minimum_key = "minimum_holdout_distinct_dates" if role == "final_holdout" else f"minimum_{role}_distinct_dates"
+        minimum = plan["collection_requirements"][minimum_key]
         if len(dates) < minimum:
             return {
                 "status": "BLOCKED_INSUFFICIENT_DISTINCT_DATES",
@@ -265,6 +297,8 @@ def assess_session_catalog(
         "sessions": sessions,
         "evaluation_sessions": target,
         "selection_freeze_sha256": _sha256(selection_freeze_path) if selection_freeze_path else None,
+        "selected_candidate_configurations": selected_configurations if stage == "holdout" else None,
+        "plan": plan,
         "commission_status": plan["evaluation"]["commission_status"],
         "net_performance_allowed": False,
         "research_only": True,
@@ -372,8 +406,22 @@ def evaluate_partition(ready: dict[str, Any], registry: dict[str, Any]) -> dict[
         candidate = generate_candidate_events(features, registry)
         ticks, profile = load_verified_ticks(session["csv"], session["manifest"])
         manifest = json.loads(session["manifest"].read_text(encoding="utf-8"))
-        replay = replay_events(ticks, candidate["events"], manifest, registry, source_profile=profile)
-        for event, outcome in zip(candidate["events"], replay["outcomes"]):
+        events = candidate["events"]
+        if ready["stage"] == "holdout":
+            selected_signatures = {
+                json.dumps(item, sort_keys=True, separators=(",", ":"))
+                for item in ready["selected_candidate_configurations"]
+            }
+            events = [
+                event for event in events
+                if json.dumps({
+                    "candidate_id": event["candidate_id"],
+                    "parameters": event["parameters"],
+                    "horizon_seconds": event["horizon_seconds"],
+                }, sort_keys=True, separators=(",", ":")) in selected_signatures
+            ]
+        replay = replay_events(ticks, events, manifest, registry, source_profile=profile)
+        for event, outcome in zip(events, replay["outcomes"]):
             key = _group_key(event)
             candidate_results.setdefault(key, {}).setdefault(session["session_id"], []).append(outcome)
 
@@ -398,11 +446,20 @@ def evaluate_partition(ready: dict[str, Any], registry: dict[str, Any]) -> dict[
 
     candidate_report = []
     for (candidate_id, params, horizon), by_session in sorted(candidate_results.items()):
+        summary = _summarize_group(by_session, slippage_grid)
+        required_outcomes = (
+            ready["plan"]["collection_requirements"]["minimum_holdout_outcomes_per_configuration_horizon"]
+            if ready["stage"] == "holdout"
+            else ready["plan"]["collection_requirements"]["minimum_validation_outcomes_per_configuration_horizon"]
+        )
+        observed_outcomes = summary["aggregate_cost_sensitivity"]["0"]["outcomes"]
         candidate_report.append({
             "candidate_id": candidate_id,
             "parameters": json.loads(params),
             "horizon_seconds": horizon,
-            **_summarize_group(by_session, slippage_grid),
+            **summary,
+            "minimum_outcomes_required": required_outcomes,
+            "sample_size_gate_passed": observed_outcomes >= required_outcomes,
         })
     benchmarks = []
     for (direction, horizon), by_session in sorted(benchmark_results.items()):
