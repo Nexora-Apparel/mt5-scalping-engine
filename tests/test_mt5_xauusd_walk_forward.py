@@ -112,10 +112,16 @@ def test_validation_evaluator_aggregates_candidate_and_directional_benchmarks(tm
     catalog_items = []
     manifests = {}
     hashes = {}
-    base = datetime(2026, 11, 13, tzinfo=timezone.utc)
     for index, sid in enumerate(session_ids):
-        start = base + timedelta(days=index)
-        end = start + timedelta(minutes=30)
+        if sid in development:
+            pinned = next(item for item in PLAN["development_sessions"] if item["session_id"] == sid)
+            start = datetime.fromisoformat(pinned["collection_started_utc"])
+            end = datetime.fromisoformat(pinned["collection_ended_utc"])
+            duration = pinned["duration_seconds"]
+        else:
+            start = datetime(2026, 11, 14 + index, tzinfo=timezone.utc)
+            end = start + timedelta(minutes=30)
+            duration = 1800.0
         csv_path = tmp_path / f"{sid}.csv"
         manifest_path = tmp_path / f"{sid}.json"
         csv_path.write_text("synthetic fixture only", encoding="utf-8")
@@ -133,7 +139,7 @@ def test_validation_evaluator_aggregates_candidate_and_directional_benchmarks(tm
             },
             "collection_started_utc": start.isoformat(),
             "collection_ended_utc": end.isoformat(),
-            "duration_seconds": 1800.0,
+            "duration_seconds": duration,
             "duration_clock": "monotonic",
         }
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
