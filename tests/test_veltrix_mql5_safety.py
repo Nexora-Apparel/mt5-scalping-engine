@@ -630,3 +630,24 @@ def test_phase7_reconciliation_fails_closed_on_live_symbol_mismatch():
     assert 'actual_symbol=PositionGetString(POSITION_SYMBOL)' in source
     assert 'if(live_symbol!=record.symbol)' in source
     assert "Live broker position symbol differs from registered XAUUSD contract" in source
+
+
+def test_phase7_safety_modules_and_ea_have_no_order_submission_or_modification_api():
+    paths = (
+        "MQL5/Include/Veltrix/RiskControls.mqh",
+        "MQL5/Include/Veltrix/RiskAllocator.mqh",
+        "MQL5/Include/Veltrix/ExecutionGuard.mqh",
+        "MQL5/Include/Veltrix/PositionRegistry.mqh",
+        "MQL5/Include/Veltrix/BrokerReconciler.mqh",
+        "MQL5/Include/Veltrix/ExecutionCoordinator.mqh",
+        "MQL5/Experts/VeltrixScalper.mq5",
+    )
+    forbidden = (
+        "ordersend(", "ordersendasync(", "ordercheck(",
+        "trade_action_deal", "trade_action_pending", "ctrade",
+        "positionopen(", "positionclose(", "positionmodify(",
+        "orderdelete(", "orderdeletebyticket(",
+    )
+    for relative in paths:
+        source = (ROOT / relative).read_text(encoding="utf-8").lower()
+        assert not [token for token in forbidden if token in source], relative
