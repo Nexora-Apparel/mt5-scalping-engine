@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import itertools
 import json
 import math
 import random
@@ -69,7 +68,7 @@ def validate_plan(plan: dict[str, Any], registry: dict[str, Any]) -> dict[str, A
     ids = [item.get("session_id") for item in development] + validation + holdout
     if any(not isinstance(value, str) or not value for value in ids) or len(ids) != len(set(ids)):
         raise WalkForwardError("session IDs must be globally unique")
-    expected = {item["sha256"] for item in registry["known_development_data"]["source_sha256"]}
+    expected = set(registry["known_development_data"]["source_sha256"])
     planned = {item.get("expected_sha256") for item in development}
     if planned != expected:
         raise WalkForwardError("development session hashes do not exactly match the frozen strategy registry")
@@ -132,12 +131,16 @@ def _validate_selected_configurations(selected: list[Any], registry: dict[str, A
         grid = candidates[cid]["parameter_grid"]
         if set(params) != set(grid) or any(params[key] not in grid[key] for key in grid):
             raise WalkForwardError("selection-freeze parameters are outside the preregistered finite grid")
-        signature = json.dumps({"candidate_id": cid, "parameters": params, "horizon_seconds": horizon},
+        canonical_params = {
+            key: next(value for value in grid[key] if value == params[key])
+            for key in grid
+        }
+        signature = json.dumps({"candidate_id": cid, "parameters": canonical_params, "horizon_seconds": horizon},
                                sort_keys=True, separators=(",", ":"))
         if signature in seen:
             raise WalkForwardError("selection-freeze contains duplicate candidate configurations")
         seen.add(signature)
-        normalized.append({"candidate_id": cid, "parameters": params, "horizon_seconds": horizon})
+        normalized.append({"candidate_id": cid, "parameters": canonical_params, "horizon_seconds": horizon})
     if not normalized:
         raise WalkForwardError("selection-freeze must contain at least one configuration")
     return normalized
