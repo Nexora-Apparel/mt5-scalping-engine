@@ -40,7 +40,7 @@ Copy-Item research/xauusd_walk_forward_catalog_template.json research/xauusd_wal
 python tools/mt5_xauusd_walk_forward.py --catalog research/xauusd_walk_forward_catalog.json --stage validation --output research/xauusd_validation_report.json
 ~~~
 
-Holdout command is intentionally unavailable for scoring while commission is unverified. Once commission evidence is verified and the registry/plan are updated under a new reviewed change, holdout additionally requires a selection-freeze JSON and the exact validation report whose SHA-256 is embedded in that freeze. The freeze timestamp must precede every holdout collection start, and only frozen candidate configurations are scored on holdout.
+Holdout command is intentionally unavailable for scoring while commission is unverified. Once commission evidence is verified and the registry/plan are updated under a new reviewed change, holdout additionally requires a selection-freeze JSON and the exact validation report whose SHA-256 is embedded in that freeze. The validation report and selection-freeze JSON must both be committed. The evaluator checks the Git commit timestamps, binds the exact validation report SHA-256, requires the freeze commit to follow the report commit, and requires that freeze commit to precede every holdout collection start. Only frozen candidate configurations are scored on holdout.
 
 ## Current evidence and blockers
 
