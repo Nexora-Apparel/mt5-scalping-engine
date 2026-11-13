@@ -127,7 +127,7 @@ def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]
              horizon: int, parameters: dict[str, Any], score: float) -> None:
         end_msc = row["_end_msc"]
         events.append({
-            "signal_id": _signal_id(source_sha, candidate_id, end_msc, direction, parameters),
+            "signal_id": _signal_id(source_sha, candidate_id, end_msc, direction, horizon, parameters),
             "candidate_id": candidate_id,
             "signal_window_end_msc": end_msc,
             "direction": direction,
