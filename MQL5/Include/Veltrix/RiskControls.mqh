@@ -257,11 +257,21 @@ public:
       return true;
    }
 
-   bool RecordVerifiedClose(const double net_profit,const long close_time_msc,string &reason)
+   bool RecordVerifiedClose(const ulong closing_deal_ticket,const double net_profit,
+                            const long close_time_msc,string &reason)
    {
       reason="";
-      if(!m_initialized || !MathIsValidNumber(net_profit) || close_time_msc<=0)
-      { reason="Only a verified close with finite net P/L and valid time may update loss controls"; return false; }
+      if(!m_initialized || closing_deal_ticket==0 ||
+         !MathIsValidNumber(net_profit) || close_time_msc<=0)
+      { reason="Only a unique verified closing deal with finite net P/L and valid time may update loss controls"; return false; }
+      string close_key=StringFormat("VX_CLOSE_%I64d_%I64u_%I64u",
+                                    m_config.expected_demo_login,
+                                    ServerHash(m_config.expected_demo_server),
+                                    ServerHash((string)closing_deal_ticket));
+      if(close_key=="" || StringLen(close_key)>63)
+      { reason="Closing-deal deduplication key is invalid"; return false; }
+      if(GlobalVariableCheck(close_key))
+      { reason="Duplicate verified closing deal ignored"; return false; }
       if(net_profit<0.0)
       {
          m_consecutive_losses++;
@@ -283,6 +293,14 @@ public:
          reason="Could not persist verified close risk state; emergency stop latched";
          return false;
       }
+      if(GlobalVariableSet(close_key,1.0)==0)
+      {
+         m_emergency_stop=true;
+         PersistRiskState();
+         reason="Could not persist closing-deal deduplication; emergency stop latched";
+         return false;
+      }
+      GlobalVariablesFlush();
       return true;
    }
 
