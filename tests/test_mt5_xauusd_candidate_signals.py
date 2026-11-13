@@ -185,7 +185,6 @@ def test_candidate_events_never_contain_execution_or_pnl_fields(registry):
 
 def test_missing_five_second_window_breaks_lookback_continuity(registry):
     features = make_features()
-    missing_timestamp = features["features"][9]["window_start_utc"]
     features["features"].pop(9)
     features["window_count"] = len(features["features"])
     features["source_records"] = sum(row["tick_count"] for row in features["features"])
