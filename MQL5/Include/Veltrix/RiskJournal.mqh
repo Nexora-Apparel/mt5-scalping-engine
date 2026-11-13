@@ -16,6 +16,7 @@ private:
    string m_request_keys[];
    string m_close_keys[];
    bool m_initialized;
+   bool m_created_new;
 
    ulong Hash64(const string value) const
    {
@@ -166,6 +167,7 @@ public:
       m_sequence=0;
       m_previous_hash="0";
       m_initialized=false;
+      m_created_new=false;
    }
 
    ~CVxRiskJournal(void)
@@ -181,10 +183,12 @@ public:
       { reason="Risk journal requires exact DEMO account identity"; return false; }
       if(m_handle!=INVALID_HANDLE)
          Close();
+      m_created_new=false;
       string server_material=demo_server;
       ulong server_hash=Hash64(server_material);
       m_filename=StringFormat("VELTRIX_XAUUSD_RISK_%I64d_%I64u.csv",
                               demo_login,server_hash);
+      bool file_existed=FileIsExist(m_filename,FILE_COMMON);
       m_handle=FileOpen(m_filename,FILE_READ|FILE_WRITE|FILE_CSV|FILE_ANSI|FILE_COMMON|FILE_SHARE_READ,',');
       if(m_handle==INVALID_HANDLE)
       {
@@ -194,6 +198,7 @@ public:
          { reason="Could not create account-scoped risk journal in MT5 Common Files"; return false; }
          FileFlush(create_handle);
          FileClose(create_handle);
+         m_created_new=true;
          m_handle=FileOpen(m_filename,FILE_READ|FILE_WRITE|FILE_CSV|FILE_ANSI|FILE_COMMON|FILE_SHARE_READ,',');
       }
       if(m_handle==INVALID_HANDLE)
@@ -241,6 +246,7 @@ public:
 
    long Count(void) const { return m_sequence; }
    bool IsInitialized(void) const { return m_initialized; }
+   bool WasCreatedNew(void) const { return m_created_new; }
 };
 
 #endif
