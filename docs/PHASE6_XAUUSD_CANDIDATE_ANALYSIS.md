@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Implement the three frozen Phase 4 formulas as an offline, deterministic event generator. It reads only completed five-second feature windows and produces candidate research events. It does not calculate PnL, rank candidates, place orders, or authorize execution.
+Implement the three frozen Phase 4 formulas as an offline, deterministic event generator. It first revalidates the source CSV and DEMO manifest with the verified feature builder, then reads only completed five-second feature windows and produces candidate research events. It does not calculate PnL, rank candidates, place orders, or authorize execution.
 
 ## Candidate calculations
 
@@ -19,7 +19,7 @@ Each event records candidate ID, family, signal window index/end time, direction
 ## CLI
 
 ```bash
-python -m tools.mt5_xauusd_candidate_signals --features features.json --registry research/xauusd_strategy_registry_v1.json --output candidate-events.json
+python -m tools.mt5_xauusd_candidate_signals --csv ticks.csv --manifest manifest.json --registry research/xauusd_strategy_registry_v1.json --output candidate-events.json
 ```
 
 No outcome returns, PnL, net performance, position sizing, or order data is generated. The previously inspected Sessions 8 and 9 may only be used for development smoke checks; their candidate event counts are not strategy evidence.
