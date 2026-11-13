@@ -14,6 +14,7 @@
 #include "..\\Include\\Veltrix\\BrokerReconciler.mqh"
 #include "..\\Include\\Veltrix\\ExecutionCoordinator.mqh"
 #include "..\\Include\\Veltrix\\StrategyResearch.mqh"
+#include "..\\Include\\Veltrix\\CandidateSignalResearch.mqh"
 #include "..\\Include\\Veltrix\\FeatureCollector.mqh"
 #include "..\\Include\\Veltrix\\FeatureDatasetExporter.mqh"
 #include "..\\Include\\Veltrix\\FeaturePipeline.mqh"
