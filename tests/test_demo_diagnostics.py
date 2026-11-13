@@ -18,9 +18,12 @@ def test_diagnostic_checks_demo_identity_and_connection():
     assert "ExpectedDemoServer" in source
 
 
-def test_diagnostic_checks_both_exact_metal_symbols_and_quote_integrity():
+def test_diagnostic_resolves_exact_xauusd_contract_and_quote_integrity():
     source = EA.read_text(encoding="utf-8")
-    assert 'string g_symbols[2] = {"XAUUSD", "XAGUSD"};' in source
+    assert "ResolveXauUsdSymbol" in source
+    assert 'StringSubstr(upper,0,6)!="XAUUSD"' in source
+    assert 'SYMBOL_CURRENCY_BASE' in source and 'SYMBOL_CURRENCY_PROFIT' in source
+    assert 'XAGUSD' not in source
     assert "SymbolInfoTick" in source
     assert "SYMBOL_POINT" in source
     assert "tick.time_msc" in source
