@@ -549,3 +549,27 @@ def test_phase7_risk_policy_reference_boundaries():
     daily_limit = 1.0
     assert (day_start - 990.01) / day_start * 100 < daily_limit
     assert (day_start - 990.0) / day_start * 100 >= daily_limit
+
+
+def test_phase7_sizing_and_intent_registration_recheck_live_account_and_daily_loss():
+    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    sizing = source.split("bool CalculateVolume", 1)[1].split("bool RegisterApprovedIntent", 1)[0]
+    registration = source.split("bool RegisterApprovedIntent", 1)[1].split("void LatchEmergencyStop", 1)[0]
+    assert "VerifyExactDemoAccount(guard_reason)" in sizing
+    assert "EvaluateDailyLoss(source.equity,guard_reason)" in sizing
+    assert "VerifyExactDemoAccount(reason)" in registration
+    assert "EvaluateDailyLoss(current_equity,reason)" in registration
+    assert "active_positions>=m_config.max_positions" in registration
+    assert "RequestSeen(request_id)" in registration
+
+
+def test_phase7_execution_preflight_binds_account_and_symbol_contract():
+    source = EXECUTION_SOURCE.read_text(encoding="utf-8")
+    assert "intent.expected_demo_login" in source
+    assert "intent.expected_demo_server" in source
+    assert "ACCOUNT_LOGIN" in source and "ACCOUNT_SERVER" in source
+    assert "SYMBOL_CURRENCY_BASE" in source
+    assert "SYMBOL_CURRENCY_PROFIT" in source
+    assert 'base_currency!="XAU" || profit_currency!="USD"' in source
+    assert "A protective stop loss is mandatory" in source
+    assert "OrderCalcMargin" in source
