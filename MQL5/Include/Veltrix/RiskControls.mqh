@@ -470,7 +470,6 @@ public:
       request.risk_percent=m_config.risk_per_trade_percent;
       request.max_portfolio_risk_percent=m_config.max_portfolio_risk_percent;
       request.open_positions=active_positions;
-      request.max_positions=m_config.max_positions;
       return VxCalculateRiskVolume(request,decision);
    }
 
@@ -489,8 +488,7 @@ public:
       { reason="Invalid request identity, timestamp, or position count"; return false; }
       if(!IsXauUsdContract(symbol))
       { reason="Only a verified XAUUSD contract is permitted"; return false; }
-      if(active_positions>=m_config.max_positions)
-      { reason="Maximum simultaneous position exposure reached"; return false; }
+      // active_positions is retained for exposure reporting only; there is no count ceiling.
       if(m_cooldown_until_msc>0 && now_msc<m_cooldown_until_msc)
       { reason="Post-loss cooldown is active"; return false; }
       string request_key=RequestKey(request_id);
