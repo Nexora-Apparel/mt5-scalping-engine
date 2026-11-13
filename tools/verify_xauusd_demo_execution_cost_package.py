@@ -68,6 +68,8 @@ def verify_package(package_dir: Path) -> dict[str, Any]:
         raise PackageVerificationError("account snapshot is not sanitized Exness DEMO evidence")
     if account.get("terminal_connected") is not True or account.get("terminal_trade_allowed") is not False or account.get("terminal_dlls_allowed") is not False:
         raise PackageVerificationError("terminal read-only controls are not proven by account snapshot")
+    if manifest.get("position_reference_scheme") != "PER_PACKAGE_SALTED_SHA256" or not _SHA256.fullmatch(manifest.get("position_reference_salt_sha256", "")):
+        raise PackageVerificationError("position references are not bound to a per-package secret salt")
     symbol = manifest.get("broker_symbol")
     if not isinstance(symbol, str) or not symbol or summary.get("broker_symbol") != symbol or spec.get("broker_symbol") != symbol:
         raise PackageVerificationError("broker symbol differs across package components")
