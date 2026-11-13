@@ -243,6 +243,22 @@ jobs:
           }
           if (!(Test-Path (Join-Path (Split-Path $source) "RiskControlsRestartVerify.ex5"))) { throw "Restart-verification EX5 artifact missing." }
 
+      - name: Compile risk journal storage-failure runtime test
+        shell: pwsh
+        run: |
+          $source = (Resolve-Path "MQL5\\Scripts\\RiskJournalFailureRuntimeTest.mq5").Path
+          $log = Join-Path (Split-Path $source) "RiskJournalFailureRuntimeTest.log"
+          if (Test-Path $log) { Remove-Item $log -Force }
+          Start-Process -FilePath $env:METAEDITOR -ArgumentList @('/compile:"' + $source + '"', '/log') -Wait | Out-Null
+          Start-Sleep -Seconds 2
+          if (!(Test-Path $log)) { throw "MetaEditor did not produce the journal-failure compilation log." }
+          $logText = Get-Content $log -Raw
+          Get-Content $log
+          if ($logText -match "(?i)\\b[1-9]\\d* errors?\\b" -or $logText -notmatch "(?i)0 errors?" -or $logText -match "(?i)\\b[1-9]\\d* warnings?\\b") {
+            throw "Journal-failure script did not compile with zero errors and warnings."
+          }
+          if (!(Test-Path (Join-Path (Split-Path $source) "RiskJournalFailureRuntimeTest.ex5"))) { throw "Journal-failure EX5 artifact missing." }
+
       - name: Execute terminal-side risk runtime tests
         shell: pwsh
         timeout-minutes: 8
@@ -258,6 +274,7 @@ jobs:
           Copy-Item "MQL5\\Scripts\\RiskControlsRuntimeTest.ex5" $scriptDirectory -Force
           Copy-Item "MQL5\\Scripts\\RiskControlsRestartSeed.ex5" $scriptDirectory -Force
           Copy-Item "MQL5\\Scripts\\RiskControlsRestartVerify.ex5" $scriptDirectory -Force
+          Copy-Item "MQL5\\Scripts\\RiskJournalFailureRuntimeTest.ex5" $scriptDirectory -Force
 
           function Invoke-Mt5RuntimeScript([string]$scriptName, [string]$resultName) {
             $resultPath = Join-Path $installPath ("MQL5\\Files\\" + $resultName)
@@ -299,6 +316,7 @@ jobs:
                     Copy-Item "MQL5\\Scripts\\RiskControlsRuntimeTest.ex5" $dataScripts -Force
                     Copy-Item "MQL5\\Scripts\\RiskControlsRestartSeed.ex5" $dataScripts -Force
                     Copy-Item "MQL5\\Scripts\\RiskControlsRestartVerify.ex5" $dataScripts -Force
+                    Copy-Item "MQL5\\Scripts\\RiskJournalFailureRuntimeTest.ex5" $dataScripts -Force
                   }
                 }
               }
@@ -356,6 +374,7 @@ jobs:
           Invoke-Mt5RuntimeScript "RiskControlsRuntimeTest" "veltrix_risk_controls_runtime_test.result"
           Invoke-Mt5RuntimeScript "RiskControlsRestartSeed" "veltrix_risk_restart_seed.result"
           Invoke-Mt5RuntimeScript "RiskControlsRestartVerify" "veltrix_risk_restart_verify.result"
+          Invoke-Mt5RuntimeScript "RiskJournalFailureRuntimeTest" "veltrix_risk_journal_failure_test.result"
 
       - name: Upload terminal-side risk runtime results
         if: always()
@@ -367,6 +386,7 @@ jobs:
             C:\\MT5\\MQL5\\Files\\veltrix_risk_controls_runtime_test.result
             C:\\MT5\\MQL5\\Files\\veltrix_risk_restart_seed.result
             C:\\MT5\\MQL5\\Files\\veltrix_risk_restart_verify.result
+            C:\\MT5\\MQL5\\Files\\veltrix_risk_journal_failure_test.result
           if-no-files-found: warn
           retention-days: 30
 
