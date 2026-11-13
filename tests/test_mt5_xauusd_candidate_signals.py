@@ -85,10 +85,10 @@ def test_future_window_mutation_cannot_change_earlier_signals():
         row["mid_low"] *= 1.2
     first = generate_candidate_events(original, registry())
     second = generate_candidate_events(mutated, registry())
-    first_early = [e for e in first["events"] if e["feature_window_start_msc"] <=
-                   first["events"][0]["feature_window_start_msc"] + cutoff * 5000]
-    second_early = [e for e in second["events"] if e["feature_window_start_msc"] <=
-                    second["events"][0]["feature_window_start_msc"] + cutoff * 5000]
+    start_msc = int(datetime.fromisoformat(original["features"][0]["window_start_utc"]).timestamp() * 1000)
+    cutoff_end = start_msc + (cutoff + 1) * 5000
+    first_early = [e for e in first["events"] if e["feature_window_start_msc"] < cutoff_end]
+    second_early = [e for e in second["events"] if e["feature_window_start_msc"] < cutoff_end]
     assert first_early == second_early
 
 
