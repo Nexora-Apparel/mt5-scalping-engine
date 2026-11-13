@@ -232,6 +232,13 @@ public:
          m_created_new=true;
          m_handle=FileOpen(m_filename,FILE_READ|FILE_WRITE|FILE_CSV|FILE_ANSI|FILE_COMMON|FILE_SHARE_READ,',');
       }
+      else if(!file_existed)
+      {
+         // FILE_WRITE may create the file during the first READ|WRITE open.
+         // Record that fact here; otherwise risk controls misclassify a new,
+         // empty journal as an old journal with missing persistent state.
+         m_created_new=true;
+      }
       if(m_handle==INVALID_HANDLE)
       { reason="Could not open account-scoped risk journal"; return false; }
       if(!Replay(reason))

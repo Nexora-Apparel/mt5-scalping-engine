@@ -232,9 +232,16 @@ jobs:
             $configText = @"
           [Common]
           Login=0
-          Symbol=EURUSD
-          Period=M1
+
+          [Experts]
+          Enabled=1
+          AllowLiveTrading=0
+          AllowDllImport=0
+
+          [StartUp]
           Script=$scriptName
+          Symbol=XAUUSD
+          Period=M1
           ShutdownTerminal=1
           "@
             $configText | Set-Content -Path $ini -Encoding ASCII
