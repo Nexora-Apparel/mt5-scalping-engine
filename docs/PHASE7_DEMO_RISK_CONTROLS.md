@@ -8,7 +8,7 @@ Implementation is in progress on `feature/phase7-demo-risk-controls`. The module
 
 - `RiskAllocator.mqh`: finite-input validation, loss-side tick economics, portfolio capacity, broker volume-step rounding down, and skip-below-minimum behavior.
 - `RiskControls.mqh`: exact DEMO login/server verification; broker-metadata-confirmed XAUUSD contract restriction; hard risk ceilings; daily equity-loss lock; verified-close loss streak and cooldown; one-position limit; duplicate request-ID and verified closing-deal deduplication persisted in MT5 terminal Global Variables; daily baseline, daily lock, consecutive-loss count, cooldown, and emergency-stop latch are also restored from account/server-scoped terminal Global Variables.
-- `ExecutionGuard.mqh`: independent DEMO preflight requiring exact configured login/server, verified XAUUSD base/profit currencies, fresh quote, spread limit, broker-valid volume, mandatory protective stop, stop-distance compliance, margin estimate, and free-margin reserve. It returns a decision only.
+- `ExecutionGuard.mqh`: independent DEMO preflight requiring exact configured login/server, verified XAUUSD base/profit currencies, fresh quote, spread limit, broker-valid volume, mandatory protective stop, broker tick-size alignment for SL/TP, stop-distance compliance, margin estimate, and free-margin reserve. It returns a decision only.
 - `PositionRegistry.mqh`: per-position lifecycle, hold deadlines, unknown-state handling, and close confirmation only after broker-history evidence.
 - `BrokerReconciler.mqh`: read-only position/deal reconciliation; partial exit history, missing history, volume mismatch, or missing protection are not treated as clean closure.
 - `ExecutionCoordinator.mqh`: request lifecycle and duplicate-deal accounting; unknown broker outcomes remain blocked until reconciled. It contains no broker submission call.
@@ -67,7 +67,7 @@ The current VELTRIX EA only includes the module for compilation. No risk-control
 
 - [ ] Python regression tests pass on final commit.
 - [ ] MQL5 compile passes with zero errors and zero warnings.
-- [ ] Risk policy tests cover invalid numeric inputs, account mismatch, symbol mismatch, stop/margin preflight, daily-loss lock, cooldown, loss streak, duplicate request, and emergency-stop latch.
+- [ ] Risk policy tests cover invalid numeric inputs, account mismatch, symbol mismatch, stop/tick-size/margin preflight, daily-loss lock, cooldown, loss streak, duplicate request, and emergency-stop latch.
 - [ ] Static scan confirms no order submission/modification/closure APIs in the VELTRIX risk modules or EA.
 - [ ] Controlled MT5 runtime test confirms emergency-stop persistence and restoration across terminal restart.
 - [ ] Independent review confirms all state persistence and restart behavior before any future DEMO execution.
