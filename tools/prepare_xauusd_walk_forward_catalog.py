@@ -145,6 +145,11 @@ def download_session_artifacts(
             shutil.copy2(csv_path, final_csv)
         if manifest_path != final_manifest:
             shutil.copy2(manifest_path, final_manifest)
+        for child in list(final_dir.iterdir()):
+            if child.is_dir():
+                shutil.rmtree(child)
+            elif child.name not in {final_csv.name, final_manifest.name}:
+                child.unlink()
         catalog_items.append({
             "session_id": sid,
             "csv": f"xauusd_sessions/{sid}/veltrix_exness_demo_ticks.csv",
