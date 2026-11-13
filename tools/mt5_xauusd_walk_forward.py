@@ -72,6 +72,15 @@ def validate_plan(plan: dict[str, Any], registry: dict[str, Any]) -> dict[str, A
     planned = {item.get("expected_sha256") for item in development}
     if planned != expected:
         raise WalkForwardError("development session hashes do not exactly match the frozen strategy registry")
+    for item in development:
+        for field in ("expected_sha256", "expected_manifest_sha256"):
+            digest = item.get(field)
+            if not isinstance(digest, str) or len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest.lower()):
+                raise WalkForwardError(f"{item['session_id']}: {field} must be a 64-character SHA-256")
+        if isinstance(item.get("workflow_run_id"), bool) or not isinstance(item.get("workflow_run_id"), int) or item["workflow_run_id"] <= 0:
+            raise WalkForwardError(f"{item['session_id']}: workflow_run_id must be positive")
+        if isinstance(item.get("artifact_id"), bool) or not isinstance(item.get("artifact_id"), int) or item["artifact_id"] <= 0:
+            raise WalkForwardError(f"{item['session_id']}: artifact_id must be positive")
     requirements = plan.get("collection_requirements", {})
     if requirements.get("purge_seconds_at_partition_boundaries") != 120:
         raise WalkForwardError("partition purge must cover the frozen 60-second lookback plus 60-second horizon")
