@@ -434,10 +434,34 @@ def _session_cluster_ci(session_means: list[float]) -> dict[str, float | None]:
     }
 
 
-def _summarize_group(outcomes_by_session: dict[str, list[dict[str, Any]]], slippage_grid: list[int]) -> dict[str, Any]:
+def _apply_verified_commission(outcome: dict[str, Any], verified: dict[str, Any]) -> None:
+    """Attach round-turn commission to every replay slippage scenario exactly once."""
+    if outcome.get("status") != "OUTCOME_AVAILABLE":
+        return
+    entry_price = outcome.get("entry_executable_price")
+    if isinstance(entry_price, bool) or not isinstance(entry_price, (int, float)) or not math.isfinite(entry_price) or entry_price <= 0:
+        raise WalkForwardError("commission evaluation requires a valid executable entry price")
+    for scenario in outcome.get("slippage_sensitivity", []):
+        scenario["net_after_commission_bps"] = net_return_bps(
+            scenario["return_before_commission_bps"],
+            verified,
+            entry_price_usd_per_oz=float(entry_price),
+            lot_size=1.0,
+        )
+    outcome["commission_status"] = "VERIFIED_FROM_EXNESS_ACCOUNT_SCHEDULE"
+
+
+def _summarize_group(
+    outcomes_by_session: dict[str, list[dict[str, Any]]],
+    slippage_grid: list[int],
+    *,
+    commission_verified: bool = False,
+) -> dict[str, Any]:
     sessions = {}
     all_returns: dict[int, list[float]] = {points: [] for points in slippage_grid}
     session_means: dict[int, list[float]] = {points: [] for points in slippage_grid}
+    all_net_returns: dict[int, list[float]] = {points: [] for points in slippage_grid}
+    session_net_means: dict[int, list[float]] = {points: [] for points in slippage_grid}
     total_skipped = 0
     total_timeouts = 0
     for sid, outcomes in sorted(outcomes_by_session.items()):
@@ -466,17 +490,30 @@ def _summarize_group(outcomes_by_session: dict[str, list[dict[str, Any]]], slipp
         scenario = {}
         for points in slippage_grid:
             returns = []
+            net_returns = []
             for outcome in accepted:
                 item = next(x for x in outcome["slippage_sensitivity"] if x["slippage_points_per_side"] == points)
                 returns.append(float(item["return_before_commission_bps"]))
+                if commission_verified:
+                    net_value = item.get("net_after_commission_bps")
+                    if isinstance(net_value, bool) or not isinstance(net_value, (int, float)) or not math.isfinite(net_value):
+                        raise WalkForwardError("verified commission is missing from an available replay outcome")
+                    net_returns.append(float(net_value))
             all_returns[points].extend(returns)
             if returns:
                 session_means[points].append(statistics.mean(returns))
+            if commission_verified:
+                all_net_returns[points].extend(net_returns)
+                if net_returns:
+                    session_net_means[points].append(statistics.mean(net_returns))
             scenario[str(points)] = {
                 "outcomes": len(returns),
                 "mean_return_before_commission_bps": round(statistics.mean(returns), 8) if returns else None,
                 "median_return_before_commission_bps": round(statistics.median(returns), 8) if returns else None,
                 "win_rate_before_commission": round(sum(value > 0 for value in returns) / len(returns), 8) if returns else None,
+                "mean_net_after_commission_bps": round(statistics.mean(net_returns), 8) if net_returns else None,
+                "median_net_after_commission_bps": round(statistics.median(net_returns), 8) if net_returns else None,
+                "win_rate_after_commission": round(sum(value > 0 for value in net_returns) / len(net_returns), 8) if net_returns else None,
             }
         sessions[sid] = {
             "available_outcomes_after_single_position_filter": len(accepted),
@@ -484,29 +521,46 @@ def _summarize_group(outcomes_by_session: dict[str, list[dict[str, Any]]], slipp
             "cost_sensitivity": scenario,
         }
     aggregate = {}
+    net_aggregate = {}
     for points in slippage_grid:
         values = all_returns[points]
+        net_values = all_net_returns[points]
         aggregate[str(points)] = {
             "outcomes": len(values),
             "mean_return_before_commission_bps": round(statistics.mean(values), 8) if values else None,
             "median_return_before_commission_bps": round(statistics.median(values), 8) if values else None,
             "win_rate_before_commission": round(sum(value > 0 for value in values) / len(values), 8) if values else None,
             "session_clustered_mean_ci_95": _session_cluster_ci(session_means[points]),
+            "mean_net_after_commission_bps": round(statistics.mean(net_values), 8) if net_values else None,
+            "median_net_after_commission_bps": round(statistics.median(net_values), 8) if net_values else None,
+            "win_rate_after_commission": round(sum(value > 0 for value in net_values) / len(net_values), 8) if net_values else None,
+            "session_clustered_net_mean_ci_95": _session_cluster_ci(session_net_means[points]) if commission_verified else {"lower_95": None, "upper_95": None},
         }
+        if commission_verified:
+            net_aggregate[str(points)] = {
+                "outcomes": len(net_values),
+                "mean_net_after_commission_bps": aggregate[str(points)]["mean_net_after_commission_bps"],
+                "session_clustered_net_mean_ci_95": aggregate[str(points)]["session_clustered_net_mean_ci_95"],
+            }
     return {
         "sessions": sessions,
         "aggregate_cost_sensitivity": aggregate,
-        "commission_status": "UNVERIFIED_REQUIRED_INPUT",
-        "net_after_commission": None,
+        "commission_status": "VERIFIED_FROM_EXNESS_ACCOUNT_SCHEDULE" if commission_verified else "UNVERIFIED_REQUIRED_INPUT",
+        "net_after_commission": net_aggregate if commission_verified else None,
         "candidate_approval": "NOT_APPROVED",
         "total_timeouts": total_timeouts,
         "total_skipped": total_skipped,
     }
 
 
-def evaluate_partition(ready: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any]:
+def evaluate_partition(
+    ready: dict[str, Any],
+    registry: dict[str, Any],
+    verified_commission: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     if ready.get("status") != "READY_FOR_RESEARCH_EVALUATION":
         return ready
+    commission_verified = verified_commission is not None
     slippage_grid = registry["evaluation"]["additional_costs"]["slippage_sensitivity_points_per_side"]
     candidate_results: dict[tuple[str, str, int], dict[str, list[dict[str, Any]]]] = {}
     benchmark_results: dict[tuple[str, int], dict[str, list[dict[str, Any]]]] = {}
@@ -531,11 +585,13 @@ def evaluate_partition(ready: dict[str, Any], registry: dict[str, Any]) -> dict[
             ]
         replay = replay_events(ticks, events, manifest, registry, source_profile=profile)
         for event, outcome in zip(events, replay["outcomes"]):
+            if commission_verified:
+                _apply_verified_commission(outcome, verified_commission)
             key = _group_key(event)
             candidate_results.setdefault(key, {}).setdefault(session["session_id"], []).append(outcome)
 
         # Directional benchmarks use the same completed windows, quote convention,
-        # horizon, slippage grid, and one-position constraint as candidates.
+        # horizon, slippage grid, commission, and one-position constraint as candidates.
         for index, row in enumerate(features["features"][:-1]):
             stamp = int(datetime.fromisoformat(row["window_start_utc"].replace("Z", "+00:00")).timestamp() * 1000) + 5000
             for horizon in registry["evaluation"]["holding_horizons_seconds"]:
@@ -551,11 +607,13 @@ def evaluate_partition(ready: dict[str, Any], registry: dict[str, Any]) -> dict[
                                              slippage_grid=slippage_grid,
                                              entry_max_wait_ms=registry["evaluation"]["entry_max_wait_seconds"] * 1000,
                                              exit_tolerance_ms=2000)
+                    if commission_verified:
+                        _apply_verified_commission(outcome, verified_commission)
                     benchmark_results.setdefault((direction, horizon), {}).setdefault(session["session_id"], []).append(outcome)
 
     candidate_report = []
     for (candidate_id, params, horizon), by_session in sorted(candidate_results.items()):
-        summary = _summarize_group(by_session, slippage_grid)
+        summary = _summarize_group(by_session, slippage_grid, commission_verified=commission_verified)
         required_outcomes = (
             ready["plan"]["collection_requirements"]["minimum_holdout_outcomes_per_configuration_horizon"]
             if ready["stage"] == "holdout"
@@ -569,13 +627,14 @@ def evaluate_partition(ready: dict[str, Any], registry: dict[str, Any]) -> dict[
             **summary,
             "minimum_outcomes_required": required_outcomes,
             "sample_size_gate_passed": observed_outcomes >= required_outcomes,
+            "net_validation_gate_passed": False,
         })
     benchmarks = []
     for (direction, horizon), by_session in sorted(benchmark_results.items()):
         benchmarks.append({
             "benchmark": "ALWAYS_" + direction.upper(),
             "horizon_seconds": horizon,
-            **_summarize_group(by_session, slippage_grid),
+            **_summarize_group(by_session, slippage_grid, commission_verified=commission_verified),
         })
     benchmark_lookup = {
         (item["benchmark"], item["horizon_seconds"]): item
@@ -590,10 +649,16 @@ def evaluate_partition(ready: dict[str, Any], registry: dict[str, Any]) -> dict[
                 for sid, row in candidate["sessions"].items()
                 if row["cost_sensitivity"][scenario_key]["mean_return_before_commission_bps"] is not None
             }
+            candidate_net_means = {
+                sid: row["cost_sensitivity"][scenario_key]["mean_net_after_commission_bps"]
+                for sid, row in candidate["sessions"].items()
+                if row["cost_sensitivity"][scenario_key]["mean_net_after_commission_bps"] is not None
+            }
             comparisons = {}
             for baseline_name in ("NO_TRADE", "ALWAYS_LONG", "ALWAYS_SHORT"):
                 if baseline_name == "NO_TRADE":
                     baseline_means = {sid: 0.0 for sid in candidate_means}
+                    baseline_net_means = {sid: 0.0 for sid in candidate_net_means}
                 else:
                     baseline = benchmark_lookup.get((baseline_name, candidate["horizon_seconds"]))
                     baseline_means = {} if baseline is None else {
@@ -601,19 +666,68 @@ def evaluate_partition(ready: dict[str, Any], registry: dict[str, Any]) -> dict[
                         for sid, row in baseline["sessions"].items()
                         if row["cost_sensitivity"][scenario_key]["mean_return_before_commission_bps"] is not None
                     }
+                    baseline_net_means = {} if baseline is None else {
+                        sid: row["cost_sensitivity"][scenario_key]["mean_net_after_commission_bps"]
+                        for sid, row in baseline["sessions"].items()
+                        if row["cost_sensitivity"][scenario_key]["mean_net_after_commission_bps"] is not None
+                    }
                 common = sorted(set(candidate_means) & set(baseline_means))
                 differences = [candidate_means[sid] - baseline_means[sid] for sid in common]
                 ci = _session_cluster_ci(differences)
-                comparisons[baseline_name] = {
+                comparison = {
                     "sessions_compared": len(common),
                     "mean_difference_before_commission_bps": round(statistics.mean(differences), 8) if differences else None,
                     "session_clustered_difference_ci_95": ci,
                     "gross_after_slippage_outperformance": bool(ci["lower_95"] is not None and ci["lower_95"] > 0),
-                    "net_comparison_status": "BLOCKED_COMMISSION_UNVERIFIED",
+                    "net_comparison_status": "VERIFIED" if commission_verified else "BLOCKED_COMMISSION_UNVERIFIED",
+                    "net_outperformance": False,
+                    "mean_difference_after_commission_bps": None,
+                    "session_clustered_net_difference_ci_95": {"lower_95": None, "upper_95": None},
                 }
+                if commission_verified:
+                    net_common = sorted(set(candidate_net_means) & set(baseline_net_means))
+                    net_differences = [candidate_net_means[sid] - baseline_net_means[sid] for sid in net_common]
+                    net_ci = _session_cluster_ci(net_differences)
+                    comparison.update({
+                        "net_sessions_compared": len(net_common),
+                        "mean_difference_after_commission_bps": round(statistics.mean(net_differences), 8) if net_differences else None,
+                        "session_clustered_net_difference_ci_95": net_ci,
+                        "net_outperformance": bool(net_ci["lower_95"] is not None and net_ci["lower_95"] > 0),
+                    })
+                comparisons[baseline_name] = comparison
             relative[scenario_key] = comparisons
         candidate["relative_benchmark_comparison"] = relative
+        if commission_verified and ready["stage"] == "validation":
+            scenario_passes = []
+            for points in slippage_grid:
+                key = str(points)
+                aggregate = candidate["aggregate_cost_sensitivity"][key]
+                ci = aggregate["session_clustered_net_mean_ci_95"]
+                positive_mean = aggregate["mean_net_after_commission_bps"] is not None and aggregate["mean_net_after_commission_bps"] > 0
+                positive_ci = ci["lower_95"] is not None and ci["lower_95"] > 0
+                benchmark_passes = all(
+                    relative[key][name]["net_outperformance"]
+                    for name in ("NO_TRADE", "ALWAYS_LONG", "ALWAYS_SHORT")
+                )
+                scenario_passes.append(positive_mean and positive_ci and benchmark_passes)
+            candidate["net_validation_gate_passed"] = bool(scenario_passes and all(scenario_passes))
+            if candidate["sample_size_gate_passed"] and candidate["net_validation_gate_passed"]:
+                candidate["candidate_approval"] = "VALIDATION_ELIGIBLE_FOR_HOLDOUT"
 
+    evidence_summary = None
+    if commission_verified:
+        evidence_summary = {
+            "status": verified_commission["status"],
+            "broker_symbol": verified_commission["broker_symbol"],
+            "account_mode": verified_commission["account_mode"],
+            "contract_size_oz_per_lot": verified_commission["contract_size_oz_per_lot"],
+            "commission_usd_per_lot_per_side": verified_commission["commission_usd_per_lot_per_side"],
+            "source_sha256": verified_commission["source_sha256"],
+            "source_reference": verified_commission["source_reference"],
+            "verification_reference": verified_commission["verification_reference"],
+            "effective_from_utc": verified_commission["effective_from_utc"],
+            "effective_to_utc": verified_commission["effective_to_utc"],
+        }
     return {
         "status": "RESEARCH_EVALUATION_COMPLETE",
         "stage": ready["stage"],
@@ -626,19 +740,25 @@ def evaluate_partition(ready: dict[str, Any], registry: dict[str, Any]) -> dict[
         ],
         "candidate_results": candidate_report,
         "benchmarks": benchmarks,
-        "no_trade_benchmark": {"mean_return_before_commission_bps": 0.0, "net_after_commission": None},
-        "commission_status": "UNVERIFIED_REQUIRED_INPUT",
-        "net_performance_allowed": False,
-        "holdout_eligible": ready["stage"] == "holdout",
+        "no_trade_benchmark": {
+            "mean_return_before_commission_bps": 0.0,
+            "mean_net_after_commission_bps": 0.0 if commission_verified else None,
+        },
+        "commission_status": "VERIFIED_FROM_EXNESS_ACCOUNT_SCHEDULE" if commission_verified else "UNVERIFIED_REQUIRED_INPUT",
+        "commission_evidence": evidence_summary,
+        "net_performance_allowed": commission_verified,
+        "holdout_eligible": ready["stage"] == "holdout" and commission_verified,
         "candidate_approval": "NOT_APPROVED",
         "limitations": [
             "All outcomes are theoretical bid/ask quote marks, not broker fills.",
-            "Spread is included once; slippage is sensitivity only; commission is unverified and net P/L remains null.",
+            "Spread is included once; slippage is a sensitivity assumption, not measured execution slippage.",
             "Each candidate configuration is simulated with at most one open position; unresolved exit timeouts block later signals in that session.",
             "Confidence intervals resample independent session clusters, not overlapping tick rows.",
+            "Net validation eligibility requires positive net mean, positive session-clustered 95% lower bound, and outperformance versus all three registered benchmarks at every registered slippage level.",
             "Research completion does not approve a candidate or authorize execution.",
-        ],
+        ] + ([] if commission_verified else ["Commission is unverified; net P/L remains null and no candidate can be validation-eligible."]),
     }
+
 
 
 def run_walk_forward(
