@@ -241,12 +241,20 @@ def collect_evidence(
         (output_dir / "round_trip_cost_summary.json").write_text(
             json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         files = {}
-        for path in sorted(output_dir.iterdir()):
-            if path.is_file() and path.name != "manifest.json":
-                files[path.name] = {
-                    "bytes": path.stat().st_size,
-                    "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-                }
+        package_files = (
+            "broker_account_snapshot.json",
+            "symbol_spec_snapshot.json",
+            "demo_deals_sanitized.csv",
+            "round_trip_cost_summary.json",
+        )
+        for name in package_files:
+            path = output_dir / name
+            if not path.is_file():
+                raise DiagnosticFailure(f"required execution-cost package file is missing: {name}")
+            files[name] = {
+                "bytes": path.stat().st_size,
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            }
         manifest = {
             "schema": "VELTRIX_XAUUSD_DEMO_EXECUTION_COST_PACKAGE_V1",
             "status": summary["status"],
