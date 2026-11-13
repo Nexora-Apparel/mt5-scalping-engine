@@ -260,10 +260,21 @@ public:
          if(!MathIsValidNumber(stored_checksum) ||
             stored_checksum!=RiskStateChecksum())
          { reason="Persistent risk-state checksum mismatch; refusing initialization"; return false; }
-         if(m_consecutive_losses>=m_config.max_consecutive_losses)
-            m_daily_loss_locked=true;
       }
       bool journal_state_changed=false;
+      if(m_consecutive_losses>=m_config.max_consecutive_losses &&
+         !m_daily_loss_locked)
+      {
+         m_daily_loss_locked=true;
+         if(m_server_day_key>0 && !m_journal.HasDailyLock(m_server_day_key))
+         {
+            string lock_reason="";
+            if(!m_journal.AppendDailyLock(m_server_day_key,
+               (long)TimeLocal()*1000,0.0,lock_reason))
+            { reason="Consecutive-loss lock could not be restored to journal: "+lock_reason; return false; }
+         }
+         journal_state_changed=true;
+      }
       if(m_journal.HasEmergencyStop() && !m_emergency_stop)
       {
          m_emergency_stop=true;
