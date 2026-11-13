@@ -737,6 +737,26 @@ def test_phase7_risk_controls_restore_journal_locks_and_persist_loss_locks():
     assert "m_journal.AppendEmergencyStop(event_time,journal_reason)" in source
 
 
+def test_phase7_journal_failure_harness_rejects_locked_and_corrupt_existing_files():
+    source = (ROOT / "MQL5" / "Scripts" / "RiskJournalFailureRuntimeTest.mq5").read_text(encoding="utf-8")
+    assert "Existing risk journal cannot be opened" in source
+    assert "FILE_COMMON" in source
+    assert "FileWriteString(raw,\"9\")" in source
+    assert "incomplete, malformed, or out-of-sequence record" in source
+    assert "RISK JOURNAL FAILURE TEST PASS" in source
+    lowered = source.lower()
+    forbidden = ("ordersend(", "ordersendasync(", "ordercheck(", "ctrade", "trade_action_deal")
+    assert not [token for token in forbidden if token in lowered]
+
+
+def test_phase7_workflow_executes_journal_failure_harness():
+    source = (ROOT / ".github" / "workflows" / "mql5-compile.yml").read_text(encoding="utf-8")
+    assert "Compile risk journal storage-failure runtime test" in source
+    assert 'Invoke-Mt5RuntimeScript "RiskJournalFailureRuntimeTest"' in source
+    assert "RiskJournalFailureRuntimeTest.ex5" in source
+    assert "veltrix_risk_journal_failure_test.result" in source
+
+
 def test_phase7_terminal_restart_harness_uses_synthetic_identity_and_two_process_stages():
     seed = (ROOT / "MQL5" / "Scripts" / "RiskControlsRestartSeed.mq5").read_text(encoding="utf-8")
     verify = (ROOT / "MQL5" / "Scripts" / "RiskControlsRestartVerify.mq5").read_text(encoding="utf-8")
