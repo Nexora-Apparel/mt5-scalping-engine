@@ -182,7 +182,7 @@ def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]
                     direction = "short" if z > 0 else "long"
                     params = {"lookback_seconds": lookback, "standardized_displacement_threshold": threshold}
                     for horizon in horizons:
-                        events.append(_event(cid, family, rows[index], index, width, direction, horizon, params, z))
+                        events.append(_event(cid, family, rows[index], index, width, direction, horizon, params, abs(z)))
                         counts[cid] += 1
 
         elif family == "volatility_breakout":
