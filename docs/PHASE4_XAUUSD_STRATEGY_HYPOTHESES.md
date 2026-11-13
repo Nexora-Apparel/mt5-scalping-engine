@@ -14,6 +14,17 @@ This phase does not produce an approved strategy. No signals are sent to MT5, no
 
 Each candidate has a finite parameter grid and explicit direction, invalidation, and fixed-horizon exit definitions. No grid may be expanded after results are observed without a new registry version and a new untouched holdout.
 
+
+## Frozen formula definitions
+
+The machine-readable registry now carries a per-candidate `calculation_spec`; the validator rejects missing or abbreviated formulas.
+
+- **Momentum:** for lookback L, compute the log return from the current completed window close to the close L seconds earlier. Divide by the square root of the sum of squared realized-volatility values from the L/5 windows strictly preceding the current window. Direction is the sign of the standardized return.
+- **Mean reversion:** compute the arithmetic mean of the preceding L/5 completed-window closes. Standardize the current close's log displacement from that reference by the same past-only volatility scale. Direction is opposite the displacement.
+- **Breakout:** form the prior high/low from the preceding L/5 windows. Compute the compression threshold from the selected percentile of the most recent 60 prior rolling-range observations. Confirm a break only after the current window closes beyond the prior boundary by the registered fraction of the past-only volatility scale. The 60-observation compression history must be complete.
+
+The current completed window is used only for the current signal observation. It is never included in its own trailing normalization, reference mean, prior range, or compression percentile. Any unavailable or zero volatility scale suppresses the signal.
+
 ## Quote-crossed outcome convention
 
 - Long entry uses Ask; long exit uses Bid.
