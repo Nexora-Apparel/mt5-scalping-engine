@@ -133,6 +133,10 @@ def download_session_artifacts(
         digest = _sha256(csv_path)
         if manifest.get("sha256") != digest:
             raise ArtifactIntakeError(f"{sid}: CSV hash does not match the artifact manifest")
+        if manifest.get("status") != "PASS" or manifest.get("data_audit_status") != "PASS":
+            raise ArtifactIntakeError(f"{sid}: collection or data-audit status is not PASS")
+        if manifest.get("duration_clock") != "monotonic" or float(manifest.get("duration_seconds", 0)) < plan["collection_requirements"]["minimum_session_duration_seconds"]:
+            raise ArtifactIntakeError(f"{sid}: session is shorter than the preregistered minimum or lacks monotonic duration")
         if manifest.get("account_mode") != "DEMO" or manifest.get("trading_enabled") is not False or manifest.get("dll_imports_enabled") is not False:
             raise ArtifactIntakeError(f"{sid}: manifest is not read-only DEMO")
         if set(manifest.get("symbols", {})) != {"XAUUSD"} or set(manifest.get("instrument_specs", {})) != {"XAUUSD"}:
