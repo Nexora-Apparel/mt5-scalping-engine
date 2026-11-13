@@ -101,7 +101,7 @@ def build_features(
             "spread_points_max": round(max(spreads), 6),
             "max_intertick_gap_ms": max(gaps, default=0),
             "gaps_over_1s": sum(gap > 1000 for gap in gaps),
-            "quote_change_ratio": round(
+            "mid_price_change_ratio": round(
                 sum(a != b for a, b in zip(mids, mids[1:])) / max(len(mids) - 1, 1), 6
             ),
         })
