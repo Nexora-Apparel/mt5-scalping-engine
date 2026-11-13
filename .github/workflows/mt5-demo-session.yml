@@ -1,5 +1,5 @@
-name: VELTRIX bounded Exness demo data session
-run-name: VELTRIX ${{ inputs.symbol }} demo session (${{ inputs.session_minutes }} min)
+name: VELTRIX bounded Exness XAUUSD DEMO data session
+run-name: VELTRIX XAUUSD-only demo session (${{ inputs.session_minutes }} min)
 
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ on:
         type: choice
         required: true
         default: XAUUSD
-        options: [XAUUSD, XAGUSD]
+        options: [XAUUSD]
       session_minutes:
         description: Collection duration
         type: choice

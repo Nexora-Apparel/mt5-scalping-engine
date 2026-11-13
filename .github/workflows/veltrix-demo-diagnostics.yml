@@ -1,5 +1,5 @@
-name: VELTRIX read-only Exness demo diagnostics
-run-name: VELTRIX read-only DEMO diagnostics (XAUUSD + XAGUSD)
+name: VELTRIX read-only Exness XAUUSD DEMO diagnostics
+run-name: VELTRIX read-only XAUUSD DEMO diagnostics
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   demo-diagnostics:
-    name: Verify DEMO account and metal quotes (no trading)
+    name: Verify DEMO account and XAUUSD quote (no trading)
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
@@ -156,7 +156,7 @@ jobs:
               if ($failure) { throw "Read-only DEMO diagnostic reported a failed account or quote guard." }
               throw "Read-only DEMO diagnostic did not complete within five minutes."
             }
-            Write-Host "SUCCESS: DEMO account identity and five consecutive fresh quote samples for both XAUUSD and XAGUSD were verified."
+            Write-Host "SUCCESS: DEMO account identity and five consecutive fresh quote samples for the verified XAUUSD contract were verified."
           }
           finally {
             if ($proc -and !$proc.HasExited) {

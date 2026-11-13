@@ -49,3 +49,18 @@ def test_legacy_ea_is_also_locked_to_verified_gold_contract():
     legacy = (ROOT / "MQL5/Experts/NexoraScalper.mq5").read_text()
     assert 'StringSubstr(normalized_symbol, 0, 6) != "XAUUSD"' in legacy
     assert 'base_currency != "XAU" || profit_currency != "USD"' in legacy
+
+def test_active_demo_workflows_and_diagnostic_ea_are_xauusd_only():
+    diagnostic = (ROOT / "MQL5/Experts/VeltrixDemoDiagnostics.mq5").read_text()
+    bounded = (ROOT / ".github/workflows/mt5-demo-session.yml").read_text()
+    readonly = (ROOT / ".github/workflows/veltrix-demo-diagnostics.yml").read_text()
+    assert 'string g_symbol = "";' in diagnostic
+    assert 'StringSubstr(upper,0,6)!="XAUUSD"' in diagnostic
+    assert "ResolveXauUsdSymbol" in diagnostic
+    assert "SYMBOL_CURRENCY_BASE" in diagnostic and "SYMBOL_CURRENCY_PROFIT" in diagnostic
+    assert "XAGUSD" not in diagnostic
+    assert "options: [XAUUSD]" in bounded and "XAGUSD" not in bounded
+    assert "XAUUSD-only" in bounded
+    assert "XAGUSD" not in readonly
+    assert "XAUUSD" in readonly and "DEMO diagnostics" in readonly
+
