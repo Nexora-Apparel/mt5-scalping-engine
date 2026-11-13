@@ -92,3 +92,12 @@ def test_walk_forward_tool_is_research_only_and_has_no_order_api_calls():
     assert "final_holdout" in source
     assert "session_clustered_mean_ci_95" in source
     assert "net_after_commission" in source
+
+def test_repository_catalog_template_produces_a_blocked_validation_report():
+    catalog = json.loads(
+        (ROOT / "research/xauusd_walk_forward_catalog_template.json").read_text(encoding="utf-8")
+    )
+    result = run_walk_forward(PLAN, REGISTRY, catalog, stage="validation", base_dir=ROOT)
+    assert result["status"] == "BLOCKED_INSUFFICIENT_DATA"
+    assert result["candidate_scoring_performed"] is False
+    assert len(result["missing_session_ids"]) == 6
