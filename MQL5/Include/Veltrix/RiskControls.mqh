@@ -320,8 +320,8 @@ public:
       // A cooldown and emergency stop deliberately survive a day boundary.
       if(!PersistRiskState())
       {
-         m_emergency_stop=true;
-         PersistRiskState();
+         string latch_reason="";
+         LatchPersistentEmergencyStop((long)TimeLocal()*1000,latch_reason);
          reason="Could not persist new server-day risk baseline; emergency stop latched";
          return false;
       }
@@ -495,15 +495,15 @@ public:
       }
       if(!m_journal.AppendRequest(request_key,now_msc,reason))
       {
-         m_emergency_stop=true;
-         PersistRiskState();
+         string latch_reason="";
+         LatchPersistentEmergencyStop(now_msc,latch_reason);
          reason="Request journal append failed; risk transaction remains locked for manual reconciliation";
          return false;
       }
       if(!ReleaseRiskStateLock(now_msc))
       {
-         m_emergency_stop=true;
-         PersistRiskState();
+         string latch_reason="";
+         LatchPersistentEmergencyStop(now_msc,latch_reason);
          reason="Could not release request journal transaction lock; manual reconciliation required";
          return false;
       }
