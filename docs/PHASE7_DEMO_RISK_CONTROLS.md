@@ -2,7 +2,7 @@
 
 ## Status
 
-Implementation is in progress on `feature/phase7-demo-risk-controls`. The module is deliberately a local risk-policy layer and does not submit, modify, or close orders. Phase 7 is not complete until final Python tests, MQL5 compilation, and safety review pass.
+**COMPLETE — 13 November 2026.** The module remains a local risk-policy layer and does not submit, modify, or close orders. The owner reviewed and accepted the personal-use implementation; the owner reports a colleague also reviewed it outside GitHub. Final CI passed 199 Python tests, nine MQL5 compilation targets with zero errors/warnings, and five Windows MT5 synthetic runtime harnesses. See the evidence below. Phase 7 completion certifies the read-only safety-control implementation, not broker fills or trading performance.
 
 ## Components
 
@@ -59,19 +59,26 @@ The current VELTRIX EA only includes the module for compilation. No risk-control
 
 - The module does not infer the server-day key or starting equity; the caller must obtain both from a verified broker session and preserve the baseline for the day.
 - Daily equity loss includes floating P/L but does not replace reconciliation of commissions, swaps, fees, deposits, withdrawals, or broker corrections.
-- Daily baseline, daily lock, consecutive-loss count, cooldown, and emergency-stop state are persisted in terminal Global Variables. Request-ID and closing-deal deduplication are replayed from the append-only journal. A checksum commit marker detects partial risk-state writes and makes initialization fail closed on mismatch. A transaction lock serializes verified-close accounting across EA instances; a nonzero lock after a crash is deliberately not auto-cleared. This storage behavior still requires controlled MT5 runtime/restart and forced-write-failure testing. A terminal-side synthetic journal harness is provided at `MQL5/Scripts/RiskJournalRuntimeTest.mq5` and is compiled by the MQL5 workflow; compilation alone does not execute its file-I/O assertions. The journal is terminal-local in the MT5 Common Files area and must be backed up and retained with the account's operational records. A journaled emergency stop is permanent; a server-day lock remains active for its recorded day and does not reset early. It is not replicated to a remote database; filesystem loss or corruption requires manual reconciliation and must never trigger automatic journal recreation.
+- Daily baseline, daily lock, consecutive-loss count, cooldown, and emergency-stop state are persisted in terminal Global Variables. Request-ID and closing-deal deduplication are replayed from the append-only journal. A checksum commit marker detects partial risk-state writes and makes initialization fail closed on mismatch. A transaction lock serializes verified-close accounting across EA instances; a nonzero lock after a crash is deliberately not auto-cleared. This storage behavior was exercised in Windows MT5 runtime CI: two separate terminal processes verified emergency-stop and daily-lock persistence; an abandoned transaction lock and mismatched state checksum were rejected; a locked existing journal was not recreated or truncated; and a corrupted journal record was rejected during replay. Harnesses use synthetic identities only. This does not simulate physical disk failure or power-loss at every instruction boundary. The journal is terminal-local in the MT5 Common Files area and must be backed up and retained with the account's operational records. A journaled emergency stop is permanent; a server-day lock remains active for its recorded day and does not reset early. It is not replicated to a remote database; filesystem loss or corruption requires manual reconciliation and must never trigger automatic journal recreation.
 - Position registry/reconciler provide primitives, not a complete durable transaction journal.
 - The existing EA is not authorized to execute. Compilation and static tests do not prove runtime broker behavior.
 - No live/real-money execution, production deployment, or scheduling is enabled.
 
-## Phase 7 completion gate
+## Phase 7 completion evidence
 
-- [ ] Python regression tests pass on final commit.
-- [ ] MQL5 compile passes with zero errors and zero warnings.
-- [ ] Static regression checks verify fail-closed branches for invalid numeric inputs, account mismatch, symbol mismatch, stop/tick-size/margin preflight, daily-loss lock, cooldown, loss streak, duplicate request, and emergency-stop latch. These checks do not substitute for runtime behavior tests.
-- [ ] Static scan confirms no order submission/modification/closure APIs in the VELTRIX risk modules or EA.
-- [ ] Run `MQL5/Scripts/RiskJournalRuntimeTest.mq5` in a desktop MT5 terminal and verify the `PASS` result sentinel for request/close deduplication, daily-lock persistence, emergency-stop persistence, and restart replay. The script uses a synthetic identity and does not connect to a broker.
-- [ ] Controlled MT5 runtime test confirms risk-state checksum restoration, transaction-lock behavior, emergency-stop persistence, and storage-failure handling across terminal restart.
-- [ ] Durable append-only risk journal passes controlled MT5 runtime tests for replay, duplicate rejection, partial-write detection, restart recovery, and filesystem-loss handling.
-- [ ] Independent review confirms all state persistence and restart behavior before any future DEMO execution.
-- [ ] No production deployment, scheduling, Telegram, or live trading.
+- [x] Python regression suite passed: 199 tests on PR #52 head.
+- [x] Nine MQL5 compilation targets passed with zero errors and zero warnings.
+- [x] Static regression checks cover invalid numeric inputs, account mismatch, XAUUSD contract mismatch, protective-stop/tick-size/margin preflight, daily-loss lock, cooldown, loss streak, duplicate request/deal handling, and emergency-stop latch.
+- [x] Static scan confirms no order submission/modification/closure APIs in the VELTRIX risk modules or EA.
+- [x] `RiskJournalRuntimeTest.mq5`: append/replay, request and close deduplication, daily-lock replay, emergency-stop replay, and checksum-chain validation passed.
+- [x] `RiskControlsRuntimeTest.mq5`: emergency-stop restore, daily-lock restore, abandoned transaction-lock rejection, checksum-mismatch rejection, and cleanup passed.
+- [x] `RiskControlsRestartSeed.mq5` and `RiskControlsRestartVerify.mq5`: emergency-stop and daily-lock survived an actual terminal process shutdown and fresh launch.
+- [x] `RiskJournalFailureRuntimeTest.mq5`: an existing journal held without sharing was rejected without recreation; a corrupted journal sequence was rejected during replay.
+- [x] Owner review accepted on 13 Nov 2026; owner reports colleague review outside GitHub.
+- [x] No production deployment, scheduling, Telegram, or live trading.
+
+**Evidence:** [PR #50](https://github.com/Nexora-Apparel/mt5-scalping-engine/pull/50), [PR #51](https://github.com/Nexora-Apparel/mt5-scalping-engine/pull/51), [PR #52](https://github.com/Nexora-Apparel/mt5-scalping-engine/pull/52), [Windows MT5 runtime workflow](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/43393115383), [runtime results artifact](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/43393115383/artifacts/14022056627).
+
+## Deferred to Phase 9
+
+- Broker-connected DEMO account identity, contract metadata, live quote, margin, and position/deal reconciliation behavior must be verified in the separately authorized DEMO forward-validation phase. No order path is currently wired. This phase does not claim fill safety or strategy profitability.
