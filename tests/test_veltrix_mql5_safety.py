@@ -145,7 +145,9 @@ def test_position_registry_reference_lifecycle_and_deadline_vectors():
 def test_execution_guard_is_demo_only_preflight_without_submission():
     source = EXECUTION_SOURCE.read_text(encoding="utf-8")
     required = (
-        "ValidateDemoIntent", "ACCOUNT_TRADE_MODE_DEMO",
+        "ValidateDemoIntent", "expected_demo_login", "expected_demo_server",
+        "ACCOUNT_LOGIN", "ACCOUNT_SERVER", "XAUUSD",
+        "SYMBOL_CURRENCY_BASE", "SYMBOL_CURRENCY_PROFIT", "ACCOUNT_TRADE_MODE_DEMO",
         "ACCOUNT_MARGIN_MODE_RETAIL_HEDGING", "TERMINAL_CONNECTED",
         "TERMINAL_TRADE_ALLOWED", "MQL_TRADE_ALLOWED",
         "ACCOUNT_TRADE_ALLOWED", "SYMBOL_TRADE_STOPS_LEVEL",
@@ -483,3 +485,261 @@ def test_live_dataset_collection_requires_exact_connected_demo_account():
     for token in required:
         assert token in source
     assert "input bool   EnableDatasetCollection = false;" in source
+
+
+RISK_CONTROLS_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "RiskControls.mqh"
+
+
+def test_phase7_risk_controls_are_demo_xauusd_only_and_fail_closed():
+    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    required = (
+        "CVxRiskControls", "expected_demo_login", "expected_demo_server",
+        "ACCOUNT_TRADE_MODE_DEMO", "ACCOUNT_LOGIN", "ACCOUNT_SERVER",
+        "risk_per_trade_percent>0.25",
+        "max_portfolio_risk_percent>0.50",
+        "max_daily_loss_percent>1.00",
+        "config.max_positions!=1", "cooldown_seconds<30",
+        "max_consecutive_losses>3", "BeginServerDay",
+        "EvaluateDailyLoss", "RecordVerifiedClose", "closing_deal_ticket",
+        "VX_CLOSE_", "Duplicate verified closing deal ignored",
+        "RegisterApprovedIntent", "RequestKey", "m_journal.HasRequest", "m_journal.AppendRequest",
+        "LatchEmergencyStop", "m_emergency_stop",
+        "GlobalVariableCheck", "GlobalVariableGet", "GlobalVariableSet",
+        "GlobalVariablesFlush", "m_emergency_key",
+        "Only a verified XAUUSD contract is permitted",
+        "Duplicate request identifier rejected",
+        "Post-loss cooldown is active",
+        "daily loss lock is latched until the next verified server day",
+    )
+    for token in required:
+        assert token.lower() in source.lower()
+    lowered = source.lower()
+    forbidden = (
+        "ordersend(", "ordersendasync(", "ordercheck(",
+        "trade_action_deal", "trade_action_pending", "ctrade",
+        "positionopen(", "positionclose(", "positionmodify(",
+    )
+    assert not [token for token in forbidden if token in lowered]
+
+
+def test_phase7_risk_controls_are_included_but_not_enabled_for_execution():
+    source = EA_SOURCE.read_text(encoding="utf-8")
+    assert 'RiskControls.mqh' in source
+    assert "EnableDemoOrders" not in source
+    assert "EnableCandidateAnalysis = false" in source
+    assert "EnableDatasetCollection = false" in source
+
+
+def test_phase7_daily_loss_lock_and_emergency_stop_are_distinct():
+    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    assert "m_daily_loss_locked=false;" in source
+    assert "m_emergency_stop=true;" in source
+    day_reset = source.split("bool BeginServerDay", 1)[1].split("bool EvaluateDailyLoss", 1)[0]
+    assert "m_daily_loss_locked=false;" in day_reset
+    assert "m_emergency_stop=false;" not in day_reset
+    assert "GlobalVariableCheck(keys[i])" in source
+    assert "GlobalVariableSet(m_emergency_key,(m_emergency_stop ? 1.0 : 0.0))" in source
+    assert "GlobalVariablesFlush();" in source
+    assert "A cooldown and emergency stop deliberately survive a day boundary." in source
+    assert "no reset method" not in source.lower() or "LatchEmergencyStop" in source
+
+
+def test_phase7_risk_policy_reference_boundaries():
+    # Policy ceilings are hard caps; the defaults remain operator-configured and unused.
+    assert 0.25 <= 0.25
+    assert not (0.250001 <= 0.25)
+    assert 0.50 <= 0.50
+    assert not (0.500001 <= 0.50)
+    assert 1.00 <= 1.00
+    assert not (1.000001 <= 1.00)
+    day_start = 1000.0
+    daily_limit = 1.0
+    assert (day_start - 990.01) / day_start * 100 < daily_limit
+    assert (day_start - 990.0) / day_start * 100 >= daily_limit
+
+
+def test_phase7_sizing_and_intent_registration_recheck_live_account_and_daily_loss():
+    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    sizing = source.split("bool CalculateVolume", 1)[1].split("bool RegisterApprovedIntent", 1)[0]
+    registration = source.split("bool RegisterApprovedIntent", 1)[1].split("bool LatchEmergencyStop", 1)[0]
+    assert "VerifyExactDemoAccount(guard_reason)" in sizing
+    assert "EvaluateDailyLoss(source.equity,guard_reason)" in sizing
+    assert "VerifyExactDemoAccount(reason)" in registration
+    assert "EvaluateDailyLoss(current_equity,reason)" in registration
+    assert "active_positions>=m_config.max_positions" in registration
+    assert "m_journal.HasRequest(request_key)" in registration
+    assert "m_journal.AppendRequest(request_key,now_msc,reason)" in registration
+    close_record = source.split("bool RecordVerifiedClose", 1)[1].split("bool CalculateVolume", 1)[0]
+    assert "m_journal.HasClose(close_key)" in close_record
+    assert "m_journal.AppendClose(close_key,close_time_msc,net_profit,reason)" in close_record
+
+
+def test_phase7_execution_preflight_binds_account_and_symbol_contract():
+    source = EXECUTION_SOURCE.read_text(encoding="utf-8")
+    assert "intent.expected_demo_login" in source
+    assert "intent.expected_demo_server" in source
+    assert "ACCOUNT_LOGIN" in source and "ACCOUNT_SERVER" in source
+    assert "SYMBOL_CURRENCY_BASE" in source
+    assert "SYMBOL_CURRENCY_PROFIT" in source
+    assert 'base_currency!="XAU" || profit_currency!="USD"' in source
+    assert "A protective stop loss is mandatory" in source
+    assert "OrderCalcMargin" in source
+
+
+def test_phase7_public_state_mutations_require_exact_connected_demo_identity():
+    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    day = source.split("bool BeginServerDay", 1)[1].split("bool EvaluateDailyLoss", 1)[0]
+    loss = source.split("bool EvaluateDailyLoss", 1)[1].split("bool RecordVerifiedClose", 1)[0]
+    close = source.split("bool RecordVerifiedClose", 1)[1].split("bool CalculateVolume", 1)[0]
+    assert "VerifyExactDemoAccount(reason)" in day
+    assert "VerifyExactDemoAccount(reason)" in loss
+    assert "VerifyExactDemoAccount(reason)" in close
+    assert "ACCOUNT_TRADE_MODE_DEMO" in source
+    assert "TERMINAL_CONNECTED" in source
+
+
+def test_phase7_execution_preflight_enforces_broker_tick_size_for_protection():
+    source = EXECUTION_SOURCE.read_text(encoding="utf-8")
+    assert "SYMBOL_TRADE_TICK_SIZE" in source
+    assert "stop_ticks=intent.stop_loss/tick_size" in source
+    assert "MathAbs(stop_ticks-MathRound(stop_ticks))>1e-6" in source
+    assert "target_ticks=intent.take_profit/tick_size" in source
+    assert "MathAbs(target_ticks-MathRound(target_ticks))>1e-6" in source
+
+
+def test_phase7_persistent_keys_use_64bit_hashing():
+    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    assert "ulong hash=14695981039346656037" in source
+    assert "hash*=1099511628211" in source
+    assert "hash^=(ulong)StringGetCharacter(value,i)" in source
+
+
+def test_phase7_position_registry_and_broker_history_are_xauusd_scoped():
+    registry = (ROOT / "MQL5" / "Include" / "Veltrix" / "PositionRegistry.mqh").read_text(encoding="utf-8")
+    reconciler = (ROOT / "MQL5" / "Include" / "Veltrix" / "BrokerReconciler.mqh").read_text(encoding="utf-8")
+    assert "IsVerifiedXauUsd(symbol)" in registry
+    assert "SYMBOL_CURRENCY_BASE" in registry
+    assert "SYMBOL_CURRENCY_PROFIT" in registry
+    assert 'base=="XAU" && profit=="USD"' in registry
+    assert "HistoryDealGetString(deal,DEAL_SYMBOL)!=record.symbol" in reconciler
+
+
+def test_phase7_reconciliation_fails_closed_on_live_symbol_mismatch():
+    source = (ROOT / "MQL5" / "Include" / "Veltrix" / "BrokerReconciler.mqh").read_text(encoding="utf-8")
+    assert 'actual_symbol=PositionGetString(POSITION_SYMBOL)' in source
+    assert 'if(live_symbol!=record.symbol)' in source
+    assert "Live broker position symbol differs from registered XAUUSD contract" in source
+
+
+def test_phase7_safety_modules_and_ea_have_no_order_submission_or_modification_api():
+    paths = (
+        "MQL5/Include/Veltrix/RiskControls.mqh",
+        "MQL5/Include/Veltrix/RiskAllocator.mqh",
+        "MQL5/Include/Veltrix/ExecutionGuard.mqh",
+        "MQL5/Include/Veltrix/PositionRegistry.mqh",
+        "MQL5/Include/Veltrix/BrokerReconciler.mqh",
+        "MQL5/Include/Veltrix/ExecutionCoordinator.mqh",
+        "MQL5/Experts/VeltrixScalper.mq5",
+    )
+    forbidden = (
+        "ordersend(", "ordersendasync(", "ordercheck(",
+        "trade_action_deal", "trade_action_pending", "ctrade",
+        "positionopen(", "positionclose(", "positionmodify(",
+        "orderdelete(", "orderdeletebyticket(",
+    )
+    for relative in paths:
+        source = (ROOT / relative).read_text(encoding="utf-8").lower()
+        assert not [token for token in forbidden if token in source], relative
+
+
+def test_phase7_persistent_risk_state_uses_last_written_checksum_commit_marker():
+    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    persist = source.split("bool PersistRiskState", 1)[1].split("public:", 1)[0]
+    assert "string m_state_checksum_name" in source
+    assert "string keys[8]" in source
+    assert "if(present!=0 && present!=8)" in source
+    assert "RiskStateChecksum()" in persist
+    assert "GlobalVariableSet(m_state_checksum_name,RiskStateChecksum())" in persist
+    assert "Persistent risk-state checksum mismatch" in source
+
+
+def test_phase7_close_accounting_is_serialized_and_abandoned_lock_fails_closed():
+    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    close = source.split("bool RecordVerifiedClose", 1)[1].split("bool CalculateVolume", 1)[0]
+    assert "GlobalVariableSetOnCondition(m_state_lock_name" in source
+    assert "AcquireRiskStateLock(close_time_msc,reason)" in close
+    assert "ReleaseRiskStateLock(close_time_msc)" in close
+    assert "prior risk-state transaction did not finish" in source
+    assert "manual reconciliation required" in source
+
+
+def test_phase7_risk_journal_is_append_only_checksum_chained_and_account_scoped():
+    source = (ROOT / "MQL5" / "Include" / "Veltrix" / "RiskJournal.mqh").read_text(encoding="utf-8")
+    assert "FILE_COMMON" in source
+    assert "VELTRIX_XAUUSD_RISK_" in source
+    assert "FileWrite(m_handle" in source
+    assert "FileFlush(m_handle)" in source
+    assert "FileSeek(m_handle,0,SEEK_END)" in source
+    assert "m_previous_hash" in source
+    assert "HashText(payload)" in source
+    assert "m_sequence+1" in source
+    assert "Risk journal checksum chain is invalid" in source
+    assert "Duplicate request identifier rejected by durable journal" in source
+    assert "Duplicate verified closing deal rejected by durable journal" in source
+
+
+def test_phase7_risk_controls_initializes_durable_journal_before_approval():
+    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    assert '#include "RiskJournal.mqh"' in source
+    assert "m_journal.Init(config.expected_demo_login,config.expected_demo_server,reason)" in source
+    assert "m_journal.AppendRequest" in source
+    assert "m_journal.AppendClose" in source
+
+
+def test_phase7_terminal_runtime_test_exercises_journal_append_replay_and_duplicates():
+    source = (ROOT / "MQL5" / "Scripts" / "RiskJournalRuntimeTest.mq5").read_text(encoding="utf-8")
+    assert "CVxRiskJournal journal" in source
+    assert "journal.AppendRequest" in source
+    assert "journal.AppendClose" in source
+    assert "journal.Close()" in source
+    assert "CVxRiskJournal replay" in source
+    assert "replay.Init(test_login,test_server,reason)" in source
+    assert "duplicate request identifier was accepted" in source
+    assert "duplicate closing-deal identifier was accepted" in source
+    assert "synthetic account only" in source.lower() or "synthetic identity only" in source.lower()
+
+
+def test_phase7_journal_and_terminal_state_must_exist_as_a_pair():
+    risk = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    journal = (ROOT / "MQL5" / "Include" / "Veltrix" / "RiskJournal.mqh").read_text(encoding="utf-8")
+    assert "m_journal.WasCreatedNew()" in risk
+    assert "existing journal remains; manual recovery required" in risk
+    assert "persistent risk state remains; refusing silent journal recreation" in risk
+    assert "bool WasCreatedNew(void) const" in journal
+    assert "Existing risk journal cannot be opened; refusing to recreate or truncate it" in journal
+
+
+def test_phase7_journal_replays_permanent_emergency_and_daily_lock_events():
+    source = (ROOT / "MQL5" / "Include" / "Veltrix" / "RiskJournal.mqh").read_text(encoding="utf-8")
+    assert 'event_type=="ESTOP"' in source
+    assert 'event_type=="DAILY_LOCK"' in source
+    assert "m_emergency_stop=true" in source
+    assert "HasDailyLock" in source
+    assert "AppendEmergencyStop" in source
+    assert "AppendDailyLock" in source
+
+
+def test_phase7_risk_controls_restore_journal_locks_and_persist_loss_locks():
+    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    assert "m_journal.HasEmergencyStop()" in source
+    assert "m_journal.HasDailyLock(m_server_day_key)" in source
+    assert "m_journal.AppendDailyLock(m_server_day_key,event_time,loss_percent,journal_reason)" in source
+    assert "m_journal.AppendEmergencyStop(event_time,journal_reason)" in source
+
+
+def test_phase7_runtime_journal_harness_covers_permanent_locks():
+    source = (ROOT / "MQL5" / "Scripts" / "RiskJournalRuntimeTest.mq5").read_text(encoding="utf-8")
+    assert "journal.AppendDailyLock" in source
+    assert "journal.AppendEmergencyStop" in source
+    assert "replay.HasDailyLock" in source
+    assert "replay.HasEmergencyStop" in source

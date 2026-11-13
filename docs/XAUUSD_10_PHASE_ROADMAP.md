@@ -36,9 +36,10 @@
    - Evidence: PR #47 passed 172 Python tests; MQL5 compile reported 0 errors and 0 warnings across four configured targets; certified Sessions 8 and 9 passed provenance-checked candidate smoke generation (10,652 generated research events across 719 completed windows). Final partial windows were excluded. The bounded MQL5 five-second adapter is opt-in and journal-only. See `docs/PHASE6_XAUUSD_CANDIDATE_ANALYSIS.md`.
    - Limitation: live terminal runtime behavior remains untested; generated events are not trade outcomes or evidence of predictive edge. No execution authorization is implied.
 
-7. **Risk engine and DEMO safety controls**
+7. **Risk engine and DEMO safety controls — IN PROGRESS**
    - Implement risk-based sizing, maximum exposure, protective stops, loss limits, cooldowns, duplicate-order protection, emergency stop, and reconciliation.
-   - Gate: fail-closed tests and verified DEMO account/contract identity; live trading remains disabled.
+   - Current implementation: `RiskControls.mqh` adds exact DEMO login/server and XAUUSD contract checks, hard risk ceilings (0.25% per trade, 0.50% aggregate, 1.00% daily equity loss), one-position policy, daily lock, verified-close loss streak/cooldown, duplicate request IDs and closing-deal deduplication through the append-only checksum-chained `RiskJournal.mqh`, which also permanently records emergency-stop and server-day loss-lock events; account/server-scoped terminal state persists the daily baseline, daily lock, loss streak, cooldown, and emergency-stop latch, with a last-written checksum marker and persistent compare-and-set lock to serialize close accounting across EA instances. `ExecutionGuard.mqh` now independently requires exact DEMO identity and verified XAUUSD metadata before its non-submitting preflight. See `docs/PHASE7_DEMO_RISK_CONTROLS.md`.
+   - Remaining gates: tests and compile on final PR head; desktop MT5 runtime execution of `RiskJournalRuntimeTest.mq5`, controlled MT5 restart and abandoned-lock recovery, storage-failure tests, and a durable append-only risk/execution journal; independent review of broker runtime behavior. No order path is wired or authorized.
 
 8. **Chronological walk-forward and robustness evaluation**
    - Use time-ordered train/validation/test partitions, untouched holdouts, multiple sessions/dates, cost sensitivity, and benchmark comparisons.

@@ -13,6 +13,8 @@ enum ENUM_VX_INTENT_SIDE
 
 struct VxExecutionIntent
 {
+   long expected_demo_login;
+   string expected_demo_server;
    string symbol;
    ENUM_VX_INTENT_SIDE side;
    double volume;
@@ -60,7 +62,8 @@ public:
       decision.estimated_margin=0.0;
       decision.reason="";
 
-      if(intent.symbol=="" ||
+      if(intent.expected_demo_login<=0 || intent.expected_demo_server=="" ||
+         intent.symbol=="" ||
          (intent.side!=VX_SIDE_BUY && intent.side!=VX_SIDE_SELL) ||
          !MathIsValidNumber(intent.volume) || intent.volume<=0.0 ||
          !MathIsValidNumber(intent.requested_price) ||
@@ -80,6 +83,12 @@ public:
       if((ENUM_ACCOUNT_TRADE_MODE)AccountInfoInteger(ACCOUNT_TRADE_MODE)!=ACCOUNT_TRADE_MODE_DEMO)
       {
          decision.reason="Account is not a verified DEMO account";
+         return false;
+      }
+      if((long)AccountInfoInteger(ACCOUNT_LOGIN)!=intent.expected_demo_login ||
+         AccountInfoString(ACCOUNT_SERVER)!=intent.expected_demo_server)
+      {
+         decision.reason="Connected DEMO login or server does not exactly match configured identity";
          return false;
       }
 
@@ -102,6 +111,24 @@ public:
       if(!SymbolSelect(intent.symbol,true))
       {
          decision.reason="Requested broker symbol is unavailable";
+         return false;
+      }
+      string normalized_symbol=intent.symbol;
+      StringToUpper(normalized_symbol);
+      string base_currency="",profit_currency="";
+      if(StringLen(normalized_symbol)<6 ||
+         StringSubstr(normalized_symbol,0,6)!="XAUUSD" ||
+         !SymbolInfoString(intent.symbol,SYMBOL_CURRENCY_BASE,base_currency) ||
+         !SymbolInfoString(intent.symbol,SYMBOL_CURRENCY_PROFIT,profit_currency))
+      {
+         decision.reason="Only a broker-verified XAUUSD contract is permitted";
+         return false;
+      }
+      StringToUpper(base_currency);
+      StringToUpper(profit_currency);
+      if(base_currency!="XAU" || profit_currency!="USD")
+      {
+         decision.reason="Symbol metadata does not confirm XAU base and USD profit currencies";
          return false;
       }
 
@@ -143,8 +170,10 @@ public:
 
       datetime server_now=TimeTradeServer();
       double point=SymbolInfoDouble(intent.symbol,SYMBOL_POINT);
+      double tick_size=SymbolInfoDouble(intent.symbol,SYMBOL_TRADE_TICK_SIZE);
       int digits=(int)SymbolInfoInteger(intent.symbol,SYMBOL_DIGITS);
-      if(server_now<=0 || !MathIsValidNumber(point) || point<=0.0 || digits<0)
+      if(server_now<=0 || !MathIsValidNumber(point) || point<=0.0 ||
+         !MathIsValidNumber(tick_size) || tick_size<=0.0 || digits<0)
       {
          decision.reason="Broker time or symbol price precision is unavailable";
          return false;
@@ -179,6 +208,13 @@ public:
          decision.reason="A protective stop loss is mandatory";
          return false;
       }
+      double stop_ticks=intent.stop_loss/tick_size;
+      if(!MathIsValidNumber(stop_ticks) ||
+         MathAbs(stop_ticks-MathRound(stop_ticks))>1e-6)
+      {
+         decision.reason="Protective stop is not aligned to broker tick size";
+         return false;
+      }
 
       double stop_distance=(intent.side==VX_SIDE_BUY ?
                             price-intent.stop_loss :
@@ -192,12 +228,14 @@ public:
 
       if(intent.take_profit>0.0)
       {
+         double target_ticks=intent.take_profit/tick_size;
          bool valid_target=(intent.side==VX_SIDE_BUY ?
                             intent.take_profit>price :
                             intent.take_profit<price);
-         if(!valid_target)
+         if(!valid_target || !MathIsValidNumber(target_ticks) ||
+            MathAbs(target_ticks-MathRound(target_ticks))>1e-6)
          {
-            decision.reason="Take-profit is on the wrong side of the live price";
+            decision.reason="Take-profit is on the wrong side or not aligned to broker tick size";
             return false;
          }
       }
