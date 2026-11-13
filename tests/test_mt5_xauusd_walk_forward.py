@@ -59,14 +59,14 @@ def test_validation_stage_refuses_to_open_final_holdout_sessions():
         )
 
 
-def test_holdout_stage_requires_validation_selection_freeze_and_complete_partitions():
+def test_holdout_stage_stays_sealed_until_commission_is_verified():
     result = run_walk_forward(
         PLAN, REGISTRY, {"sessions": []}, stage="holdout", base_dir=ROOT
     )
-    assert result["status"] == "BLOCKED_INSUFFICIENT_DATA"
+    assert result["status"] == "BLOCKED_COMMISSION_UNVERIFIED"
     assert result["candidate_scoring_performed"] is False
-    assert "validation_01" in result["missing_session_ids"]
-    assert "holdout_01" in result["missing_session_ids"]
+    assert result["holdout_opened"] is False
+    assert result["net_performance_allowed"] is False
 
 
 def test_selection_freeze_accepts_only_registered_candidate_parameter_combinations():
