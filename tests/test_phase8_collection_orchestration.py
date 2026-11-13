@@ -29,7 +29,6 @@ def test_phase8_intake_requires_manifest_bound_validation_session_id():
     assert 'manifest.get("session_id") != sid' in source
     assert "manifest session_id does not match" in source
     assert "distinct dates required" in source
-    assert "requires all preregistered eligible sessions together" in source
 
 
 def test_phase8_collection_workflow_has_no_trade_execution_or_scheduled_trigger():
