@@ -52,10 +52,12 @@ class CVxBrokerReconciler
 private:
    VxReconcileRow m_rows[];
 
-   bool FindLivePosition(const long identifier,ulong &ticket,double &volume,
+   bool FindLivePosition(const long identifier,const string expected_symbol,
+                         string &actual_symbol,ulong &ticket,double &volume,
                          double &stop_loss,double &take_profit,
                          double &current_price,long &position_type)
    {
+      actual_symbol="";
       ticket=0;
       volume=0.0;
       stop_loss=0.0;
@@ -71,6 +73,7 @@ private:
          if(PositionGetInteger(POSITION_IDENTIFIER)!=identifier)
             continue;
 
+         actual_symbol=PositionGetString(POSITION_SYMBOL);
          ticket=candidate;
          volume=PositionGetDouble(POSITION_VOLUME);
          stop_loss=PositionGetDouble(POSITION_SL);
@@ -178,6 +181,7 @@ public:
          row.closing_deal_count=0;
          row.reason="Broker state has not yet been reconciled";
 
+         string live_symbol="";
          ulong live_ticket=0;
          double live_volume=0.0;
          double stop_loss=0.0;
@@ -185,10 +189,21 @@ public:
          double current_price=0.0;
          long position_type=-1;
 
-         if(FindLivePosition(record.identifier,live_ticket,live_volume,
-                             stop_loss,take_profit,current_price,position_type))
+         if(FindLivePosition(record.identifier,record.symbol,live_symbol,
+                             live_ticket,live_volume,stop_loss,take_profit,
+                             current_price,position_type))
          {
             row.broker_position_found=true;
+            if(live_symbol!=record.symbol)
+            {
+               row.status=VX_RECONCILE_UNKNOWN;
+               row.reason="Live broker position symbol differs from registered XAUUSD contract";
+               registry.MarkUnknown(record.identifier,row.reason);
+               summary.unknown++;
+               m_rows[row_index]=row;
+               summary.scanned++;
+               continue;
+            }
             row.broker_ticket=live_ticket;
             row.live_volume=live_volume;
             row.stop_loss=stop_loss;
