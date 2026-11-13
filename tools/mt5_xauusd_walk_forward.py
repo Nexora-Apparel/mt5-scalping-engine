@@ -771,14 +771,76 @@ def run_walk_forward(
     selection_freeze: dict[str, Any] | None = None,
     selection_freeze_path: Path | None = None,
     validation_report_path: Path | None = None,
+    commission_evidence: dict[str, Any] | None = None,
+    commission_source_artifact_path: Path | None = None,
+    commission_verification_time_utc: str | None = None,
 ) -> dict[str, Any]:
+    if stage == "holdout" and (commission_evidence is None or commission_source_artifact_path is None):
+        return {
+            "status": "BLOCKED_COMMISSION_UNVERIFIED",
+            "stage": stage,
+            "candidate_scoring_performed": False,
+            "holdout_opened": False,
+            "commission_status": "UNVERIFIED_REQUIRED_INPUT",
+            "net_performance_allowed": False,
+            "required_manual_evidence": "Applicable Exness DEMO XAUUSD commission schedule or statement, original source artifact, and independent verification record.",
+        }
+    if (commission_evidence is None) != (commission_source_artifact_path is None):
+        raise WalkForwardError("commission evidence JSON and original source artifact must be supplied together")
     ready = assess_session_catalog(plan, registry, catalog, stage=stage, base_dir=base_dir,
                                    selection_freeze=selection_freeze,
                                    selection_freeze_path=selection_freeze_path,
                                    validation_report_path=validation_report_path)
     if ready.get("status") != "READY_FOR_RESEARCH_EVALUATION":
         return ready
-    return evaluate_partition(ready, registry)
+
+    verified_commission = None
+    if commission_evidence is not None:
+        evaluation_sessions = ready["evaluation_sessions"]
+        if not evaluation_sessions:
+            raise WalkForwardError("commission validation requires at least one evaluation session")
+        specs = []
+        starts = []
+        ends = []
+        for session in evaluation_sessions:
+            manifest = json.loads(session["manifest"].read_text(encoding="utf-8"))
+            spec = manifest.get("instrument_specs", {}).get("XAUUSD", {})
+            broker_symbol = spec.get("broker_symbol")
+            contract_size = spec.get("trade_contract_size")
+            if not isinstance(broker_symbol, str) or not broker_symbol:
+                raise WalkForwardError("evaluation manifest is missing the exact broker symbol")
+            if isinstance(contract_size, bool) or not isinstance(contract_size, (int, float)) or not math.isfinite(contract_size) or contract_size <= 0:
+                raise WalkForwardError("evaluation manifest is missing a valid broker contract size")
+            if spec.get("currency_profit") != "USD":
+                raise WalkForwardError("evaluation manifest profit currency is not USD")
+            specs.append((broker_symbol, float(contract_size)))
+            starts.append(_utc(manifest.get("collection_started_utc"), "collection_started_utc"))
+            ends.append(_utc(manifest.get("collection_ended_utc"), "collection_ended_utc"))
+        if len({item[0] for item in specs}) != 1 or len({item[1] for item in specs}) != 1:
+            raise WalkForwardError("evaluation sessions do not share one stable XAUUSD broker contract")
+        broker_symbol, manifest_contract_size = specs[0]
+        try:
+            verified_commission = validate_commission_evidence(
+                commission_evidence,
+                broker_symbol=broker_symbol,
+                account_mode="DEMO",
+                evaluation_time_utc=max(ends).isoformat(),
+                evaluation_start_utc=min(starts).isoformat(),
+                evaluation_end_utc=max(ends).isoformat(),
+                verification_time_utc=commission_verification_time_utc,
+                source_artifact_path=commission_source_artifact_path,
+            )
+        except CommissionEvidenceError as exc:
+            raise WalkForwardError(f"commission evidence rejected: {exc}") from exc
+        if not math.isclose(
+            verified_commission["contract_size_oz_per_lot"],
+            manifest_contract_size,
+            rel_tol=0.0,
+            abs_tol=1e-9,
+        ):
+            raise WalkForwardError("commission evidence contract size does not match the collected XAUUSD contract")
+
+    return evaluate_partition(ready, registry, verified_commission)
 
 
 def main() -> int:
@@ -789,6 +851,9 @@ def main() -> int:
     parser.add_argument("--stage", choices=("validation", "holdout"), default="validation")
     parser.add_argument("--selection-freeze", type=Path)
     parser.add_argument("--validation-report", type=Path)
+    parser.add_argument("--commission-evidence", type=Path)
+    parser.add_argument("--commission-source-artifact", type=Path)
+    parser.add_argument("--commission-verification-time-utc")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     try:
@@ -796,11 +861,15 @@ def main() -> int:
         registry = json.loads(args.registry.read_text(encoding="utf-8"))
         catalog = json.loads(args.catalog.read_text(encoding="utf-8"))
         freeze = json.loads(args.selection_freeze.read_text(encoding="utf-8")) if args.selection_freeze else None
+        commission = json.loads(args.commission_evidence.read_text(encoding="utf-8")) if args.commission_evidence else None
         result = run_walk_forward(plan, registry, catalog, stage=args.stage,
                                   base_dir=args.catalog.parent,
                                   selection_freeze=freeze,
                                   selection_freeze_path=args.selection_freeze,
-                                  validation_report_path=args.validation_report)
+                                  validation_report_path=args.validation_report,
+                                  commission_evidence=commission,
+                                  commission_source_artifact_path=args.commission_source_artifact,
+                                  commission_verification_time_utc=args.commission_verification_time_utc)
     except (OSError, json.JSONDecodeError, ProfileError, CandidateError, RegistryError, ReplayError, WalkForwardError, KeyError, TypeError, ValueError) as exc:
         parser.exit(2, f"WALK-FORWARD FAIL: {exc}\n")
     rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
