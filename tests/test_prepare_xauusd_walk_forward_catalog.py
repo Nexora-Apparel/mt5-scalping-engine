@@ -24,6 +24,7 @@ def test_artifact_intake_accepts_only_preregistered_development_and_validation_i
     {"session_id": "XAGUSD", "run_id": 43390000001},
     {"session_id": "validation_01", "run_id": True},
     {"session_id": "validation_99", "run_id": 43390000001},
+    {"session_id": "session8", "run_id": 43333365051},
 ])
 def test_artifact_intake_rejects_unregistered_sessions_and_invalid_run_ids(item):
     with pytest.raises(ArtifactIntakeError):
