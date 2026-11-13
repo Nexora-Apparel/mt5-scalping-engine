@@ -20,6 +20,9 @@ from tools.mt5_tick_market_profile import ProfileError, profile_dataset
 from tools.mt5_xauusd_candidate_signals import CandidateError, generate_candidate_events
 from tools.mt5_xauusd_feature_research import build_features
 from tools.mt5_xauusd_strategy_registry import RegistryError, validate_registry
+from tools.mt5_xauusd_commission import (
+    CommissionEvidenceError, net_return_bps, validate_commission_evidence,
+)
 from tools.mt5_xauusd_tick_replay import (
     ReplayError, evaluate_event, load_verified_ticks, replay_events,
 )
@@ -230,19 +233,6 @@ def assess_session_catalog(
     if stage not in ("validation", "holdout"):
         raise WalkForwardError("stage must be validation or holdout")
     plan_result = validate_plan(plan, registry)
-    if stage == "holdout" and (
-        plan["evaluation"]["commission_status"] != "VERIFIED_FROM_EXNESS_ACCOUNT_SCHEDULE"
-        or plan["evaluation"].get("net_performance_allowed") is not True
-    ):
-        return {
-            "status": "BLOCKED_COMMISSION_UNVERIFIED",
-            "stage": stage,
-            "candidate_scoring_performed": False,
-            "holdout_opened": False,
-            "commission_status": plan["evaluation"]["commission_status"],
-            "net_performance_allowed": False,
-            "required_manual_evidence": "Applicable Exness DEMO commission schedule or statement, with exact per-side/per-lot charges and currency.",
-        }
     supplied = _load_catalog(catalog, base_dir)
     development = {item["session_id"]: item for item in plan["development_sessions"]}
     validation_ids = list(plan["validation_sessions"])
