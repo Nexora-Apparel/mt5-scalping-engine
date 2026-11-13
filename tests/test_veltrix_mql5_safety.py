@@ -567,10 +567,11 @@ def test_phase7_sizing_and_intent_registration_recheck_live_account_and_daily_lo
     assert "VerifyExactDemoAccount(reason)" in registration
     assert "EvaluateDailyLoss(current_equity,reason)" in registration
     assert "active_positions>=m_config.max_positions" in registration
-    assert "m_journal.HasRequest(request_key)" in registration\n    assert "m_journal.AppendRequest(request_key,now_msc,reason)" in registration
+    assert "m_journal.HasRequest(request_key)" in registration
+    assert "m_journal.AppendRequest(request_key,now_msc,reason)" in registration
     close_record = source.split("bool RecordVerifiedClose", 1)[1].split("bool CalculateVolume", 1)[0]
-    assert "GlobalVariableCheck(close_key)" in close_record
-    assert "ReservePersistentKey(close_key" in close_record
+    assert "m_journal.HasClose(close_key)" in close_record
+    assert "m_journal.AppendClose(close_key,close_time_msc,net_profit,reason)" in close_record
 
 
 def test_phase7_execution_preflight_binds_account_and_symbol_contract():
