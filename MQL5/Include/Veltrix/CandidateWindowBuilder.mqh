@@ -55,7 +55,6 @@ private:
 
    bool FinalizeCurrent(string &reason)
    {
-      m_current.completed=true;
       if(m_observations<2)
       {
          m_current.valid=false;
