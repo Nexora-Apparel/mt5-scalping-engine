@@ -59,6 +59,10 @@ def test_artifact_download_builds_catalog_from_verified_xauusd_artifact(tmp_path
     digest = "a" * 64
     manifest = {
         "sha256": digest,
+        "status": "PASS",
+        "data_audit_status": "PASS",
+        "duration_clock": "monotonic",
+        "duration_seconds": 1802.0,
         "account_mode": "DEMO",
         "trading_enabled": False,
         "dll_imports_enabled": False,
