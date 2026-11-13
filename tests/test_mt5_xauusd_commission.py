@@ -115,15 +115,15 @@ def test_verified_evidence_and_round_turn_cost(tmp_path):
 ])
 def test_invalid_evidence_fails_closed(mutation, tmp_path):
     evidence = copy.deepcopy(valid_evidence())
-    source_path, verification_path = source_artifact(tmp_path, evidence)
+    source_path, verification_path, public_path, fingerprint = source_artifact(tmp_path, evidence)
     mutation(evidence)
     with pytest.raises(CommissionEvidenceError):
-        verify(evidence, source_path, verification_path)
+        verify(evidence, source_path, verification_path, public_path, fingerprint)
 
 
 def test_wrong_requested_account_or_symbol_fails(tmp_path):
     evidence = valid_evidence()
-    source_path, verification_path = source_artifact(tmp_path, evidence)
+    source_path, verification_path, public_path, fingerprint = source_artifact(tmp_path, evidence)
     with pytest.raises(CommissionEvidenceError):
         validate_commission_evidence(evidence, broker_symbol="XAUUSD", account_mode="DEMO",
                                      evaluation_time_utc="2026-11-13T12:00:00Z", source_artifact_path=source_path,
@@ -132,13 +132,14 @@ def test_wrong_requested_account_or_symbol_fails(tmp_path):
     with pytest.raises(CommissionEvidenceError):
         validate_commission_evidence(evidence, broker_symbol="XAUUSDm", account_mode="LIVE",
                                      evaluation_time_utc="2026-11-13T12:00:00Z", source_artifact_path=source_path,
-                                     verification_artifact_path=verification_path)
+                                     verification_artifact_path=verification_path,
+                                     verification_public_key_path=public_path, trusted_reviewer_key_sha256=fingerprint)
 
 
 def test_invalid_price_and_lot_size_fail(tmp_path):
     evidence = valid_evidence()
-    source_path, verification_path = source_artifact(tmp_path, evidence)
-    verified = verify(evidence, source_path, verification_path)
+    source_path, verification_path, public_path, fingerprint = source_artifact(tmp_path, evidence)
+    verified = verify(evidence, source_path, verification_path, public_path, fingerprint)
     with pytest.raises(CommissionEvidenceError):
         commission_cost_bps(verified, entry_price_usd_per_oz=0)
     with pytest.raises(CommissionEvidenceError):
@@ -147,26 +148,26 @@ def test_invalid_price_and_lot_size_fail(tmp_path):
 
 def test_source_hash_must_match_original_artifact(tmp_path):
     evidence = valid_evidence()
-    source_path, verification_path = source_artifact(tmp_path, evidence)
+    source_path, verification_path, public_path, fingerprint = source_artifact(tmp_path, evidence)
     source_path.write_bytes(b"changed source bytes")
     with pytest.raises(CommissionEvidenceError, match="SHA-256"):
-        verify(evidence, source_path, verification_path)
+        verify(evidence, source_path, verification_path, public_path, fingerprint)
 
 
 def test_historical_evaluation_can_be_verified_after_the_market_period(tmp_path):
     evidence = valid_evidence()
-    source_path, verification_path = source_artifact(tmp_path, evidence)
+    source_path, verification_path, public_path, fingerprint = source_artifact(tmp_path, evidence)
     evidence["evidence"]["verified_at_utc"] = "2026-11-13T12:00:01Z"
-    verified = verify(evidence, source_path, verification_path)
+    verified = verify(evidence, source_path, verification_path, public_path, fingerprint)
     assert verified["status"] == "VERIFIED"
     evidence["evidence"]["verified_at_utc"] = "2026-11-14T00:00:01Z"
     with pytest.raises(CommissionEvidenceError, match="cannot be in the future"):
-        verify(evidence, source_path, verification_path)
+        verify(evidence, source_path, verification_path, public_path, fingerprint)
 
 
 def test_commission_schedule_must_cover_entire_evaluation_period(tmp_path):
     evidence = valid_evidence()
-    source_path, verification_path = source_artifact(tmp_path, evidence)
+    source_path, verification_path, public_path, fingerprint = source_artifact(tmp_path, evidence)
     evidence["commission"]["effective_to_utc"] = "2026-11-14T00:00:00Z"
     with pytest.raises(CommissionEvidenceError, match="full evaluation period"):
         validate_commission_evidence(
@@ -184,10 +185,10 @@ def test_commission_schedule_must_cover_entire_evaluation_period(tmp_path):
 
 def test_independent_verification_artifact_must_match_its_own_hash(tmp_path):
     evidence = valid_evidence()
-    source_path, verification_path = source_artifact(tmp_path, evidence)
+    source_path, verification_path, public_path, fingerprint = source_artifact(tmp_path, evidence)
     verification_path.write_bytes(b"altered review artifact")
     with pytest.raises(CommissionEvidenceError, match="verification artifact SHA-256"):
-        verify(evidence, source_path, verification_path)
+        verify(evidence, source_path, verification_path, public_path, fingerprint)
 
 
 def test_missing_independent_verification_artifact_fails_closed(tmp_path):
