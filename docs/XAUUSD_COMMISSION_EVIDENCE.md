@@ -7,7 +7,9 @@ This directory contains the schema contract for broker-cost evidence. The templa
 - Contract size must be confirmed from the applicable Exness instrument specification.
 - Commission must be stated in USD per lot per side, with effective dates and an explicit charging basis.
 - The original source artifact must be retained securely; only a sanitized reference and SHA-256 belong in the repository.
-- Independent verification must be a separate artifact with its own sanitized reference, SHA-256, and timestamp. The verification artifact hash must differ from the source artifact hash.
+- Independent verification must be a separate JSON attestation with its own sanitized reference, SHA-256, reviewer identity/organization/role, reviewed source hash, exact XAUUSD DEMO contract and commission terms, effective dates, timestamp, and explicit independence statement.
+- The attestation must be signed with Ed25519. The evaluator verifies it against a public key whose SHA-256 fingerprint is pinned through a trusted out-of-band channel. A public key or fingerprint embedded in the attestation is never trusted.
+- The trusted fingerprint is an operational trust anchor: it must be obtained from the reviewer through a separately authenticated channel and protected from modification. The signature proves possession of the corresponding private key, not by itself a legal identity or organizational independence.
 
 ## Fail-closed rule
 A template, missing field, stale schedule, mismatched account/symbol/currency, malformed hash, or unverified source is invalid. Never infer a commission rate from spread, swap, generic broker marketing pages, or another account type.
@@ -59,7 +61,7 @@ python -m tools.mt5_xauusd_walk_forward \
   --commission-verification-artifact path/to/independent-review-record.pdf
 ```
 
-The validator checks both the original source artifact SHA-256 and a separately hashed independent verification artifact, DEMO account mode,
+The validator checks both the original source artifact SHA-256 and a separately hashed, scope-bound Ed25519-signed review attestation against the separately pinned trusted key, DEMO account mode,
 exact broker symbol, USD profit/commission currency, per-side charging basis,
 contract size, and that the schedule's effective period covers the entire
 evaluation partition. The contract size and broker symbol must also match every
@@ -83,3 +85,8 @@ Holdout remains sealed unless runtime commission evidence is supplied and the
 committed validation report plus selection-freeze record satisfy the existing
 chronology and hash-binding requirements. The preregistered plan is not
 rewritten to manufacture a verified status.
+
+
+## Signed reviewer attestation
+
+The review JSON is canonicalized using UTF-8 JSON with sorted keys and compact separators, excluding `signature_ed25519_base64`, then signed with Ed25519. It must bind the exact source SHA-256, reviewer identity and organization, approval status, XAUUSD/XAUUSDm DEMO/USD scope, contract size, per-side commission, effective period, review timestamp, and independence statement. The public key is supplied separately; its raw Ed25519 key fingerprint is SHA-256. The fingerprint must come from a separately authenticated reviewer channel and must not be copied from the same untrusted evidence package. Synthetic test keys and attestations are test fixtures only and are never broker evidence.
