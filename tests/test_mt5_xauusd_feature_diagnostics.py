@@ -1,4 +1,7 @@
 import copy
+import json
+import subprocess
+import sys
 from datetime import datetime, timezone
 import pytest
 from tools.mt5_xauusd_feature_diagnostics import DiagnosticsError, diagnose_sessions
@@ -91,3 +94,31 @@ def test_rejects_non_xauusd_input():
     first["canonical_symbol"] = "XAGUSD"
     with pytest.raises(DiagnosticsError, match="XAUUSD"):
         diagnose_sessions([first, second])
+
+def test_cli_output_file_is_valid_json(tmp_path):
+    first = make_session(1_800_000_000_000, "a")
+    second = make_session(1_800_000_300_000, "b")
+    first_path = tmp_path / "first.json"
+    second_path = tmp_path / "second.json"
+    output_path = tmp_path / "diagnostics.json"
+    first_path.write_text(json.dumps(first), encoding="utf-8")
+    second_path.write_text(json.dumps(second), encoding="utf-8")
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "tools.mt5_xauusd_feature_diagnostics",
+            "--inputs",
+            str(first_path),
+            str(second_path),
+            "--output",
+            str(output_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    parsed = json.loads(output_path.read_text(encoding="utf-8"))
+    assert parsed["status"] == "PASS"
+    assert parsed["total_windows"] == 80
