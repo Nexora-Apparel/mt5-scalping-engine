@@ -377,7 +377,7 @@ def _summarize_group(outcomes_by_session: dict[str, list[dict[str, Any]]], slipp
                 continue
             if outcome["status"] != "OUTCOME_AVAILABLE":
                 continue
-            if outcome["entry_time_msc"] < next_free:
+            if outcome["entry_time_msc"] <= next_free:
                 total_skipped += 1
                 continue
             next_free = outcome["exit_time_msc"]
