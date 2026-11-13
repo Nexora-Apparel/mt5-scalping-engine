@@ -1,6 +1,6 @@
 # MT5 Scalping Engine
 
-VELTRIX is an Exness MT5 research and scalping system with a strict **XAUUSD-only** instrument policy. The Android device is the operator/control device; bounded Windows GitHub Actions sessions provide the temporary MT5 terminal.
+VELTRIX is an Exness MT5 research and scalping system with a strict **XAUUSD-only** instrument policy. Current research and collection workflows are offline/read-only; bounded Windows GitHub Actions sessions provide the temporary MT5 terminal.
 
 ## Active instrument policy
 
