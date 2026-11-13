@@ -34,6 +34,7 @@ def validate_commission_evidence(
     broker_symbol: str,
     account_mode: str,
     evaluation_time_utc: str,
+    source_artifact_path: Path,
 ) -> dict[str, Any]:
     """Validate provenance, applicability, and effective period; never trust a status flag alone."""
     if not isinstance(evidence, dict) or evidence.get("schema") != "VELTRIX_XAUUSD_COMMISSION_EVIDENCE_V1":
@@ -78,7 +79,20 @@ def validate_commission_evidence(
         raise CommissionEvidenceError("source_sha256 must be a lowercase SHA-256 digest")
     if not isinstance(source.get("verification_reference"), str) or not source["verification_reference"].strip():
         raise CommissionEvidenceError("independent verification reference is required")
-    _utc(source.get("verified_at_utc"), "verified_at_utc")
+    verified_at = _utc(source.get("verified_at_utc"), "verified_at_utc")
+    if verified_at < effective_from or verified_at > evaluation:
+        raise CommissionEvidenceError("verification timestamp must fall within the effective-to-evaluation interval")
+    if not isinstance(source_artifact_path, Path) or not source_artifact_path.is_file():
+        raise CommissionEvidenceError("the original commission source artifact must be supplied for hash verification")
+    digest_calculator = hashlib.sha256()
+    try:
+        with source_artifact_path.open("rb") as source_file:
+            for chunk in iter(lambda: source_file.read(1024 * 1024), b""):
+                digest_calculator.update(chunk)
+    except OSError as exc:
+        raise CommissionEvidenceError("commission source artifact cannot be read") from exc
+    if digest_calculator.hexdigest() != digest:
+        raise CommissionEvidenceError("commission source artifact SHA-256 does not match the evidence record")
     return {
         "status": "VERIFIED",
         "broker_symbol": broker_symbol,
