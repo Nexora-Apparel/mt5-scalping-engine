@@ -111,6 +111,8 @@ def test_replay_keeps_commission_unverified_and_execution_disabled(registry):
     assert result["status"] == "PASS"
     assert result["research_only"] is True
     assert result["commission_status"] == "UNVERIFIED_REQUIRED_INPUT"
+    assert result["data_role"] == "UNCLASSIFIED_NOT_HOLDOUT"
+    assert result["final_holdout_eligible"] is False
     assert result["outcomes"][0]["net_after_commission"] is None
     assert result["outcomes"][0]["execution_sent"] is False
 
