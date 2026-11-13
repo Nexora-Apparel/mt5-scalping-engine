@@ -178,10 +178,10 @@ jobs:
           if (!(Test-Path $log)) { throw "MetaEditor did not produce the risk-journal runtime-test log." }
           Get-Content $log
           $logText = Get-Content $log -Raw
-          if ($logText -match "(?i)\\b[1-9]\\d* errors?\\b" -or $logText -notmatch "(?i)0 errors?") {
+          if ($logText -match "(?i)\b[1-9]\d* errors?\b" -or $logText -notmatch "(?i)0 errors?") {
             throw "Risk-journal runtime-test script did not compile cleanly."
           }
-          if ($logText -match "(?i)\\b[1-9]\\d* warnings?\\b") {
+          if ($logText -match "(?i)\b[1-9]\d* warnings?\b") {
             throw "Risk-journal runtime-test script reported compiler warnings."
           }
           $compiled = Join-Path (Split-Path $source) "RiskJournalRuntimeTest.ex5"
