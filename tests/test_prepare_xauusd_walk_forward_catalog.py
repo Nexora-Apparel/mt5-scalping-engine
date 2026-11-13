@@ -100,3 +100,18 @@ def test_artifact_download_builds_catalog_from_verified_xauusd_artifact(tmp_path
     assert catalog["sessions"][0]["session_id"] == "validation_01"
     assert (tmp_path / "research/xauusd_sessions/validation_01/manifest.json").exists()
     assert (tmp_path / "research/xauusd_sessions/validation_01/veltrix_exness_demo_ticks.csv").exists()
+def test_development_artifact_id_must_match_preregistered_artifact(tmp_path, monkeypatch):
+    import tools.prepare_xauusd_walk_forward_catalog as intake
+
+    calls = iter([
+        {"status": "completed", "conclusion": "success"},
+        {"artifacts": [{"id": 99999999999, "name": "veltrix-exness-demo-ticks-8", "expired": False}]},
+    ])
+    monkeypatch.setattr(intake, "_gh_json", lambda *args, **kwargs: next(calls))
+    with pytest.raises(ArtifactIntakeError, match="artifact ID"):
+        intake.download_session_artifacts(
+            [{"session_id": "session8", "run_id": 43333365050}],
+            PLAN,
+            repo="Nexora-Apparel/mt5-scalping-engine",
+            workspace=tmp_path,
+        )
