@@ -21,7 +21,7 @@ Each populated window contains:
 - Trend efficiency: absolute net mid-price movement divided by the sum of absolute consecutive movements; zero for a flat path.
 - Median, p95, and maximum quoted spread in broker points.
 - Maximum inter-tick gap and count of gaps exceeding one second.
-- Quote-change ratio, based on consecutive midpoint changes.
+- Mid-price change ratio, based on consecutive midpoint changes (spread-only changes are not counted).
 
 A window with one tick has no measurable within-window tick rate and receives null. Boundary windows can be partial. These are intentional properties, not filled or extrapolated observations.
 
