@@ -97,6 +97,8 @@ private:
          ulong deal=HistoryDealGetTicket(i);
          if(deal==0 || HistoryDealGetInteger(deal,DEAL_POSITION_ID)!=record.identifier)
             continue;
+         if(HistoryDealGetString(deal,DEAL_SYMBOL)!=record.symbol)
+            return false;
 
          long entry=HistoryDealGetInteger(deal,DEAL_ENTRY);
          if(entry!=DEAL_ENTRY_OUT && entry!=DEAL_ENTRY_OUT_BY)
