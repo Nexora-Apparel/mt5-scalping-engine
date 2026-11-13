@@ -585,3 +585,15 @@ def test_phase7_execution_preflight_binds_account_and_symbol_contract():
     assert 'base_currency!="XAU" || profit_currency!="USD"' in source
     assert "A protective stop loss is mandatory" in source
     assert "OrderCalcMargin" in source
+
+
+def test_phase7_public_state_mutations_require_exact_connected_demo_identity():
+    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    day = source.split("bool BeginServerDay", 1)[1].split("bool EvaluateDailyLoss", 1)[0]
+    loss = source.split("bool EvaluateDailyLoss", 1)[1].split("bool RecordVerifiedClose", 1)[0]
+    close = source.split("bool RecordVerifiedClose", 1)[1].split("bool CalculateVolume", 1)[0]
+    assert "VerifyExactDemoAccount(reason)" in day
+    assert "VerifyExactDemoAccount(reason)" in loss
+    assert "VerifyExactDemoAccount(reason)" in close
+    assert "ACCOUNT_TRADE_MODE_DEMO" in source
+    assert "TERMINAL_CONNECTED" in source
