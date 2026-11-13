@@ -1,0 +1,69 @@
+{
+  "schema": "VELTRIX_XAUUSD_STRATEGY_HYPOTHESES_V1",
+  "status": "PREREGISTERED_UNTESTED",
+  "instrument": "XAUUSD",
+  "account_scope": "Exness DEMO research data only",
+  "holding_horizons_seconds": [5, 10, 15, 30, 60],
+  "feature_window_seconds": 5,
+  "threshold_policy": {
+    "method": "rolling empirical quantiles",
+    "lookback_populated_windows": 60,
+    "minimum_valid_prior_observations": 30,
+    "current_window_excluded": true,
+    "future_windows_excluded": true,
+    "session_history_reset": true
+  },
+  "evaluation_policy": {
+    "target_source": "observed future bid/ask ticks",
+    "forward_fill": false,
+    "entry_cost": "Use the observed ask for long entries and bid for short entries.",
+    "exit_cost": "Use the observed bid for long exits and ask for short exits.",
+    "additional_costs": "Apply separately documented commission and conservative slippage assumptions; do not infer them from quote ticks.",
+    "quote_tolerance": "Predeclare and freeze a maximum target-quote delay before event-study evaluation.",
+    "holdout_policy": "Chronological holdout remains untouched until candidate definitions and evaluation rules are frozen.",
+    "trade_execution": false
+  },
+  "hypotheses": [
+    {
+      "id": "H1_TREND_CONTINUATION",
+      "status": "UNTESTED",
+      "hypothesis": "A directional displacement accompanied by unusually high trend efficiency is more likely to continue over a 5–60 second horizon than matched baseline windows.",
+      "entry_context": "At a completed 5-second window, trend_efficiency is at or above its prior-window p75 and absolute return_bps is at or above the prior-window p75 of absolute returns.",
+      "direction": "Sign of the completed window return_bps.",
+      "invalidation_reference": "The opposite extreme of the trigger window; evaluate stop-touch ordering using actual chronological ticks.",
+      "evaluation_horizons_seconds": [5, 10, 15, 30, 60],
+      "primary_outcome": "Side-adjusted future bid/ask return after spread, commission, and slippage assumptions.",
+      "confounders": ["spread expansion", "quote gaps", "news volatility", "session transitions"]
+    },
+    {
+      "id": "H2_RANGE_REVERSION",
+      "status": "UNTESTED",
+      "hypothesis": "A large short-term displacement with low trend efficiency is more likely to partially revert over a 5–60 second horizon than matched baseline windows.",
+      "entry_context": "At a completed 5-second window, trend_efficiency is at or below its prior-window p25 and absolute return_bps is at or above the prior-window p75 of absolute returns.",
+      "direction": "Opposite the sign of the completed window return_bps.",
+      "invalidation_reference": "Continuation beyond the trigger-window extreme; evaluate stop-touch ordering using actual chronological ticks.",
+      "evaluation_horizons_seconds": [5, 10, 15, 30, 60],
+      "primary_outcome": "Side-adjusted future bid/ask return after spread, commission, and slippage assumptions.",
+      "confounders": ["trend regime transitions", "spread expansion", "quote gaps", "news volatility"]
+    },
+    {
+      "id": "H3_ACTIVITY_CONFIRMED_EXPANSION",
+      "status": "UNTESTED",
+      "hypothesis": "High tick-count intensity and high realized volatility together add predictive information about short-horizon directional continuation beyond price displacement alone.",
+      "entry_context": "At a completed 5-second window, ticks_per_second and realized_volatility_bps are both at or above their respective prior-window p75 values, with non-zero return_bps.",
+      "direction": "Sign of the completed window return_bps.",
+      "invalidation_reference": "The opposite extreme of the trigger window; evaluate stop-touch ordering using actual chronological ticks.",
+      "evaluation_horizons_seconds": [5, 10, 15, 30, 60],
+      "primary_outcome": "Incremental side-adjusted future bid/ask return versus H1 and matched baseline windows.",
+      "confounders": ["feed burstiness", "quote duplication", "spread expansion", "news volatility"]
+    }
+  ],
+  "prohibitions": [
+    "No XAGUSD, BTC, forex, indices, or other instruments.",
+    "No use of future observations in trigger features or thresholds.",
+    "No threshold tuning on chronological holdout data.",
+    "No conversion of tick counts into traded volume.",
+    "No trade signals, order placement, or execution permission from this registry.",
+    "No production deployment, Telegram activation, or scheduling."
+  ]
+}
