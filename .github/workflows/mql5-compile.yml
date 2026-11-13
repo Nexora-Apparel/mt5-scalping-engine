@@ -223,14 +223,15 @@ jobs:
             $resultPath = Join-Path $installPath ("MQL5\\Files\\" + $resultName)
             if (Test-Path $resultPath) { Remove-Item $resultPath -Force }
             $ini = Join-Path $env:RUNNER_TEMP ($scriptName + ".ini")
-            @"
+            $configText = @"
           [Common]
           Login=0
           Symbol=EURUSD
           Period=M1
           Script=$scriptName
           ShutdownTerminal=1
-          "@ | Set-Content -Path $ini -Encoding ASCII
+          "@
+            $configText | Set-Content -Path $ini -Encoding ASCII
 
             Get-Process terminal64 -ErrorAction SilentlyContinue | Stop-Process -Force
             $process = Start-Process -FilePath $terminal -ArgumentList @("/portable", "/config:$ini") -PassThru
