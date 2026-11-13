@@ -62,5 +62,5 @@ def test_active_demo_workflows_and_diagnostic_ea_are_xauusd_only():
     assert "options: [XAUUSD]" in bounded and "XAGUSD" not in bounded
     assert "XAUUSD-only" in bounded
     assert "XAGUSD" not in readonly
-    assert "XAUUSD-only" in readonly
+    assert "XAUUSD" in readonly and "DEMO diagnostics" in readonly
 
