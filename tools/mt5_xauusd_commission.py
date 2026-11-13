@@ -1,12 +1,18 @@
 """Fail-closed validation and cost conversion for XAUUSD DEMO commission evidence."""
 from __future__ import annotations
 
+import base64
 import hashlib
+import json
 import math
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 
 class CommissionEvidenceError(ValueError):
@@ -36,6 +42,8 @@ def validate_commission_evidence(
     evaluation_time_utc: str,
     source_artifact_path: Path,
     verification_artifact_path: Path,
+    verification_public_key_path: Path,
+    trusted_reviewer_key_sha256: str,
     evaluation_start_utc: str | None = None,
     evaluation_end_utc: str | None = None,
     verification_time_utc: str | None = None,
@@ -118,6 +126,66 @@ def validate_commission_evidence(
         raise CommissionEvidenceError("independent verification artifact cannot be read") from exc
     if verification_calculator.hexdigest() != verification_digest:
         raise CommissionEvidenceError("independent verification artifact SHA-256 does not match the evidence record")
+
+    # The review artifact is a signed JSON attestation. Its signature is checked
+    # against a separately pinned fingerprint, never a key supplied by the artifact.
+    if not isinstance(trusted_reviewer_key_sha256, str) or not _SHA256.fullmatch(trusted_reviewer_key_sha256):
+        raise CommissionEvidenceError("trusted reviewer public-key fingerprint must be pinned out of band")
+    if not isinstance(verification_public_key_path, Path) or not verification_public_key_path.is_file():
+        raise CommissionEvidenceError("trusted reviewer public key file is required")
+    try:
+        public_key = serialization.load_pem_public_key(verification_public_key_path.read_bytes())
+        if not isinstance(public_key, Ed25519PublicKey):
+            raise CommissionEvidenceError("reviewer public key must be Ed25519")
+        raw_public_key = public_key.public_bytes(encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw)
+        actual_fingerprint = hashlib.sha256(raw_public_key).hexdigest()
+        if actual_fingerprint != trusted_reviewer_key_sha256:
+            raise CommissionEvidenceError("reviewer public key does not match the out-of-band trusted fingerprint")
+        attestation = json.loads(verification_artifact_path.read_text(encoding="utf-8"))
+        if not isinstance(attestation, dict):
+            raise CommissionEvidenceError("review attestation must be a JSON object")
+        signature_text = attestation.get("signature_ed25519_base64")
+        signed_payload = {key: value for key, value in attestation.items() if key != "signature_ed25519_base64"}
+        canonical_payload = json.dumps(signed_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        signature = base64.b64decode(signature_text, validate=True)
+        public_key.verify(signature, canonical_payload)
+    except CommissionEvidenceError:
+        raise
+    except (OSError, ValueError, TypeError, json.JSONDecodeError, InvalidSignature) as exc:
+        raise CommissionEvidenceError("review attestation signature or encoding is invalid") from exc
+
+    expected_fields = {
+        "schema": "VELTRIX_COMMISSION_REVIEW_ATTESTATION_V1",
+        "review_status": "APPROVED",
+        "reviewer_identity": attestation.get("reviewer_identity"),
+        "reviewer_organization": attestation.get("reviewer_organization"),
+        "reviewer_role": attestation.get("reviewer_role"),
+        "reviewed_source_sha256": digest,
+        "canonical_symbol": "XAUUSD",
+        "broker_symbol": broker_symbol,
+        "account_mode": account_mode,
+        "currency": "USD",
+        "contract_size_oz_per_lot": float(contract),
+        "commission_usd_per_lot_per_side": float(amount),
+        "charging_basis": "PER_SIDE",
+        "effective_from_utc": charge.get("effective_from_utc"),
+        "effective_to_utc": charge.get("effective_to_utc"),
+        "reviewed_at_utc": attestation.get("reviewed_at_utc"),
+        "independence_statement": attestation.get("independence_statement"),
+    }
+    for field, expected_value in expected_fields.items():
+        actual_value = attestation.get(field)
+        if field in ("contract_size_oz_per_lot", "commission_usd_per_lot_per_side"):
+            if actual_value != expected_value:
+                raise CommissionEvidenceError(f"review attestation {field} does not match commission evidence")
+        elif not isinstance(actual_value, str) or not actual_value.strip():
+            raise CommissionEvidenceError(f"review attestation {field} is required")
+        elif actual_value != expected_value:
+            raise CommissionEvidenceError(f"review attestation {field} does not match commission evidence")
+    if _utc(attestation["reviewed_at_utc"], "reviewed_at_utc") != verified_at:
+        raise CommissionEvidenceError("review attestation timestamp does not match evidence verification timestamp")
+    if len(attestation["independence_statement"]) < 40:
+        raise CommissionEvidenceError("reviewer independence attestation is insufficient")
     return {
         "status": "VERIFIED",
         "broker_symbol": broker_symbol,
