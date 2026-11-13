@@ -13,7 +13,8 @@ from itertools import product
 from pathlib import Path
 from typing import Any
 
-from tools.mt5_tick_market_profile import percentile
+from tools.mt5_tick_market_profile import ProfileError, percentile
+from tools.mt5_xauusd_feature_research import build_features
 from tools.mt5_xauusd_strategy_registry import validate_registry
 
 
@@ -68,12 +69,13 @@ def _validate_features(data: dict[str, Any]) -> tuple[list[dict[str, Any]], int]
         if isinstance(count, bool) or not isinstance(count, int) or count < 1:
             raise CandidateError(f"feature window {index} tick_count must be positive")
         total_ticks += count
-        for metric in ("mid_close", "mid_high", "mid_low"):
-            value = _finite(row.get(metric), f"window {index} {metric}")
-            if value <= 0:
-                raise CandidateError(f"window {index} {metric} must be positive")
-        if row["mid_high"] < row["mid_low"]:
-            raise CandidateError(f"window {index} has an inverted high/low")
+        close = _finite(row.get("mid_close"), f"window {index} mid_close")
+        high = _finite(row.get("mid_high"), f"window {index} mid_high")
+        low = _finite(row.get("mid_low"), f"window {index} mid_low")
+        if close <= 0 or high <= 0 or low <= 0:
+            raise CandidateError(f"window {index} prices must be positive")
+        if high < low or close < low or close > high:
+            raise CandidateError(f"window {index} has inconsistent OHLC values")
         rv = _finite(row.get("realized_volatility_bps"), f"window {index} realized_volatility_bps", nullable=True)
         if rv is not None and rv < 0:
             raise CandidateError(f"window {index} realized volatility cannot be negative")
@@ -261,15 +263,16 @@ def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--features", type=Path, required=True)
+    parser.add_argument("--csv", type=Path, required=True)
+    parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--registry", type=Path, default=Path("research/xauusd_strategy_registry_v1.json"))
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     try:
-        features = json.loads(args.features.read_text(encoding="utf-8"))
+        features = build_features(args.csv, args.manifest, window_seconds=5)
         registry = json.loads(args.registry.read_text(encoding="utf-8"))
         result = generate_candidate_events(features, registry)
-    except (OSError, json.JSONDecodeError, CandidateError, ValueError, KeyError, TypeError) as exc:
+    except (OSError, json.JSONDecodeError, CandidateError, ProfileError, ValueError, KeyError, TypeError) as exc:
         parser.exit(2, f"CANDIDATE GENERATION FAIL: {exc}\n")
     rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:
