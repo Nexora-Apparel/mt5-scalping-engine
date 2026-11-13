@@ -64,6 +64,7 @@ def test_artifact_download_builds_catalog_from_verified_xauusd_artifact(tmp_path
         "data_audit_status": "PASS",
         "duration_clock": "monotonic",
         "duration_seconds": 1802.0,
+        "session_id": "validation_01",
         "account_mode": "DEMO",
         "trading_enabled": False,
         "dll_imports_enabled": False,
