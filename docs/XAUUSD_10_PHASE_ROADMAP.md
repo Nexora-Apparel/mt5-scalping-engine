@@ -41,9 +41,12 @@
    - Current implementation: `RiskControls.mqh` adds exact DEMO login/server and XAUUSD contract checks, hard risk ceilings (0.25% per trade, 0.50% aggregate, 1.00% daily equity loss), one-position policy, daily lock, verified-close loss streak/cooldown, duplicate request IDs and closing-deal deduplication through the append-only checksum-chained `RiskJournal.mqh`, which also permanently records emergency-stop and server-day loss-lock events; account/server-scoped terminal state persists the daily baseline, daily lock, loss streak, cooldown, and emergency-stop latch, with a last-written checksum marker and persistent compare-and-set lock to serialize close accounting across EA instances. `ExecutionGuard.mqh` now independently requires exact DEMO identity and verified XAUUSD metadata before its non-submitting preflight. See `docs/PHASE7_DEMO_RISK_CONTROLS.md`.
    - Evidence: PR #50 merged the new-journal initialization fix; PR #51 added a true two-process MT5 restart test; PR #52 added locked-file and corrupted-journal fail-closed tests. Final PR #52 head passed 199 Python tests and nine MQL5 compilation targets with 0 errors and 0 warnings. Windows MT5 terminal runtime passed five synthetic harnesses: journal append/replay and duplicate rejection; risk-state restore, abandoned-lock rejection, and checksum mismatch rejection; emergency-stop/daily-lock seed; fresh-process restart restoration; and existing-journal lock/corruption rejection. Runtime evidence: [workflow #43393115383](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/43393115383), [results artifact](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/43393115383/artifacts/14022056627). The owner reviewed and accepted the personal-use implementation on 13 Nov 2026; the owner also reports a colleague reviewed it outside GitHub. No order path is wired or authorized, so broker-fill behavior and trading performance remain untested and are not Phase 7 claims.
 
-8. **Chronological walk-forward and robustness evaluation**
-   - Use time-ordered train/validation/test partitions, untouched holdouts, multiple sessions/dates, cost sensitivity, and benchmark comparisons.
-   - Gate: predeclared statistical and risk criteria pass; no retrospective threshold changes.
+8. **Chronological walk-forward and robustness evaluation — IN PROGRESS**
+   - Preregistered plan and evaluator added: `research/xauusd_walk_forward_plan_v1.json`, `tools/mt5_xauusd_walk_forward.py`, and `docs/PHASE8_XAUUSD_WALK_FORWARD.md`.
+   - Plan pins the two known development hashes; requires four new validation sessions across four dates (100 non-overlapping outcomes per candidate configuration/horizon), then ten untouched holdout sessions across ten dates (300 outcomes per configuration/horizon), 120-second partition purge, one-position simulation, 0/1/2/5-point slippage sensitivity, and always-long/always-short/no-trade benchmarks.
+   - Final holdout is sealed until commission is verified and a validation selection-freeze record is committed before holdout collection. Net performance is disabled while commission is unverified.
+   - Current data is insufficient: the two previously inspected development sessions cannot be promoted; no new validation/holdout CSV-manifest artifacts are available in the repository. No candidate is ranked or approved.
+   - Gate: complete chronological sessions, sample counts, verified commission, positive net mean with session-clustered 95% lower bound above zero, and performance superior to all registered benchmarks after identical costs.
 
 9. **Prospective Exness DEMO forward validation**
    - Conduct a separately authorized, monitored DEMO-only forward test after all earlier gates; reconcile every decision and any permitted demo order.
@@ -62,5 +65,5 @@
 - Phase 5: complete.
 - Phase 6: complete.
 - Phase 7: complete for the read-only safety-control implementation and synthetic terminal-runtime certification.
-- Phase 8: unlocked; chronological research validation may begin.
+- Phase 8: in progress; preregistered evaluator and holdout controls implemented, but future validation data and verified commission are outstanding.
 - Phases 9–10: remain gated by Phase 8 and the prospective DEMO/release criteria.
