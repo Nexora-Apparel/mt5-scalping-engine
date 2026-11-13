@@ -71,6 +71,7 @@ def _validate_input(data: dict[str, Any]) -> tuple[list[dict[str, Any]], int]:
     if not isinstance(rows, list) or data.get("window_count") != len(rows) or not rows:
         raise RegimeError("window_count must match a non-empty features array")
     previous_ms = None
+    total_ticks = 0
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
             raise RegimeError(f"feature window {index} must be an object")
@@ -91,12 +92,21 @@ def _validate_input(data: dict[str, Any]) -> tuple[list[dict[str, Any]], int]:
         count = row.get("tick_count")
         if isinstance(count, bool) or not isinstance(count, int) or count < 1:
             raise RegimeError(f"feature window {index} tick_count must be a positive integer")
+        total_ticks += count
         for metric in (*METRICS, "return_bps"):
-            _number(row.get(metric), f"feature window {index} {metric}", nullable=True)
+            value = _number(row.get(metric), f"feature window {index} {metric}", nullable=True)
+            if metric == "realized_volatility_bps" and value is not None and value < 0:
+                raise RegimeError(f"feature window {index} realized volatility cannot be negative")
+            if metric == "trend_efficiency" and value is not None and not 0 <= value <= 1:
+                raise RegimeError(f"feature window {index} trend efficiency must be between 0 and 1")
+            if metric == "ticks_per_second" and value is not None and value < 0:
+                raise RegimeError(f"feature window {index} tick rate cannot be negative")
         for metric in ("spread_points_median", "spread_points_p95", "spread_points_max"):
             value = _number(row.get(metric), f"feature window {index} {metric}")
             if value < 0:
                 raise RegimeError(f"feature window {index} {metric} cannot be negative")
+    if total_ticks != data["source_records"]:
+        raise RegimeError("sum of feature-window tick_count values does not match source_records")
     return rows, width
 
 
