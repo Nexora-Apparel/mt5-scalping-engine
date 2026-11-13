@@ -231,6 +231,11 @@ def replay_dataset(
         for horizon in horizons:
             outcomes = [item for event in category_events for item in event["outcomes"] if item["horizon_seconds"] == horizon]
             observed = [float(item["bid_ask_adjusted_gross_return_bps"]) for item in outcomes if item["bid_ask_adjusted_gross_return_bps"] is not None]
+            net_observed = [
+                float(item["net_return_bps"])
+                for item in outcomes
+                if item["net_return_bps"] is not None
+            ]
             summary[category][str(horizon)] = {
                 "events": len(category_events),
                 "observed_outcomes": len(observed),
@@ -238,7 +243,8 @@ def replay_dataset(
                 "mean_bid_ask_adjusted_gross_return_bps": round(sum(observed) / len(observed), 8) if observed else None,
                 "median_bid_ask_adjusted_gross_return_bps": round(_percentile(observed, 0.5), 8) if observed else None,
                 "positive_outcome_rate": round(sum(value > 0 for value in observed) / len(observed), 8) if observed else None,
-                "net_return_bps": None if config.get("commission_bps") is None or config.get("slippage_bps") is None else "available_per_event",
+                "net_observed_outcomes": len(net_observed),
+                "mean_net_return_bps": round(sum(net_observed) / len(net_observed), 8) if net_observed else None,
             }
 
     return {
@@ -284,8 +290,8 @@ def main() -> int:
         config = json.loads(args.config.read_text(encoding="utf-8"))
         result = replay_dataset(args.csv, args.manifest, registry, config)
     except (OSError, json.JSONDecodeError, ProfileError, ReplayError, KeyError, TypeError, ValueError) as exc:
-        parser.exit(2, f"XAUUSD REPLAY FAIL: {exc}\\n")
-    rendered = json.dumps(result, indent=2, sort_keys=True) + "\\n"
+        parser.exit(2, f"XAUUSD REPLAY FAIL: {exc}\n")
+    rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:
         args.output.write_text(rendered, encoding="utf-8")
     print(rendered, end="")
