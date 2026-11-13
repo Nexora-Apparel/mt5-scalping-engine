@@ -717,3 +717,29 @@ def test_phase7_journal_and_terminal_state_must_exist_as_a_pair():
     assert "persistent risk state remains; refusing silent journal recreation" in risk
     assert "bool WasCreatedNew(void) const" in journal
     assert "Existing risk journal cannot be opened; refusing to recreate or truncate it" in journal
+
+
+def test_phase7_journal_replays_permanent_emergency_and_daily_lock_events():
+    source = (ROOT / "MQL5" / "Include" / "Veltrix" / "RiskJournal.mqh").read_text(encoding="utf-8")
+    assert 'event_type=="ESTOP"' in source
+    assert 'event_type=="DAILY_LOCK"' in source
+    assert "m_emergency_stop=true" in source
+    assert "HasDailyLock" in source
+    assert "AppendEmergencyStop" in source
+    assert "AppendDailyLock" in source
+
+
+def test_phase7_risk_controls_restore_journal_locks_and_persist_loss_locks():
+    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    assert "m_journal.HasEmergencyStop()" in source
+    assert "m_journal.HasDailyLock(m_server_day_key)" in source
+    assert "m_journal.AppendDailyLock(m_server_day_key,event_time,loss_percent,journal_reason)" in source
+    assert "m_journal.AppendEmergencyStop(event_time,journal_reason)" in source
+
+
+def test_phase7_runtime_journal_harness_covers_permanent_locks():
+    source = (ROOT / "MQL5" / "Scripts" / "RiskJournalRuntimeTest.mq5").read_text(encoding="utf-8")
+    assert "journal.AppendDailyLock" in source
+    assert "journal.AppendEmergencyStop" in source
+    assert "replay.HasDailyLock" in source
+    assert "replay.HasEmergencyStop" in source
