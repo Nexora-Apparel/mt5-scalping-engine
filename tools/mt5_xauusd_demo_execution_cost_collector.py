@@ -182,7 +182,7 @@ def collect_evidence(
         output_dir.mkdir(parents=True, exist_ok=True)
         deals_path = output_dir / "demo_deals_sanitized.csv"
         with deals_path.open("w", encoding="utf-8", newline="") as handle:
-            writer = csv.DictWriter(handle, fieldnames=DEAL_FIELDS, lineterminator="\\n")
+            writer = csv.DictWriter(handle, fieldnames=DEAL_FIELDS, lineterminator="\n")
             writer.writeheader()
             writer.writerows(sorted(sanitized, key=lambda row: (row["time_msc"], row["position_ref"])))
         spec_snapshot = {
@@ -211,9 +211,9 @@ def collect_evidence(
             "login_persisted": False,
         }
         (output_dir / "broker_account_snapshot.json").write_text(
-            json.dumps(account_snapshot, indent=2, sort_keys=True) + "\\n", encoding="utf-8")
+            json.dumps(account_snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         (output_dir / "symbol_spec_snapshot.json").write_text(
-            json.dumps(spec_snapshot, indent=2, sort_keys=True) + "\\n", encoding="utf-8")
+            json.dumps(spec_snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         summary = {
             "schema": "VELTRIX_XAUUSD_DEMO_EXECUTION_COST_OBSERVATIONS_V1",
             "status": "OBSERVATIONS_CAPTURED" if sanitized else "NEEDS_DEMO_DEAL_HISTORY",
@@ -239,7 +239,7 @@ def collect_evidence(
             ],
         }
         (output_dir / "round_trip_cost_summary.json").write_text(
-            json.dumps(summary, indent=2, sort_keys=True) + "\\n", encoding="utf-8")
+            json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         files = {}
         for path in sorted(output_dir.iterdir()):
             if path.is_file() and path.name != "manifest.json":
@@ -258,7 +258,7 @@ def collect_evidence(
             "net_performance_allowed": False,
         }
         (output_dir / "manifest.json").write_text(
-            json.dumps(manifest, indent=2, sort_keys=True) + "\\n", encoding="utf-8")
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return manifest
     finally:
         mt5.shutdown()
