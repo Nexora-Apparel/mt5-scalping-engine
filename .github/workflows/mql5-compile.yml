@@ -246,8 +246,35 @@ jobs:
               Start-Sleep -Seconds 2
             }
             if (!(Test-Path $resultPath)) {
+              Write-Host "Expected portable result path: $resultPath"
+              Write-Host "Installed script files:"
+              Get-ChildItem $scriptDirectory -ErrorAction SilentlyContinue | Select-Object Name,Length
+              Write-Host "Portable MQL5 Files directory:"
+              Get-ChildItem $filesDirectory -ErrorAction SilentlyContinue | Select-Object Name,Length
+              Write-Host "Terminal processes:"
+              Get-Process terminal64 -ErrorAction SilentlyContinue | Select-Object Id,ProcessName,StartTime
+              $dataRoot = Join-Path $env:APPDATA "MetaQuotes\\Terminal"
+              if (Test-Path $dataRoot) {
+                Write-Host "Searching non-portable terminal data for result sentinel:"
+                $found = Get-ChildItem $dataRoot -Filter $resultName -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($found) {
+                  Write-Host "Found result at $($found.FullName)"
+                  Copy-Item $found.FullName $resultPath -Force
+                }
+              }
+              foreach ($logDir in @((Join-Path $installPath "logs"), (Join-Path $installPath "MQL5\\Logs"))) {
+                if (Test-Path $logDir) {
+                  Write-Host "Recent terminal logs in $logDir"
+                  Get-ChildItem $logDir -File | Sort-Object LastWriteTime -Descending | Select-Object -First 2 | ForEach-Object {
+                    Write-Host "---- $($_.FullName) ----"
+                    Get-Content $_.FullName -Tail 80
+                  }
+                }
+              }
               Get-Process terminal64 -ErrorAction SilentlyContinue | Stop-Process -Force
-              throw "$scriptName did not write its runtime result sentinel within three minutes."
+              if (!(Test-Path $resultPath)) {
+                throw "$scriptName did not write its runtime result sentinel within three minutes."
+              }
             }
             $result = (Get-Content $resultPath -Raw).Trim()
             Write-Host "$scriptName result: $result"
