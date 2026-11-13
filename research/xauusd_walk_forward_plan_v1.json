@@ -1,0 +1,112 @@
+{
+  "plan_schema": "VELTRIX_XAUUSD_WALK_FORWARD_PLAN_V1",
+  "plan_version": 1,
+  "status": "PREREGISTERED_RESEARCH_ONLY",
+  "canonical_symbol": "XAUUSD",
+  "broker": "Exness",
+  "account_mode": "DEMO",
+  "created_utc": "2026-11-13T00:00:00Z",
+  "execution_enabled": false,
+  "live_trading_enabled": false,
+  "development_sessions": [
+    {
+      "session_id": "session8",
+      "expected_sha256": "a81a9ec96602e3a0f20dad64d50cacd36432715c31f6ecf7e5a5f1b94cb6b2e7",
+      "workflow_run_id": 43333365050,
+      "artifact_id": 13997174371,
+      "collection_started_utc": "2026-11-13T00:00:09.575620+00:00",
+      "collection_ended_utc": "2026-11-13T00:30:11.496689+00:00",
+      "duration_seconds": 1802,
+      "expected_manifest_sha256": "55c246840ae466a48100e49e71917723664686f414e01f8a657564297eb9f663"
+    },
+    {
+      "session_id": "session9",
+      "expected_sha256": "d31d8b8f463f0bf74b7f98893fe2b2cd3f078153621ef7f52863e95e963967c1",
+      "workflow_run_id": 43338046880,
+      "artifact_id": 13999059160,
+      "collection_started_utc": "2026-11-13T00:34:53.923845+00:00",
+      "collection_ended_utc": "2026-11-13T01:04:55.899531+00:00",
+      "duration_seconds": 1802,
+      "expected_manifest_sha256": "b336edd572eabb42f7a1f980bc42ae9e7d463623f5a6aab20ccea4c8e00ab280"
+    }
+  ],
+  "validation_sessions": [
+    "validation_01",
+    "validation_02",
+    "validation_03",
+    "validation_04"
+  ],
+  "final_holdout_sessions": [
+    "holdout_01",
+    "holdout_02",
+    "holdout_03",
+    "holdout_04",
+    "holdout_05",
+    "holdout_06",
+    "holdout_07",
+    "holdout_08",
+    "holdout_09",
+    "holdout_10"
+  ],
+  "collection_requirements": {
+    "minimum_session_duration_seconds": 1800,
+    "minimum_validation_sessions": 4,
+    "minimum_validation_distinct_dates": 4,
+    "minimum_holdout_sessions": 10,
+    "minimum_holdout_distinct_dates": 10,
+    "minimum_validation_outcomes_per_configuration_horizon": 100,
+    "minimum_holdout_outcomes_per_configuration_horizon": 300,
+    "purge_seconds_at_partition_boundaries": 120,
+    "maximum_signal_lookback_seconds": 60,
+    "maximum_holding_horizon_seconds": 60,
+    "one_open_position_per_candidate_configuration": true
+  },
+  "evaluation": {
+    "holding_horizons_seconds": [
+      5,
+      15,
+      30,
+      60
+    ],
+    "slippage_sensitivity_points_per_side": [
+      0,
+      1,
+      2,
+      5
+    ],
+    "spread_treatment": "Executable bid/ask crossing includes spread exactly once.",
+    "commission_status": "UNVERIFIED_REQUIRED_INPUT",
+    "net_performance_allowed": false,
+    "benchmark_set": [
+      "NO_TRADE",
+      "ALWAYS_LONG",
+      "ALWAYS_SHORT"
+    ],
+    "primary_statistical_gate": "After verified commission and registered slippage assumptions, mean net return must be positive and the session-clustered 95% lower confidence bound must exceed zero.",
+    "relative_gate": "Selected candidate configuration must outperform NO_TRADE, ALWAYS_LONG, and ALWAYS_SHORT on the same chronological partition after identical costs.",
+    "holdout_policy": "The final holdout is not scored until validation selection is frozen in a separately committed selection-freeze record whose timestamp precedes every holdout collection start.",
+    "no_parameter_tuning_on_holdout": true,
+    "no_random_row_splits": true,
+    "no_forward_fill": true,
+    "no_cross_session_feature_history": true,
+    "all_reports_research_only": true
+  },
+  "selection_freeze_contract": {
+    "schema": "VELTRIX_XAUUSD_SELECTION_FREEZE_V1",
+    "required_fields": [
+      "registry_sha256",
+      "validation_report_sha256",
+      "frozen_utc",
+      "selection_rule_id",
+      "selected_candidate_configurations"
+    ],
+    "selection_rule_id": "XAUUSD_VALIDATION_NET_EDGE_V1",
+    "must_be_committed_before_holdout_collection": true
+  },
+  "limitations": [
+    "Sessions 8 and 9 are development-only and cannot be promoted to validation or holdout.",
+    "No actual broker fills, market impact, order-book depth, or traded volume are available from tick quotes.",
+    "Commission must be verified from the applicable Exness DEMO account schedule or statement before any net-performance claim.",
+    "A completed walk-forward report is not permission to execute orders."
+  ]
+}
