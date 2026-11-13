@@ -52,8 +52,7 @@ class CVxBrokerReconciler
 private:
    VxReconcileRow m_rows[];
 
-   bool FindLivePosition(const long identifier,const string expected_symbol,
-                         string &actual_symbol,ulong &ticket,double &volume,
+   bool FindLivePosition(const long identifier,string &actual_symbol,ulong &ticket,double &volume,
                          double &stop_loss,double &take_profit,
                          double &current_price,long &position_type)
    {
@@ -189,7 +188,7 @@ public:
          double current_price=0.0;
          long position_type=-1;
 
-         if(FindLivePosition(record.identifier,record.symbol,live_symbol,
+         if(FindLivePosition(record.identifier,live_symbol,
                              live_ticket,live_volume,stop_loss,take_profit,
                              current_price,position_type))
          {
