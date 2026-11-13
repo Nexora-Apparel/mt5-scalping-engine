@@ -112,19 +112,23 @@ def classify_regimes(
     if isinstance(min_history, bool) or not isinstance(min_history, int) or not 1 <= min_history <= lookback_windows:
         raise RegimeError("min_history must be an integer from 1 to lookback_windows")
     rows, width = _validate_input(data)
-    history: dict[str, list[float]] = {metric: [] for metric in METRICS}
+    history: list[dict[str, Any]] = []
     output: list[dict[str, Any]] = []
 
     for index, row in enumerate(rows):
-        prior = {metric: values[-lookback_windows:] for metric, values in history.items()}
+        prior_rows = history[-lookback_windows:]
+        prior = {
+            metric: [float(item[metric]) for item in prior_rows if item.get(metric) is not None]
+            for metric in METRICS
+        }
         available = all(row.get(metric) is not None for metric in METRICS) and row.get("return_bps") is not None
         enough_history = all(len(prior[metric]) >= min_history for metric in METRICS)
         result: dict[str, Any] = {
             "window_start_utc": row["window_start_utc"],
             "tick_count": row["tick_count"],
             "history_count": min((len(prior[m]) for m in METRICS), default=0),
-            "history_start_utc": output[max(0, index - lookback_windows)]["window_start_utc"] if index and enough_history else None,
-            "history_end_utc": output[index - 1]["window_start_utc"] if index else None,
+            "history_start_utc": prior_rows[0]["window_start_utc"] if prior_rows and enough_history else None,
+            "history_end_utc": prior_rows[-1]["window_start_utc"] if prior_rows else None,
             "volatility_state": None,
             "trend_state": None,
             "activity_state": None,
@@ -164,12 +168,10 @@ def classify_regimes(
             result["regime_label"] = "UNCLASSIFIED_CURRENT_DATA"
         output.append(result)
 
-        # Append the current observation only after classifying it. This is the
-        # central no-lookahead invariant: window i can never influence window i.
-        for metric in METRICS:
-            value = row.get(metric)
-            if value is not None:
-                history[metric].append(float(value))
+        # Append the current observation only after classifying it. Keep nulls
+        # in the row history so lookback_windows always means prior windows,
+        # not an unbounded search for older non-null observations.
+        history.append({metric: row.get(metric) for metric in METRICS})
 
     return {
         "status": "PASS",
