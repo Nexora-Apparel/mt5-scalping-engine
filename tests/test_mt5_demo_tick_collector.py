@@ -71,6 +71,14 @@ def test_full_collector_records_only_gold_and_passes_integrity(tmp_path,monkeypa
  assert m["streams"]["XAUUSD"]["records"]==1802
  assert (tmp_path/"manifest.json").is_file() and (tmp_path/"veltrix_exness_demo_ticks.csv").is_file()
 
+def test_collector_rejects_unregistered_validation_session_before_mt5_initialize(monkeypatch):
+ monkeypatch.setenv("VELTRIX_SESSION_ID","holdout_01")
+ api=FakeMT5(Clock())
+ with pytest.raises(collector.DiagnosticFailure,match="preregistered validation IDs"):
+  collector.collect(api,30,Path("unused"))
+ assert api.shutdown_called is False
+
+
 def test_collector_contains_no_order_submission_calls():
  import re
  source=P.read_text()
