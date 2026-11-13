@@ -73,5 +73,6 @@ jobs:
           path: |
             research/xauusd_validation_report.json
             research/xauusd_walk_forward_catalog.json
+            research/xauusd_sessions/
           if-no-files-found: warn
           retention-days: 30
