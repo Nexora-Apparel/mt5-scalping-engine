@@ -199,6 +199,10 @@ def validate_commission_evidence(
         "verification_sha256": verification_digest,
         "source_reference": source["source_reference"],
         "verification_reference": source["verification_reference"],
+        "reviewer_identity": attestation["reviewer_identity"],
+        "reviewer_organization": attestation["reviewer_organization"],
+        "reviewer_role": attestation["reviewer_role"],
+        "reviewer_key_sha256": actual_fingerprint,
         "effective_from_utc": effective_from.isoformat(),
         "effective_to_utc": effective_to.isoformat() if effective_to else None,
     }
