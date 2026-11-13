@@ -141,7 +141,7 @@ def evaluate_event(
         entry_price, exit_price = entry.ask, exit_tick.bid
     else:
         entry_price, exit_price = entry.bid, exit_tick.ask
-    gross = exit_price - entry_price
+    gross = exit_price - entry_price if direction == "long" else entry_price - exit_price
     gross_bps = gross / entry_price * 10000
     sensitivity = []
     for slip_points in slippage_grid:
