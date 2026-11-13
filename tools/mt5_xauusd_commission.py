@@ -35,6 +35,9 @@ def validate_commission_evidence(
     account_mode: str,
     evaluation_time_utc: str,
     source_artifact_path: Path,
+    evaluation_start_utc: str | None = None,
+    evaluation_end_utc: str | None = None,
+    verification_time_utc: str | None = None,
 ) -> dict[str, Any]:
     """Validate provenance, applicability, and effective period; never trust a status flag alone."""
     if not isinstance(evidence, dict) or evidence.get("schema") != "VELTRIX_XAUUSD_COMMISSION_EVIDENCE_V1":
@@ -64,10 +67,15 @@ def validate_commission_evidence(
     effective_to_raw = charge.get("effective_to_utc")
     effective_to = _utc(effective_to_raw, "effective_to_utc") if effective_to_raw else None
     evaluation = _utc(evaluation_time_utc, "evaluation_time_utc")
+    evaluation_start = _utc(evaluation_start_utc, "evaluation_start_utc") if evaluation_start_utc else evaluation
+    evaluation_end = _utc(evaluation_end_utc, "evaluation_end_utc") if evaluation_end_utc else evaluation
+    verification_time = _utc(verification_time_utc, "verification_time_utc") if verification_time_utc else datetime.now(timezone.utc)
+    if evaluation_start > evaluation_end:
+        raise CommissionEvidenceError("evaluation time range is invalid")
     if effective_to and effective_to <= effective_from:
         raise CommissionEvidenceError("commission effective period is invalid")
-    if evaluation < effective_from or (effective_to and evaluation >= effective_to):
-        raise CommissionEvidenceError("commission schedule is not effective at evaluation time")
+    if evaluation_start < effective_from or (effective_to and evaluation_end >= effective_to):
+        raise CommissionEvidenceError("commission schedule does not cover the full evaluation period")
     if source.get("independently_verified") is not True:
         raise CommissionEvidenceError("independent source verification is required")
     if not isinstance(source.get("source_type"), str) or not source["source_type"].strip():
@@ -80,8 +88,8 @@ def validate_commission_evidence(
     if not isinstance(source.get("verification_reference"), str) or not source["verification_reference"].strip():
         raise CommissionEvidenceError("independent verification reference is required")
     verified_at = _utc(source.get("verified_at_utc"), "verified_at_utc")
-    if verified_at < effective_from or verified_at > evaluation:
-        raise CommissionEvidenceError("verification timestamp must fall within the effective-to-evaluation interval")
+    if verified_at > verification_time:
+        raise CommissionEvidenceError("independent verification timestamp cannot be in the future")
     if not isinstance(source_artifact_path, Path) or not source_artifact_path.is_file():
         raise CommissionEvidenceError("the original commission source artifact must be supplied for hash verification")
     digest_calculator = hashlib.sha256()
