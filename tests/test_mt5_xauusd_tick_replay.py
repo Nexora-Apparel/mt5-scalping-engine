@@ -27,6 +27,7 @@ def event(direction="long", horizon=5, signal_end=1000):
         "signal_window_end_msc": signal_end,
         "direction": direction,
         "horizon_seconds": horizon,
+        "event_origin": "SYNTHETIC_REPLAY_SMOKE_ONLY",
     }
 
 
@@ -47,6 +48,7 @@ def test_long_uses_ask_entry_and_bid_exit_spread_once():
     assert result["exit_executable_price"] == 100.500
     assert result["gross_pnl_price_units"] == pytest.approx(0.260)
     assert result["spread_included_once"] is True
+    assert result["event_origin"] == "SYNTHETIC_REPLAY_SMOKE_ONLY"
     assert result["slippage_sensitivity"][1]["pnl_before_commission_price_units"] == pytest.approx(0.258)
     assert result["net_after_commission"] is None
 
