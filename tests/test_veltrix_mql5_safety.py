@@ -707,3 +707,13 @@ def test_phase7_terminal_runtime_test_exercises_journal_append_replay_and_duplic
     assert "duplicate request identifier was accepted" in source
     assert "duplicate closing-deal identifier was accepted" in source
     assert "synthetic account only" in source.lower() or "synthetic identity only" in source.lower()
+
+
+def test_phase7_journal_and_terminal_state_must_exist_as_a_pair():
+    risk = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    journal = (ROOT / "MQL5" / "Include" / "Veltrix" / "RiskJournal.mqh").read_text(encoding="utf-8")
+    assert "m_journal.WasCreatedNew()" in risk
+    assert "existing journal remains; manual recovery required" in risk
+    assert "persistent risk state remains; refusing silent journal recreation" in risk
+    assert "bool WasCreatedNew(void) const" in journal
+    assert "Existing risk journal cannot be opened; refusing to recreate or truncate it" in journal
