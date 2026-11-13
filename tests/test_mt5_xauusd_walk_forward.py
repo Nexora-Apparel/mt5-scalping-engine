@@ -197,3 +197,26 @@ def test_validation_evaluator_aggregates_candidate_and_directional_benchmarks(tm
     assert len(report["benchmarks"]) == 8
     assert report["net_performance_allowed"] is False
     assert report["candidate_approval"] == "NOT_APPROVED"
+def test_walk_forward_cli_writes_explicit_blocked_report_for_empty_catalog(tmp_path):
+    import subprocess
+    import sys
+
+    output = tmp_path / "blocked-report.json"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "tools/mt5_xauusd_walk_forward.py"),
+            "--catalog", str(ROOT / "research/xauusd_walk_forward_catalog_template.json"),
+            "--stage", "validation",
+            "--output", str(output),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    report = json.loads(output.read_text(encoding="utf-8"))
+    assert report["status"] == "BLOCKED_INSUFFICIENT_DATA"
+    assert report["candidate_scoring_performed"] is False
+    assert "missing_session_ids" in report
