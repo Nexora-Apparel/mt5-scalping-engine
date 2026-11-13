@@ -28,29 +28,35 @@ def valid_evidence():
             "source_type": "ACCOUNT_SCHEDULE", "source_reference": "secure://sanitized-source",
             "source_sha256": "a" * 64, "independently_verified": True,
             "verification_reference": "review-record-001",
+            "verification_sha256": "b" * 64,
             "verified_at_utc": "2026-11-13T00:00:00Z",
         },
     }
 
 
 def source_artifact(tmp_path, evidence):
-    path = tmp_path / "exness-account-schedule.txt"
-    path.write_bytes(b"synthetic test fixture; not actual broker evidence")
-    evidence["evidence"]["source_sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
-    return path
+    source_path = tmp_path / "exness-account-schedule.txt"
+    verification_path = tmp_path / "independent-review-record.txt"
+    source_path.write_bytes(b"synthetic test fixture; not actual broker evidence")
+    verification_path.write_bytes(b"synthetic independent-review fixture; not actual verification")
+    evidence["evidence"]["source_sha256"] = hashlib.sha256(source_path.read_bytes()).hexdigest()
+    evidence["evidence"]["verification_sha256"] = hashlib.sha256(verification_path.read_bytes()).hexdigest()
+    return source_path, verification_path
 
 
-def verify(evidence, source_path):
+def verify(evidence, source_path, verification_path):
     return validate_commission_evidence(
         evidence, broker_symbol="XAUUSDm", account_mode="DEMO",
         evaluation_time_utc="2026-11-13T12:00:00Z", source_artifact_path=source_path,
+        verification_artifact_path=verification_path,
         verification_time_utc="2026-11-14T00:00:00Z",
     )
 
 
 def test_verified_evidence_and_round_turn_cost(tmp_path):
     evidence = valid_evidence()
-    verified = verify(evidence, source_artifact(tmp_path, evidence))
+    source_path, verification_path = source_artifact(tmp_path, evidence)
+    verified = verify(evidence, source_path, verification_path)
     assert commission_cost_bps(verified, entry_price_usd_per_oz=2000.0) == pytest.approx(0.35)
     assert net_return_bps(1.0, verified, entry_price_usd_per_oz=2000.0) == pytest.approx(0.65)
 
@@ -70,21 +76,23 @@ def test_verified_evidence_and_round_turn_cost(tmp_path):
 ])
 def test_invalid_evidence_fails_closed(mutation, tmp_path):
     evidence = copy.deepcopy(valid_evidence())
-    source_path = source_artifact(tmp_path, evidence)
+    source_path, verification_path = source_artifact(tmp_path, evidence)
     mutation(evidence)
     with pytest.raises(CommissionEvidenceError):
-        verify(evidence, source_path)
+        verify(evidence, source_path, verification_path)
 
 
 def test_wrong_requested_account_or_symbol_fails(tmp_path):
     evidence = valid_evidence()
-    source_path = source_artifact(tmp_path, evidence)
+    source_path, verification_path = source_artifact(tmp_path, evidence)
     with pytest.raises(CommissionEvidenceError):
         validate_commission_evidence(evidence, broker_symbol="XAUUSD", account_mode="DEMO",
-                                     evaluation_time_utc="2026-11-13T12:00:00Z", source_artifact_path=source_path)
+                                     evaluation_time_utc="2026-11-13T12:00:00Z", source_artifact_path=source_path,
+                                     verification_artifact_path=verification_path)
     with pytest.raises(CommissionEvidenceError):
         validate_commission_evidence(evidence, broker_symbol="XAUUSDm", account_mode="LIVE",
-                                     evaluation_time_utc="2026-11-13T12:00:00Z", source_artifact_path=source_path)
+                                     evaluation_time_utc="2026-11-13T12:00:00Z", source_artifact_path=source_path,
+                                     verification_artifact_path=verification_path)
 
 
 def test_invalid_price_and_lot_size_fail(tmp_path):
@@ -98,26 +106,26 @@ def test_invalid_price_and_lot_size_fail(tmp_path):
 
 def test_source_hash_must_match_original_artifact(tmp_path):
     evidence = valid_evidence()
-    path = source_artifact(tmp_path, evidence)
-    path.write_bytes(b"changed source bytes")
+    source_path, verification_path = source_artifact(tmp_path, evidence)
+    source_path.write_bytes(b"changed source bytes")
     with pytest.raises(CommissionEvidenceError, match="SHA-256"):
-        verify(evidence, path)
+        verify(evidence, source_path, verification_path)
 
 
 def test_historical_evaluation_can_be_verified_after_the_market_period(tmp_path):
     evidence = valid_evidence()
-    path = source_artifact(tmp_path, evidence)
+    source_path, verification_path = source_artifact(tmp_path, evidence)
     evidence["evidence"]["verified_at_utc"] = "2026-11-13T12:00:01Z"
-    verified = verify(evidence, path)
+    verified = verify(evidence, source_path, verification_path)
     assert verified["status"] == "VERIFIED"
     evidence["evidence"]["verified_at_utc"] = "2026-11-14T00:00:01Z"
     with pytest.raises(CommissionEvidenceError, match="cannot be in the future"):
-        verify(evidence, path)
+        verify(evidence, source_path, verification_path)
 
 
 def test_commission_schedule_must_cover_entire_evaluation_period(tmp_path):
     evidence = valid_evidence()
-    path = source_artifact(tmp_path, evidence)
+    source_path, verification_path = source_artifact(tmp_path, evidence)
     evidence["commission"]["effective_to_utc"] = "2026-11-14T00:00:00Z"
     with pytest.raises(CommissionEvidenceError, match="full evaluation period"):
         validate_commission_evidence(
@@ -126,5 +134,14 @@ def test_commission_schedule_must_cover_entire_evaluation_period(tmp_path):
             evaluation_start_utc="2026-11-12T00:00:00Z",
             evaluation_end_utc="2026-11-15T00:00:00Z",
             verification_time_utc="2026-11-16T00:00:00Z",
-            source_artifact_path=path,
+            source_artifact_path=source_path,
+            verification_artifact_path=verification_path,
         )
+
+
+def test_independent_verification_artifact_must_match_its_own_hash(tmp_path):
+    evidence = valid_evidence()
+    source_path, verification_path = source_artifact(tmp_path, evidence)
+    verification_path.write_bytes(b"altered review artifact")
+    with pytest.raises(CommissionEvidenceError, match="verification artifact SHA-256"):
+        verify(evidence, source_path, verification_path)
