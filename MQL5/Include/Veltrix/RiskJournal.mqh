@@ -91,7 +91,8 @@ private:
             sequence_number!=(double)(m_sequence+1) ||
             timestamp_number<=0.0 || key=="" ||
             previous_hash!=m_previous_hash ||
-            (event_type!="REQUEST" && event_type!="CLOSE" &&\n             event_type!="ESTOP" && event_type!="DAILY_LOCK"))
+            (event_type!="REQUEST" && event_type!="CLOSE" &&
+             event_type!="ESTOP" && event_type!="DAILY_LOCK"))
          {
             reason="Risk journal contains an incomplete, malformed, or out-of-sequence record";
             return false;
@@ -138,7 +139,8 @@ private:
       reason="";
       if(!m_initialized || m_handle==INVALID_HANDLE ||
          key=="" || timestamp_msc<=0 || !MathIsValidNumber(value) ||
-         (event_type!="REQUEST" && event_type!="CLOSE" &&\n          event_type!="ESTOP" && event_type!="DAILY_LOCK"))
+         (event_type!="REQUEST" && event_type!="CLOSE" &&
+          event_type!="ESTOP" && event_type!="DAILY_LOCK"))
       { reason="Risk journal is not initialized or append fields are invalid"; return false; }
       if(event_type=="REQUEST" && Contains(m_request_keys,key))
       { reason="Duplicate request identifier rejected by durable journal"; return false; }
