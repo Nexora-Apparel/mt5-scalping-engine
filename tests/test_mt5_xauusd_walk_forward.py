@@ -213,6 +213,9 @@ def test_validation_evaluator_aggregates_candidate_and_directional_benchmarks(tm
     assert candidate["aggregate_cost_sensitivity"]["0"]["outcomes"] == 4
     assert candidate["aggregate_cost_sensitivity"]["5"]["mean_return_before_commission_bps"] == 5.0
     assert len(report["benchmarks"]) == 8
+    assert candidate["relative_benchmark_comparison"]["0"]["NO_TRADE"]["sessions_compared"] == 4
+    assert candidate["relative_benchmark_comparison"]["0"]["NO_TRADE"]["gross_after_slippage_outperformance"] is True
+    assert candidate["relative_benchmark_comparison"]["0"]["ALWAYS_LONG"]["gross_after_slippage_outperformance"] is False
     assert report["net_performance_allowed"] is False
     assert report["candidate_approval"] == "NOT_APPROVED"
 def test_walk_forward_cli_writes_explicit_blocked_report_for_empty_catalog(tmp_path):
