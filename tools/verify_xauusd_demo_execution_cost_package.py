@@ -8,6 +8,7 @@ import json
 import math
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -79,8 +80,8 @@ def verify_package(package_dir: Path) -> dict[str, Any]:
         raise PackageVerificationError("verified broker contract size is missing")
     if summary.get("schema") != "VELTRIX_XAUUSD_DEMO_EXECUTION_COST_OBSERVATIONS_V1":
         raise PackageVerificationError("unsupported deal-observation summary schema")
-    if summary.get("status") not in ("OBSERVATIONS_CAPTURED", "NEEDS_DEMO_DEAL_HISTORY"):
-        raise PackageVerificationError("deal-observation status is invalid")
+    if summary.get("status") not in ("OBSERVATIONS_CAPTURED", "NEEDS_DEMO_DEAL_HISTORY") or manifest.get("status") != summary.get("status"):
+        raise PackageVerificationError("deal-observation status is invalid or differs from the manifest")
     if summary.get("commission_schedule_status") != manifest["commission_schedule_status"] or summary.get("net_performance_allowed") is not False:
         raise PackageVerificationError("summary attempts to unlock commission or net scoring")
 
@@ -103,6 +104,9 @@ def verify_package(package_dir: Path) -> dict[str, Any]:
             raise PackageVerificationError(f"deal row {index} has invalid numeric data") from exc
         if stamp <= 0 or not all(math.isfinite(value) for value in numeric) or numeric[0] <= 0 or numeric[1] <= 0:
             raise PackageVerificationError(f"deal row {index} contains non-finite or non-positive values")
+        expected_utc = datetime.fromtimestamp(stamp / 1000, tz=timezone.utc).isoformat()
+        if row.get("time_utc") != expected_utc:
+            raise PackageVerificationError(f"deal row {index} UTC timestamp does not match epoch milliseconds")
         if row.get("deal_entry") not in ("IN", "OUT", "INOUT", "OUT_BY") and not row.get("deal_entry", "").startswith("UNKNOWN_"):
             raise PackageVerificationError(f"deal row {index} has an invalid entry classification")
 
@@ -111,7 +115,14 @@ def verify_package(package_dir: Path) -> dict[str, Any]:
     observations = summary.get("round_trip_observations")
     if not isinstance(observations, list) or summary.get("position_count") != len(observations):
         raise PackageVerificationError("position summary count does not match observations")
-    complete = sum(item.get("round_trip_complete_in_export") is True for item in observations if isinstance(item, dict))
+    if any(not isinstance(item, dict) or not _SHA256.fullmatch(item.get("position_ref", "")) for item in observations):
+        raise PackageVerificationError("position summary contains an invalid pseudonymous position reference")
+    if len({item["position_ref"] for item in observations}) != len(observations):
+        raise PackageVerificationError("position summary contains duplicate position references")
+    observed_refs = {item["position_ref"] for item in observations}
+    if any(row["position_ref"] not in observed_refs for row in rows):
+        raise PackageVerificationError("deal CSV contains a position missing from the grouped summary")
+    complete = sum(item.get("round_trip_complete_in_export") is True for item in observations)
     if summary.get("complete_round_trip_position_count") != complete:
         raise PackageVerificationError("complete round-trip count does not match position summaries")
     return {
