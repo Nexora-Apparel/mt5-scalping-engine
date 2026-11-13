@@ -296,17 +296,20 @@ def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--features", type=Path, required=True)
+    parser.add_argument("--csv", type=Path, required=True)
+    parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--registry", type=Path, default=Path("research/xauusd_strategy_registry_v1.json"))
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     try:
-        features = json.loads(args.features.read_text(encoding="utf-8"))
+        # Rebuild from the original CSV/manifest so provenance and DEMO/read-only
+        # constraints are revalidated instead of trusting a detached feature JSON.
+        features = build_features(args.csv, args.manifest, window_seconds=5)
         registry = json.loads(args.registry.read_text(encoding="utf-8"))
         result = generate_candidate_events(features, registry)
-    except (OSError, json.JSONDecodeError, RegistryError, SignalError) as exc:
-        parser.exit(2, f"CANDIDATE SIGNAL GENERATION FAIL: {exc}\n")
-    rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
+    except (OSError, json.JSONDecodeError, RegistryError, ProfileError, SignalError) as exc:
+        parser.exit(2, f"CANDIDATE SIGNAL GENERATION FAIL: {exc}\\n")
+    rendered = json.dumps(result, indent=2, sort_keys=True) + "\\n"
     if args.output:
         args.output.write_text(rendered, encoding="utf-8")
     print(rendered, end="")
