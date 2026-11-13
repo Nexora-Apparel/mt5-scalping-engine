@@ -17,7 +17,7 @@ def make_row(stamp, bid, ask):
 def write_dataset(tmp_path, rows):
     csv_path=tmp_path/"ticks.csv"; manifest_path=tmp_path/"manifest.json"
     with csv_path.open("w",encoding="utf-8",newline="") as handle:
-        writer=csv.DictWriter(handle,fieldnames=HEADER,lineterminator="\\n")
+        writer=csv.DictWriter(handle,fieldnames=HEADER,lineterminator="\n")
         writer.writeheader(); writer.writerows(rows)
     manifest={"sha256":hashlib.sha256(csv_path.read_bytes()).hexdigest(),"records":len(rows),
       "account_mode":"DEMO","status":"PASS","trading_enabled":False,"dll_imports_enabled":False,
@@ -51,7 +51,7 @@ def test_rejects_invalid_window_width(tmp_path,seconds):
 def test_rejects_hash_mismatch_before_feature_generation(tmp_path):
     base=1_800_000_000_000
     csv_path,manifest_path=write_dataset(tmp_path,[make_row(base,3000.0,3000.2)])
-    csv_path.write_text(csv_path.read_text(encoding="utf-8")+"\\n",encoding="utf-8")
+    csv_path.write_text(csv_path.read_text(encoding="utf-8")+"\n",encoding="utf-8")
     with pytest.raises(ProfileError,match="SHA-256"):
         build_features(csv_path,manifest_path)
 
