@@ -264,6 +264,7 @@ def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]
         "source_records": features["source_records"],
         "window_seconds": width,
         "window_count": len(rows),
+        "completed_window_count": completed_count,
         "data_role": data_role,
         "final_holdout_eligible": False,
         "registry_sha256": registry_result["registry_sha256"],
