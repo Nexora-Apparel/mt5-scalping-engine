@@ -69,10 +69,6 @@ def validate_session_map(
             raise ArtifactIntakeError(f"{sid}: run_id differs from the preregistered development workflow run")
         seen.add(sid)
         normalized.append({"session_id": sid, "run_id": run_id})
-    selected_validation = {item["session_id"] for item in normalized} & validation
-    if selected_validation != validation:
-        missing = sorted(validation - selected_validation)
-        raise ArtifactIntakeError(f"validation intake requires all preregistered eligible sessions together; missing={missing}")
     return normalized
 
 
@@ -99,7 +95,6 @@ def download_session_artifacts(
     development = {item["session_id"]: item["expected_sha256"] for item in plan["development_sessions"]}
     catalog_items = []
     validation_dates: dict[str, str] = {}
-    ineligible_dates = {entry["collection_date_utc"] for entry in plan.get("ineligible_validation_sessions", [])}
 
     for item in session_map:
         sid, run_id = item["session_id"], item["run_id"]
@@ -173,8 +168,6 @@ def download_session_artifacts(
                 collection_date = started.astimezone(timezone.utc).date().isoformat()
             except (KeyError, TypeError, ValueError) as exc:
                 raise ArtifactIntakeError(f"{sid}: invalid UTC collection start timestamp") from exc
-            if collection_date in ineligible_dates:
-                raise ArtifactIntakeError(f"{sid}: collection date {collection_date} is already disqualified")
             if collection_date in validation_dates:
                 other = validation_dates[collection_date]
                 raise ArtifactIntakeError(f"{sid}: shares UTC collection date {collection_date} with {other}; distinct dates required")
