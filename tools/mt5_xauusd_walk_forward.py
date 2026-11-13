@@ -252,6 +252,13 @@ def assess_session_catalog(
         if profile.get("status") != "PASS":
             raise WalkForwardError(f"{sid}: dataset profile is not PASS")
         manifest = json.loads(item["manifest"].read_text(encoding="utf-8"))
+        if sid in development:
+            expected_manifest = development[sid]
+            if expected_manifest.get("expected_manifest_sha256") and _sha256(item["manifest"]) != expected_manifest["expected_manifest_sha256"]:
+                raise WalkForwardError(f"{sid}: development manifest hash differs from the preregistered manifest")
+            for field in ("collection_started_utc", "collection_ended_utc", "duration_seconds"):
+                if manifest.get(field) != expected_manifest.get(field):
+                    raise WalkForwardError(f"{sid}: development manifest {field} differs from the preregistered value")
         if manifest.get("account_mode") != "DEMO" or manifest.get("trading_enabled") is not False or manifest.get("dll_imports_enabled") is not False:
             raise WalkForwardError(f"{sid}: source manifest must prove read-only DEMO collection")
         specs = manifest.get("instrument_specs", {})
