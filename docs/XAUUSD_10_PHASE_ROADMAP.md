@@ -23,11 +23,11 @@
    - Compare independent sessions without pooling away session identity; report distributions, null coverage, correlations, and median drift; reject duplicate or overlapping sessions and incompatible schemas.
    - Evidence: cross-session diagnostics merged in PR #35; 124 tests passed; two certified sessions processed into 721 five-second windows (12,838 source ticks). Provenance hashes, distributions, null coverage, descriptive correlations, and median drift are recorded in `docs/PHASE3_XAUUSD_CROSS_SESSION_REPORT.md`. Median spread was 240 points (0.240 price units), a material cost constraint for short-horizon scalping.
 
-4. **Strategy hypotheses and candidate specification — IN PROGRESS**
+4. **Strategy hypotheses and candidate specification — COMPLETE**
    - Freeze falsifiable XAUUSD-only hypotheses, entry context, direction, invalidation, 5–60 second evaluation horizons, and cost-aware outcomes before any candidate testing.
-   - Gate: versioned pre-registration and validation of registry constraints; no threshold tuning on holdout data.
+   - Evidence: PRs #40 and #41 merged; registry validator and exact past-only calculation formulas passed 143 tests. Three finite candidate families are frozen (momentum, mean reversion, volatility breakout), with 5/15/30/60-second horizons, quote-crossed outcome rules, explicit cost treatment, and chronological holdout/purge controls. Commission remains unverified, so no net-performance approval is possible.
 
-5. **Tick replay and deterministic research simulator**
+5. **Tick replay and deterministic research simulator — IN PROGRESS**
    - Replay chronological bid/ask ticks; model spread-aware entries/exits, quote freshness, latency assumptions, and conservative execution constraints.
    - Gate: deterministic replay, timestamp integrity, no lookahead, and audited cost assumptions.
 
@@ -56,5 +56,6 @@
 - Phase 1: complete.
 - Phase 2: complete.
 - Phase 3: complete.
-- Phase 4: in progress.
-- Phases 5–10: locked until preceding phase gates pass.
+- Phase 4: complete.
+- Phase 5: in progress.
+- Phases 6–10: locked until preceding phase gates pass.
