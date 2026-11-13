@@ -38,6 +38,7 @@ private:
    string m_loss_streak_name;
    string m_cooldown_name;
    string m_state_checksum_name;
+   string m_state_lock_name;
 
    bool IsXauUsdContract(const string symbol)
    {
@@ -74,6 +75,26 @@ private:
                           ServerHash(request_id));
    }
 
+   bool AcquireRiskStateLock(const long token,string &reason)
+   {
+      reason="";
+      if(token<=0 || m_state_lock_name=="")
+      { reason="Risk-state lock token or key is invalid"; return false; }
+      if(!GlobalVariableSetOnCondition(m_state_lock_name,(double)token,0.0))
+      { reason="Risk-state update is already active or its lock is inconsistent"; return false; }
+      GlobalVariablesFlush();
+      return true;
+   }
+
+   bool ReleaseRiskStateLock(const long token)
+   {
+      if(token<=0 || m_state_lock_name=="")
+         return false;
+      bool released=GlobalVariableSetOnCondition(m_state_lock_name,0.0,(double)token);
+      GlobalVariablesFlush();
+      return released;
+   }
+
    bool ReservePersistentKey(const string key,const double stamp,
                              const string duplicate_reason,string &reason)
    {
@@ -107,7 +128,7 @@ private:
       if(m_emergency_key=="" || m_day_key_name=="" ||
          m_day_equity_name=="" || m_daily_lock_name=="" ||
          m_loss_streak_name=="" || m_cooldown_name=="" ||
-         m_state_checksum_name=="")
+         m_state_checksum_name=="" || m_state_lock_name=="")
          return false;
       if(GlobalVariableSet(m_emergency_key,(m_emergency_stop ? 1.0 : 0.0))==0 ||
          GlobalVariableSet(m_day_key_name,(double)m_server_day_key)==0 ||
@@ -141,6 +162,7 @@ public:
       m_loss_streak_name="";
       m_cooldown_name="";
       m_state_checksum_name="";
+      m_state_lock_name="";
    }
 
    bool Init(const VxRiskControlConfig &config,string &reason)
@@ -177,26 +199,28 @@ public:
       m_loss_streak_name="VX_LS_"+suffix;
       m_cooldown_name="VX_CD_"+suffix;
       m_state_checksum_name="VX_CSUM_"+suffix;
+      m_state_lock_name="VX_LOCKTX_"+suffix;
       if(StringLen(m_emergency_key)>63 || StringLen(m_day_key_name)>63 ||
          StringLen(m_day_equity_name)>63 || StringLen(m_daily_lock_name)>63 ||
          StringLen(m_loss_streak_name)>63 || StringLen(m_cooldown_name)>63 ||
-         StringLen(m_state_checksum_name)>63)
+         StringLen(m_state_checksum_name)>63 || StringLen(m_state_lock_name)>63)
       { reason="Risk-state persistence key is invalid"; return false; }
 
-      string keys[7];
+      string keys[8];
       keys[0]=m_emergency_key; keys[1]=m_day_key_name;
       keys[2]=m_day_equity_name; keys[3]=m_daily_lock_name;
       keys[4]=m_loss_streak_name; keys[5]=m_cooldown_name;
-      keys[6]=m_state_checksum_name;
+      keys[6]=m_state_checksum_name; keys[7]=m_state_lock_name;
       int present=0;
-      for(int i=0;i<7;i++)
+      for(int i=0;i<8;i++)
          if(GlobalVariableCheck(keys[i])) present++;
-      if(present!=0 && present!=7)
+      if(present!=0 && present!=8)
       { reason="Persistent risk state is incomplete; refusing to reset partial state"; return false; }
       if(present==0)
       {
-         if(!PersistRiskState())
-         { reason="Could not initialize persistent risk state"; return false; }
+         if(GlobalVariableSet(m_state_lock_name,0.0)==0 ||
+            !PersistRiskState())
+         { reason="Could not initialize persistent risk state or transaction lock"; return false; }
       }
       else
       {
@@ -206,6 +230,9 @@ public:
          double daily_lock=GlobalVariableGet(m_daily_lock_name);
          double losses=GlobalVariableGet(m_loss_streak_name);
          double cooldown=GlobalVariableGet(m_cooldown_name);
+         double transaction_lock=GlobalVariableGet(m_state_lock_name);
+         if(!MathIsValidNumber(transaction_lock) || transaction_lock!=0.0)
+         { reason="A prior risk-state transaction did not finish; manual reconciliation required"; return false; }
          if(!MathIsValidNumber(emergency) || !MathIsValidNumber(day) ||
             !MathIsValidNumber(equity) || !MathIsValidNumber(daily_lock) ||
             !MathIsValidNumber(losses) || !MathIsValidNumber(cooldown) ||
@@ -322,9 +349,14 @@ public:
                                     ServerHash(StringFormat("%I64u",closing_deal_ticket)));
       if(close_key=="" || StringLen(close_key)>63)
       { reason="Closing-deal deduplication key is invalid"; return false; }
-      if(!ReservePersistentKey(close_key,(double)close_time_msc,
-                               "Duplicate verified closing deal ignored",reason))
+      if(!AcquireRiskStateLock(close_time_msc,reason))
          return false;
+      if(GlobalVariableCheck(close_key))
+      {
+         ReleaseRiskStateLock(close_time_msc);
+         reason="Duplicate verified closing deal ignored";
+         return false;
+      }
       if(net_profit<0.0)
       {
          m_consecutive_losses++;
@@ -344,6 +376,21 @@ public:
          m_emergency_stop=true;
          PersistRiskState();
          reason="Could not persist verified close risk state; emergency stop latched";
+         return false;
+      }
+      if(!ReservePersistentKey(close_key,(double)close_time_msc,
+                               "Duplicate verified closing deal ignored",reason))
+      {
+         m_emergency_stop=true;
+         PersistRiskState();
+         reason="Could not commit closing-deal idempotency after state update; manual reconciliation required";
+         return false;
+      }
+      if(!ReleaseRiskStateLock(close_time_msc))
+      {
+         m_emergency_stop=true;
+         PersistRiskState();
+         reason="Could not release risk-state transaction lock; manual reconciliation required";
          return false;
       }
       return true;
