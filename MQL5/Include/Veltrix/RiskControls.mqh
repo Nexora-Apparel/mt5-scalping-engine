@@ -178,7 +178,7 @@ public:
    }
 
    bool CalculateVolume(const VxRiskRequest &source,const int active_positions,
-                        VxRiskDecision &decision) const
+                        VxRiskDecision &decision)
    {
       decision.approved=false;
       decision.volume=0.0;
@@ -188,6 +188,11 @@ public:
       decision.reason="";
       if(!m_initialized || m_emergency_stop || m_daily_loss_locked)
       { decision.reason="Risk controls are uninitialized or locked"; return false; }
+      string guard_reason;
+      if(!VerifyExactDemoAccount(guard_reason))
+      { decision.reason=guard_reason; return false; }
+      if(!EvaluateDailyLoss(source.equity,guard_reason))
+      { decision.reason=guard_reason; return false; }
       VxRiskRequest request=source;
       request.risk_percent=m_config.risk_per_trade_percent;
       request.max_portfolio_risk_percent=m_config.max_portfolio_risk_percent;
