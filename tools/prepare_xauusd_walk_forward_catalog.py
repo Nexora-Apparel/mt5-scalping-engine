@@ -11,6 +11,7 @@ import json
 import re
 import shutil
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +49,7 @@ def validate_session_map(
         raise ArtifactIntakeError("session map must contain a sessions array")
     development = {item["session_id"]: item for item in plan["development_sessions"]}
     validation = set(plan["validation_sessions"])
+    ineligible = {entry["session_id"] for entry in plan.get("ineligible_validation_sessions", [])}
     allowed = set(development) | validation
     seen: set[str] = set()
     normalized = []
@@ -55,6 +57,8 @@ def validate_session_map(
         if not isinstance(item, dict):
             raise ArtifactIntakeError("each session map item must be an object")
         sid, run_id = item.get("session_id"), item.get("run_id")
+        if sid in ineligible:
+            raise ArtifactIntakeError(f"{sid}: session is explicitly ineligible for distinct-date validation")
         if sid not in allowed:
             raise ArtifactIntakeError(f"session ID is not allowed in validation intake: {sid}")
         if sid in seen:
@@ -65,6 +69,10 @@ def validate_session_map(
             raise ArtifactIntakeError(f"{sid}: run_id differs from the preregistered development workflow run")
         seen.add(sid)
         normalized.append({"session_id": sid, "run_id": run_id})
+    selected_validation = {item["session_id"] for item in normalized} & validation
+    if selected_validation != validation:
+        missing = sorted(validation - selected_validation)
+        raise ArtifactIntakeError(f"validation intake requires all preregistered eligible sessions together; missing={missing}")
     return normalized
 
 
@@ -90,6 +98,8 @@ def download_session_artifacts(
     session_root.mkdir(parents=True, exist_ok=True)
     development = {item["session_id"]: item["expected_sha256"] for item in plan["development_sessions"]}
     catalog_items = []
+    validation_dates: dict[str, str] = {}
+    ineligible_dates = {entry["collection_date_utc"] for entry in plan.get("ineligible_validation_sessions", [])}
 
     for item in session_map:
         sid, run_id = item["session_id"], item["run_id"]
@@ -155,6 +165,20 @@ def download_session_artifacts(
             raise ArtifactIntakeError(f"{sid}: development artifact hash differs from preregistered hash")
         if sid not in development and manifest.get("session_id") != sid:
             raise ArtifactIntakeError(f"{sid}: manifest session_id does not match the preregistered validation ID")
+        if sid not in development:
+            try:
+                started = datetime.fromisoformat(str(manifest["collection_started_utc"]).replace("Z", "+00:00"))
+                if started.tzinfo is None:
+                    raise ValueError("timestamp has no timezone")
+                collection_date = started.astimezone(timezone.utc).date().isoformat()
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ArtifactIntakeError(f"{sid}: invalid UTC collection start timestamp") from exc
+            if collection_date in ineligible_dates:
+                raise ArtifactIntakeError(f"{sid}: collection date {collection_date} is already disqualified")
+            if collection_date in validation_dates:
+                other = validation_dates[collection_date]
+                raise ArtifactIntakeError(f"{sid}: shares UTC collection date {collection_date} with {other}; distinct dates required")
+            validation_dates[collection_date] = sid
         if sid not in development and digest in set(development.values()):
             raise ArtifactIntakeError(f"{sid}: inspected development artifact cannot be promoted to validation")
 
