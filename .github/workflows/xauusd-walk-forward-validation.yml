@@ -1,0 +1,77 @@
+name: VELTRIX Phase 8 XAUUSD validation
+run-name: VELTRIX XAUUSD walk-forward validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      session_map_json:
+        description: JSON map of preregistered session IDs to successful tick-collection workflow run IDs
+        required: true
+        type: string
+        default: |
+          {"sessions":[{"session_id":"session8","run_id":43333365050},{"session_id":"session9","run_id":43338046880}]}
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: veltrix-xauusd-walk-forward-validation
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install project dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Write session map
+        env:
+          SESSION_MAP_JSON: ${{ inputs.session_map_json }}
+        run: |
+          python - <<'PY'
+          import os
+          import json
+          value = json.loads(os.environ["SESSION_MAP_JSON"])
+          with open("research/xauusd_session_run_map.json", "w", encoding="utf-8") as f:
+              json.dump(value, f, indent=2)
+          PY
+
+      - name: Download and verify completed XAUUSD DEMO session artifacts
+        run: |
+          python -m tools.prepare_xauusd_walk_forward_catalog \
+            --session-map research/xauusd_session_run_map.json \
+            --stage validation \
+            --repo "$GITHUB_REPOSITORY"
+
+      - name: Run chronological validation evaluator
+        run: |
+          python -m tools.mt5_xauusd_walk_forward \
+            --catalog research/xauusd_walk_forward_catalog.json \
+            --stage validation \
+            --output research/xauusd_validation_report.json
+
+      - name: Publish validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veltrix-xauusd-walk-forward-validation
+          path: |
+            research/xauusd_validation_report.json
+            research/xauusd_walk_forward_catalog.json
+          if-no-files-found: warn
+          retention-days: 30
