@@ -33,7 +33,7 @@ def _finite(value: Any, field: str, *, nullable: bool = False) -> float | None:
     return number
 
 
-def _validate_features(data: dict[str, Any]) -> tuple[list[dict[str, Any]], int]:
+def _validate_features(data: dict[str, Any]) -> tuple[list[dict[str, Any]], int, list[int]]:
     if not isinstance(data, dict) or data.get("status") != "PASS" or data.get("research_only") is not True:
         raise CandidateError("feature input must be PASS and research_only")
     if data.get("feature_schema") != "VELTRIX_XAUUSD_TICK_WINDOWS_V1" or data.get("canonical_symbol") != "XAUUSD":
@@ -52,6 +52,7 @@ def _validate_features(data: dict[str, Any]) -> tuple[list[dict[str, Any]], int]
         raise CandidateError("source_records must be a positive integer")
     total_ticks = 0
     previous_ms = None
+    window_starts_ms: list[int] = []
     for index, row in enumerate(rows):
         if not isinstance(row, dict) or row.get("window_seconds") != width:
             raise CandidateError(f"invalid feature window {index}")
@@ -65,6 +66,7 @@ def _validate_features(data: dict[str, Any]) -> tuple[list[dict[str, Any]], int]
         if stamp_ms % (width * 1000) != 0 or (previous_ms is not None and stamp_ms <= previous_ms):
             raise CandidateError("feature windows must be aligned and strictly chronological")
         previous_ms = stamp_ms
+        window_starts_ms.append(stamp_ms)
         count = row.get("tick_count")
         if isinstance(count, bool) or not isinstance(count, int) or count < 1:
             raise CandidateError(f"feature window {index} tick_count must be positive")
@@ -81,7 +83,14 @@ def _validate_features(data: dict[str, Any]) -> tuple[list[dict[str, Any]], int]
             raise CandidateError(f"window {index} realized volatility cannot be negative")
     if total_ticks != source_records:
         raise CandidateError("feature tick counts do not reconcile to source_records")
-    return rows, width
+    return rows, width, window_starts_ms
+
+
+def _contiguous_windows(stamps: list[int], start: int, end_exclusive: int, width: int) -> bool:
+    if start < 0 or end_exclusive > len(stamps) or end_exclusive <= start:
+        return False
+    expected_step = width * 1000
+    return all(stamps[index] - stamps[index - 1] == expected_step for index in range(start + 1, end_exclusive))
 
 
 def _volatility_scale(rows: list[dict[str, Any]], start: int, end: int) -> float | None:
@@ -140,7 +149,7 @@ def _event(
 
 def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any]:
     registry_result = validate_registry(registry)
-    rows, width = _validate_features(features)
+    rows, width, window_starts_ms = _validate_features(features)
     events: list[dict[str, Any]] = []
     counts = {item["candidate_id"]: 0 for item in registry["candidates"]}
     horizons = registry["evaluation"]["holding_horizons_seconds"]
@@ -153,6 +162,8 @@ def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]
             for lookback, threshold in product(grid["lookback_seconds"], grid["standardized_impulse_threshold"]):
                 n = lookback // width
                 for index in range(n, len(rows)):
+                    if not _contiguous_windows(window_starts_ms, index - n, index + 1, width):
+                        continue
                     scale = _volatility_scale(rows, index - n, index)
                     current = float(rows[index]["mid_close"])
                     previous = float(rows[index - n]["mid_close"])
@@ -171,6 +182,8 @@ def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]
             for lookback, threshold in product(grid["lookback_seconds"], grid["standardized_displacement_threshold"]):
                 n = lookback // width
                 for index in range(n, len(rows)):
+                    if not _contiguous_windows(window_starts_ms, index - n, index + 1, width):
+                        continue
                     scale = _volatility_scale(rows, index - n, index)
                     current = float(rows[index]["mid_close"])
                     reference = sum(float(row["mid_close"]) for row in rows[index - n:index]) / n
@@ -193,6 +206,8 @@ def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]
             ):
                 n = lookback // width
                 for index in range(60 + n, len(rows)):
+                    if not _contiguous_windows(window_starts_ms, index - 60 - n, index + 1, width):
+                        continue
                     scale = _volatility_scale(rows, index - n, index)
                     if scale is None:
                         continue
