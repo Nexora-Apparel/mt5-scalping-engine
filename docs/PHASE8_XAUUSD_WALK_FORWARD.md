@@ -44,10 +44,17 @@ Holdout command is intentionally unavailable for scoring while commission is unv
 
 ## Current evidence and blockers
 
-The two known development sessions are not sufficient to run chronological validation. The repository does not contain the actual CSV/manifest artifacts for the four future validation sessions or ten future holdout sessions. The current catalog template is empty, so the correct evaluator result is BLOCKED_INSUFFICIENT_DATA; it does not emit performance rankings.
+The two known development sessions were downloaded from their original GitHub Actions artifacts and their manifests/CSV hashes independently checked:
 
-The registry also marks Exness commission as UNVERIFIED_REQUIRED_INPUT. The final holdout remains sealed and net-performance claims remain disabled until the applicable DEMO commission schedule or statement is independently sourced.
+| Session | Collection window (UTC) | Ticks | Maximum inter-tick gap | Gaps over 5 seconds | Spread | Volume fields |
+|---|---|---:|---:|---:|---:|---|
+| Session 8 — run 43333365050, artifact 13997174371 | 00:00:09–00:30:11, 13 Nov 2026 | 5,192 | 3.040 s | 0 | 240 points on every tick | volume and volume_real always zero |
+| Session 9 — run 43338046880, artifact 13999059160 | 00:34:53–01:04:55, 13 Nov 2026 | 7,646 | 3.812 s | 0 | median 240 points; 7 ticks at 260 points | volume and volume_real always zero |
 
-The observed development-session median spread was 240 broker points (0.240 XAUUSD price units at a 0.001 point size). That is a material hurdle for 5–60 second scalping; all robustness reports must preserve the observed bid/ask crossing and additional cost sensitivity.
+Both manifests report DEMO, trading disabled, DLL imports disabled, and a broker contract XAUUSDm with base XAU, profit USD, contract size 100, point 0.001, and tick size 0.001. Their exact CSV hashes are pinned in the plan. The two sessions are non-overlapping, but they are on the same date and remain development-only. No validation or holdout sessions have been collected. The empty catalog therefore correctly returns BLOCKED_INSUFFICIENT_DATA and emits no candidate rankings.
+
+The spread is 0.240 XAUUSD price units for almost every tick. The feed also contains no nonzero tick-volume values. It is therefore unsuitable to claim volume-based order-flow evidence, and the spread is a severe cost hurdle for 5–60 second scalping. All robustness reports must preserve executable bid/ask crossing and additional cost sensitivity.
+
+The registry marks Exness commission as UNVERIFIED_REQUIRED_INPUT. Final holdout remains sealed and net-performance claims remain disabled until the applicable DEMO commission schedule or statement is independently sourced.
 
 **Phase 8 is not complete.** No candidate is approved. Phase 9 DEMO forward validation and Phase 10 release hardening remain gated.
