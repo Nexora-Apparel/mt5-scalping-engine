@@ -80,9 +80,12 @@ jobs:
           repository = os.environ["GH_REPOSITORY"]
           root = Path("certification-sources")
           root.mkdir(parents=True, exist_ok=True)
+          # Run as a package module so the repository root is on sys.path.
+          # The certification module imports tools.mt5_tick_market_profile.
           cert_args = [
               sys.executable,
-              "tools/mt5_multi_session_certification.py",
+              "-m",
+              "tools.mt5_multi_session_certification",
           ]
 
           def gh(*args):
