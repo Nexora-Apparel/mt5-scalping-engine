@@ -44,6 +44,7 @@ def verify(evidence, source_path):
     return validate_commission_evidence(
         evidence, broker_symbol="XAUUSDm", account_mode="DEMO",
         evaluation_time_utc="2026-11-13T12:00:00Z", source_artifact_path=source_path,
+        verification_time_utc="2026-11-14T00:00:00Z",
     )
 
 
@@ -103,12 +104,27 @@ def test_source_hash_must_match_original_artifact(tmp_path):
         verify(evidence, path)
 
 
-def test_verification_cannot_precede_effective_date_or_follow_evaluation(tmp_path):
+def test_historical_evaluation_can_be_verified_after_the_market_period(tmp_path):
     evidence = valid_evidence()
     path = source_artifact(tmp_path, evidence)
-    evidence["evidence"]["verified_at_utc"] = "2025-12-31T23:59:59Z"
-    with pytest.raises(CommissionEvidenceError, match="verification timestamp"):
-        verify(evidence, path)
     evidence["evidence"]["verified_at_utc"] = "2026-11-13T12:00:01Z"
-    with pytest.raises(CommissionEvidenceError, match="verification timestamp"):
+    verified = verify(evidence, path)
+    assert verified["status"] == "VERIFIED"
+    evidence["evidence"]["verified_at_utc"] = "2026-11-14T00:00:01Z"
+    with pytest.raises(CommissionEvidenceError, match="cannot be in the future"):
         verify(evidence, path)
+
+
+def test_commission_schedule_must_cover_entire_evaluation_period(tmp_path):
+    evidence = valid_evidence()
+    path = source_artifact(tmp_path, evidence)
+    evidence["commission"]["effective_to_utc"] = "2026-11-14T00:00:00Z"
+    with pytest.raises(CommissionEvidenceError, match="full evaluation period"):
+        validate_commission_evidence(
+            evidence, broker_symbol="XAUUSDm", account_mode="DEMO",
+            evaluation_time_utc="2026-11-13T12:00:00Z",
+            evaluation_start_utc="2026-11-12T00:00:00Z",
+            evaluation_end_utc="2026-11-15T00:00:00Z",
+            verification_time_utc="2026-11-16T00:00:00Z",
+            source_artifact_path=path,
+        )
