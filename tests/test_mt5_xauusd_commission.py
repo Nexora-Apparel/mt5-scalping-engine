@@ -97,7 +97,8 @@ def test_wrong_requested_account_or_symbol_fails(tmp_path):
 
 def test_invalid_price_and_lot_size_fail(tmp_path):
     evidence = valid_evidence()
-    verified = verify(evidence, source_artifact(tmp_path, evidence))
+    source_path, verification_path = source_artifact(tmp_path, evidence)
+    verified = verify(evidence, source_path, verification_path)
     with pytest.raises(CommissionEvidenceError):
         commission_cost_bps(verified, entry_price_usd_per_oz=0)
     with pytest.raises(CommissionEvidenceError):
@@ -145,3 +146,15 @@ def test_independent_verification_artifact_must_match_its_own_hash(tmp_path):
     verification_path.write_bytes(b"altered review artifact")
     with pytest.raises(CommissionEvidenceError, match="verification artifact SHA-256"):
         verify(evidence, source_path, verification_path)
+
+
+def test_missing_independent_verification_artifact_fails_closed(tmp_path):
+    evidence = valid_evidence()
+    source_path, _ = source_artifact(tmp_path, evidence)
+    with pytest.raises(CommissionEvidenceError, match="independent verification artifact"):
+        validate_commission_evidence(
+            evidence, broker_symbol="XAUUSDm", account_mode="DEMO",
+            evaluation_time_utc="2026-11-13T12:00:00Z",
+            source_artifact_path=source_path,
+            verification_artifact_path=tmp_path / "missing-review-record.txt",
+        )
