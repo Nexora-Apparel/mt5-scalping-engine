@@ -1,6 +1,9 @@
 import copy
 import hashlib
+import json
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from tools.mt5_xauusd_commission import (
     CommissionEvidenceError,
@@ -38,25 +41,61 @@ def source_artifact(tmp_path, evidence):
     source_path = tmp_path / "exness-account-schedule.txt"
     verification_path = tmp_path / "independent-review-record.txt"
     source_path.write_bytes(b"synthetic test fixture; not actual broker evidence")
-    verification_path.write_bytes(b"synthetic independent-review fixture; not actual verification")
     evidence["evidence"]["source_sha256"] = hashlib.sha256(source_path.read_bytes()).hexdigest()
+    private_key = Ed25519PrivateKey.generate()
+    public_key = private_key.public_key()
+    public_path = tmp_path / "trusted-reviewer-public.pem"
+    public_path.write_bytes(public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    ))
+    raw_public = public_key.public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    fingerprint = hashlib.sha256(raw_public).hexdigest()
+    attestation = {
+        "schema": "VELTRIX_COMMISSION_REVIEW_ATTESTATION_V1",
+        "review_status": "APPROVED",
+        "reviewer_identity": "Synthetic Test Reviewer",
+        "reviewer_organization": "Synthetic Test Organization",
+        "reviewer_role": "Independent Cost Reviewer",
+        "reviewed_source_sha256": evidence["evidence"]["source_sha256"],
+        "canonical_symbol": "XAUUSD",
+        "broker_symbol": "XAUUSDm",
+        "account_mode": "DEMO",
+        "currency": "USD",
+        "contract_size_oz_per_lot": 100.0,
+        "commission_usd_per_lot_per_side": 3.5,
+        "charging_basis": "PER_SIDE",
+        "effective_from_utc": "2026-01-01T00:00:00Z",
+        "effective_to_utc": None,
+        "reviewed_at_utc": "2026-11-13T00:00:00Z",
+        "independence_statement": "Synthetic test fixture only; no actual broker evidence or reviewer identity is asserted.",
+    }
+    canonical = json.dumps(attestation, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    import base64
+    attestation["signature_ed25519_base64"] = base64.b64encode(private_key.sign(canonical)).decode("ascii")
+    verification_path.write_text(json.dumps(attestation, sort_keys=True), encoding="utf-8")
     evidence["evidence"]["verification_sha256"] = hashlib.sha256(verification_path.read_bytes()).hexdigest()
-    return source_path, verification_path
+    return source_path, verification_path, public_path, fingerprint
 
 
-def verify(evidence, source_path, verification_path):
+def verify(evidence, source_path, verification_path, public_path, fingerprint):
     return validate_commission_evidence(
         evidence, broker_symbol="XAUUSDm", account_mode="DEMO",
         evaluation_time_utc="2026-11-13T12:00:00Z", source_artifact_path=source_path,
         verification_artifact_path=verification_path,
+        verification_public_key_path=public_path,
+        trusted_reviewer_key_sha256=fingerprint,
         verification_time_utc="2026-11-14T00:00:00Z",
     )
 
 
 def test_verified_evidence_and_round_turn_cost(tmp_path):
     evidence = valid_evidence()
-    source_path, verification_path = source_artifact(tmp_path, evidence)
-    verified = verify(evidence, source_path, verification_path)
+    source_path, verification_path, public_path, fingerprint = source_artifact(tmp_path, evidence)
+    verified = verify(evidence, source_path, verification_path, public_path, fingerprint)
     assert commission_cost_bps(verified, entry_price_usd_per_oz=2000.0) == pytest.approx(0.35)
     assert net_return_bps(1.0, verified, entry_price_usd_per_oz=2000.0) == pytest.approx(0.65)
 
@@ -88,7 +127,8 @@ def test_wrong_requested_account_or_symbol_fails(tmp_path):
     with pytest.raises(CommissionEvidenceError):
         validate_commission_evidence(evidence, broker_symbol="XAUUSD", account_mode="DEMO",
                                      evaluation_time_utc="2026-11-13T12:00:00Z", source_artifact_path=source_path,
-                                     verification_artifact_path=verification_path)
+                                     verification_artifact_path=verification_path,
+                                     verification_public_key_path=public_path, trusted_reviewer_key_sha256=fingerprint)
     with pytest.raises(CommissionEvidenceError):
         validate_commission_evidence(evidence, broker_symbol="XAUUSDm", account_mode="LIVE",
                                      evaluation_time_utc="2026-11-13T12:00:00Z", source_artifact_path=source_path,
@@ -137,6 +177,8 @@ def test_commission_schedule_must_cover_entire_evaluation_period(tmp_path):
             verification_time_utc="2026-11-16T00:00:00Z",
             source_artifact_path=source_path,
             verification_artifact_path=verification_path,
+            verification_public_key_path=public_path,
+            trusted_reviewer_key_sha256=fingerprint,
         )
 
 
@@ -150,11 +192,13 @@ def test_independent_verification_artifact_must_match_its_own_hash(tmp_path):
 
 def test_missing_independent_verification_artifact_fails_closed(tmp_path):
     evidence = valid_evidence()
-    source_path, _ = source_artifact(tmp_path, evidence)
+    source_path, verification_path, public_path, fingerprint = source_artifact(tmp_path, evidence)
     with pytest.raises(CommissionEvidenceError, match="independent verification artifact"):
         validate_commission_evidence(
             evidence, broker_symbol="XAUUSDm", account_mode="DEMO",
             evaluation_time_utc="2026-11-13T12:00:00Z",
             source_artifact_path=source_path,
             verification_artifact_path=tmp_path / "missing-review-record.txt",
+            verification_public_key_path=public_path,
+            trusted_reviewer_key_sha256=fingerprint,
         )
