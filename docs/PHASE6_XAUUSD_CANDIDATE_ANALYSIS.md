@@ -23,3 +23,9 @@ python -m tools.mt5_xauusd_candidate_signals --csv ticks.csv --manifest manifest
 ```
 
 No outcome returns, PnL, net performance, position sizing, or order data is generated. The previously inspected Sessions 8 and 9 may only be used for development smoke checks; their candidate event counts are not strategy evidence.
+
+## MQL5 research integration
+
+`MQL5/Include/Veltrix/CandidateAnalysis.mqh` provides XAUUSD-only implementations of the same momentum, mean-reversion, and volatility-breakout formulas for completed five-second feature windows. It rejects incomplete or discontinuous histories and emits only in-memory research-candidate records. `VeltrixScalper.mq5` includes the module; the MQL5 compile workflow verifies the integration.
+
+The current live-quote collector produces rolling snapshots rather than the fixed completed-window stream required by this module. The candidate module is therefore not invoked on live quotes yet. A fixed-window adapter and runtime verification must be completed before live terminal analysis is enabled. This does not affect the offline Python candidate generator.
