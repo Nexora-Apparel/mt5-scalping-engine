@@ -201,3 +201,18 @@ def test_missing_five_second_window_breaks_lookback_continuity(registry):
         and event["signal_window_start_utc"] == target_timestamp
         and event["parameters"]["lookback_seconds"] == 5
     ]
+
+def test_candidate_output_is_deterministic(registry):
+    features = make_features()
+    features["features"][10]["mid_close"] = 100.2
+    features["features"][10]["mid_high"] = 100.201
+    features["features"][10]["mid_low"] = 100.199
+    first = generate_candidate_events(features, registry)
+    second = generate_candidate_events(features, registry)
+    assert first == second
+
+
+def test_mql5_candidate_module_contains_no_order_api_calls():
+    source = Path("MQL5/Include/Veltrix/CandidateAnalysis.mqh").read_text(encoding="utf-8")
+    forbidden = ("OrderSend(", "OrderSendAsync(", "PositionOpen(", "CTrade")
+    assert all(token not in source for token in forbidden)
