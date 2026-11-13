@@ -4,12 +4,12 @@ import pytest
 from tools.mt5_xauusd_feature_diagnostics import DiagnosticsError, diagnose_sessions
 
 
-def make_session(start_ms, source_id):
+def make_session(start_ms, source_id, width=5):
     rows = []
     for i in range(40):
         rows.append({
-            "window_start_utc": datetime.fromtimestamp((start_ms // 5000 + i) * 5, timezone.utc).isoformat(),
-            "window_seconds": 5,
+            "window_start_utc": datetime.fromtimestamp((start_ms // (width * 1000) + i) * width, timezone.utc).isoformat(),
+            "window_seconds": width,
             "tick_count": 4 + (i % 5),
             "ticks_per_second": 1.0 + (i % 7) / 3,
             "return_bps": ((i % 9) - 4) / 10,
@@ -72,8 +72,7 @@ def test_rejects_source_tick_count_mismatch():
 
 def test_rejects_different_window_widths():
     first = make_session(1_800_000_000_000, "a")
-    second = make_session(1_800_000_300_000, "b")
-    second["window_seconds"] = 10
+    second = make_session(1_800_000_300_000, "b", width=10)
     with pytest.raises(DiagnosticsError, match="same feature window"):
         diagnose_sessions([first, second])
 
