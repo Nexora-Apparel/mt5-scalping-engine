@@ -562,7 +562,7 @@ def test_phase7_risk_policy_reference_boundaries():
 def test_phase7_sizing_and_intent_registration_recheck_live_account_and_daily_loss():
     source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
     sizing = source.split("bool CalculateVolume", 1)[1].split("bool RegisterApprovedIntent", 1)[0]
-    registration = source.split("bool RegisterApprovedIntent", 1)[1].split("void LatchEmergencyStop", 1)[0]
+    registration = source.split("bool RegisterApprovedIntent", 1)[1].split("bool LatchEmergencyStop", 1)[0]
     assert "VerifyExactDemoAccount(guard_reason)" in sizing
     assert "EvaluateDailyLoss(source.equity,guard_reason)" in sizing
     assert "VerifyExactDemoAccount(reason)" in registration
