@@ -245,3 +245,31 @@ def test_last_observed_window_is_never_treated_as_completed(registry):
     result = generate_candidate_events(features, registry)
     assert result["completed_window_count"] == last_index
     assert not [event for event in result["events"] if event["signal_window_index"] == last_index]
+
+
+def test_future_mutations_do_not_change_breakout_compression_or_signal(registry):
+    features = make_features(count=100)
+    index = 85
+    features["features"][index]["mid_close"] = 101.0
+    features["features"][index]["mid_high"] = 101.001
+    features["features"][index]["mid_low"] = 100.999
+    baseline = generate_candidate_events(features, registry)
+    expected = [
+        event for event in baseline["events"]
+        if event["candidate_id"] == "XAU_VOLATILITY_BREAKOUT_V1"
+        and event["signal_window_index"] == index
+    ]
+    assert expected
+    mutated = copy.deepcopy(features)
+    for row in mutated["features"][index + 1:]:
+        row["mid_close"] = 150.0
+        row["mid_high"] = 150.1
+        row["mid_low"] = 149.9
+        row["realized_volatility_bps"] = 100.0
+    after = generate_candidate_events(mutated, registry)
+    actual = [
+        event for event in after["events"]
+        if event["candidate_id"] == "XAU_VOLATILITY_BREAKOUT_V1"
+        and event["signal_window_index"] == index
+    ]
+    assert actual == expected
