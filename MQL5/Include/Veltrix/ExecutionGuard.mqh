@@ -108,6 +108,11 @@ public:
          return false;
       }
 
+      if(!SymbolSelect(intent.symbol,true))
+      {
+         decision.reason="Requested broker symbol is unavailable";
+         return false;
+      }
       string normalized_symbol=intent.symbol;
       StringToUpper(normalized_symbol);
       string base_currency="",profit_currency="";
@@ -124,11 +129,6 @@ public:
       if(base_currency!="XAU" || profit_currency!="USD")
       {
          decision.reason="Symbol metadata does not confirm XAU base and USD profit currencies";
-         return false;
-      }
-      if(!SymbolSelect(intent.symbol,true))
-      {
-         decision.reason="Requested broker symbol is unavailable";
          return false;
       }
 
