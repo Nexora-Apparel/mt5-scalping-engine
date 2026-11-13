@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import random
 import statistics
 import subprocess
@@ -877,7 +878,6 @@ def main() -> int:
     parser.add_argument("--commission-source-artifact", type=Path)
     parser.add_argument("--commission-verification-artifact", type=Path)
     parser.add_argument("--commission-review-public-key", type=Path)
-    parser.add_argument("--commission-review-key-sha256")
     parser.add_argument("--commission-verification-time-utc")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -896,7 +896,7 @@ def main() -> int:
                                   commission_source_artifact_path=args.commission_source_artifact,
                                   commission_verification_artifact_path=args.commission_verification_artifact,
                                   commission_review_public_key_path=args.commission_review_public_key,
-                                  trusted_commission_reviewer_key_sha256=args.commission_review_key_sha256,
+                                  trusted_commission_reviewer_key_sha256=os.environ.get("VELTRIX_COMMISSION_REVIEW_KEY_SHA256"),
                                   commission_verification_time_utc=args.commission_verification_time_utc)
     except (OSError, json.JSONDecodeError, ProfileError, CandidateError, RegistryError, ReplayError, WalkForwardError, KeyError, TypeError, ValueError) as exc:
         parser.exit(2, f"WALK-FORWARD FAIL: {exc}\n")
