@@ -33,3 +33,16 @@ The two already inspected sessions remain development-only. Replay smoke tests o
 `.github/workflows/phase5-xauusd-replay-validation.yml` downloads the two retained certified collection artifacts by their exact source run IDs. It rebuilds their five-second features, reruns the cross-session diagnostic, creates clearly labelled synthetic smoke events, and replays those events against the original ticks. It asserts that no execution or actual-fill claim is emitted and that commission remains null. The resulting evidence bundle is retained as a 90-day Actions artifact.
 
 The synthetic smoke events are not outputs of the three candidate signal formulas and must not be interpreted as candidate trades or strategy results. This workflow validates replay mechanics and data lineage only.
+
+## Verified certified-session smoke result
+
+Historical validation workflow [43378951998](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/43378951998) completed successfully. Its retained evidence artifact is [14015811691](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/43378951998/artifacts/14015811691).
+
+- Both original certified datasets were downloaded by exact run/artifact identity and passed provenance validation.
+- Feature rebuild and Phase 3 cross-session diagnostics passed: 12,838 source ticks and 721 five-second windows; diagnostics output was valid JSON.
+- Four synthetic smoke events per session were replayed (8 total); all 8 had an eligible entry and exit quote, with zero entry or exit timeouts.
+- Both outputs identify the source data as `DEVELOPMENT_ONLY` and `final_holdout_eligible=false`.
+- Every outcome records `execution_sent=false`, `actual_fill_claimed=false`, and `spread_included_once=true`.
+- Commission remains unverified and every `net_after_commission` field remains null.
+
+These are synthetic mechanics checks, not outputs of the candidate formulas. The gross price changes in the smoke report are not strategy results and must not be used to rank or approve candidates. The full Project Tests workflow passed 153 tests after the Phase 5 merge.
