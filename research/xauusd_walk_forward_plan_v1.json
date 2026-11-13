@@ -11,11 +11,21 @@
   "development_sessions": [
     {
       "session_id": "session8",
-      "expected_sha256": "a81a9ec96602e3a0f20dad64d50cacd36432715c31f6ecf7e5a5f1b94cb6b2e7"
+      "expected_sha256": "a81a9ec96602e3a0f20dad64d50cacd36432715c31f6ecf7e5a5f1b94cb6b2e7",
+      "workflow_run_id": 43333365050,
+      "artifact_id": 13997174371,
+      "collection_started_utc": "2026-11-13T00:00:09.575620+00:00",
+      "collection_ended_utc": "2026-11-13T00:30:11.496689+00:00",
+      "duration_seconds": 1802
     },
     {
       "session_id": "session9",
-      "expected_sha256": "d31d8b8f463f0bf74b7f98893fe2b2cd3f078153621ef7f52863e95e963967c1"
+      "expected_sha256": "d31d8b8f463f0bf74b7f98893fe2b2cd3f078153621ef7f52863e95e963967c1",
+      "workflow_run_id": 43338046880,
+      "artifact_id": 13999059160,
+      "collection_started_utc": "2026-11-13T00:34:53.923845+00:00",
+      "collection_ended_utc": "2026-11-13T01:04:55.899531+00:00",
+      "duration_seconds": 1802
     }
   ],
   "validation_sessions": [
@@ -50,12 +60,26 @@
     "one_open_position_per_candidate_configuration": true
   },
   "evaluation": {
-    "holding_horizons_seconds": [5, 15, 30, 60],
-    "slippage_sensitivity_points_per_side": [0, 1, 2, 5],
+    "holding_horizons_seconds": [
+      5,
+      15,
+      30,
+      60
+    ],
+    "slippage_sensitivity_points_per_side": [
+      0,
+      1,
+      2,
+      5
+    ],
     "spread_treatment": "Executable bid/ask crossing includes spread exactly once.",
     "commission_status": "UNVERIFIED_REQUIRED_INPUT",
     "net_performance_allowed": false,
-    "benchmark_set": ["NO_TRADE", "ALWAYS_LONG", "ALWAYS_SHORT"],
+    "benchmark_set": [
+      "NO_TRADE",
+      "ALWAYS_LONG",
+      "ALWAYS_SHORT"
+    ],
     "primary_statistical_gate": "After verified commission and registered slippage assumptions, mean net return must be positive and the session-clustered 95% lower confidence bound must exceed zero.",
     "relative_gate": "Selected candidate configuration must outperform NO_TRADE, ALWAYS_LONG, and ALWAYS_SHORT on the same chronological partition after identical costs.",
     "holdout_policy": "The final holdout is not scored until validation selection is frozen in a separately committed selection-freeze record whose timestamp precedes every holdout collection start.",
