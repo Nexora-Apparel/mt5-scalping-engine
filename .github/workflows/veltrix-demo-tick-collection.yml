@@ -1,12 +1,18 @@
 name: VELTRIX bounded Exness DEMO tick collection
-run-name: VELTRIX XAUUSD-only read-only tick collection (30 min)
+run-name: VELTRIX ${{ inputs.validation_session_id }} XAUUSD-only read-only collection (30 min)
 
 on:
   workflow_dispatch:
-  schedule:
-    # Four bounded, read-only XAUUSD DEMO validation sessions on four dates.
-    # This temporary research schedule ends after 17 November 2026.
-    - cron: "30 10 14-17 11 *"
+    inputs:
+      validation_session_id:
+        description: Preregistered Phase 8 validation session ID (use one distinct date per ID)
+        required: true
+        type: choice
+        options:
+          - validation_01
+          - validation_02
+          - validation_03
+          - validation_04
 
 permissions:
   contents: read
@@ -88,6 +94,7 @@ jobs:
           MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
           MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
           MT5_SERVER: ${{ secrets.MT5_SERVER }}
+          VELTRIX_SESSION_ID: ${{ inputs.validation_session_id }}
         run: |
           $ErrorActionPreference = "Stop"
           python tools/mt5_demo_tick_collector.py --minutes 30 --output-dir session-artifacts
