@@ -240,7 +240,7 @@ jobs:
 
           [StartUp]
           Script=$scriptName
-          Symbol=EURUSD
+          Symbol=XAUUSD
           Period=M1
           ShutdownTerminal=1
           "@
