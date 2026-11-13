@@ -218,6 +218,12 @@ jobs:
           $installPath = Split-Path $env:METAEDITOR
           $terminal = Join-Path $installPath "terminal64.exe"
           if (!(Test-Path $terminal)) { throw "MetaTrader terminal executable was not found." }
+          $scriptDirectory = Join-Path $installPath "MQL5\\Scripts"
+          $filesDirectory = Join-Path $installPath "MQL5\\Files"
+          New-Item -ItemType Directory -Force -Path $scriptDirectory | Out-Null
+          New-Item -ItemType Directory -Force -Path $filesDirectory | Out-Null
+          Copy-Item "MQL5\\Scripts\\RiskJournalRuntimeTest.ex5" $scriptDirectory -Force
+          Copy-Item "MQL5\\Scripts\\RiskControlsRuntimeTest.ex5" $scriptDirectory -Force
 
           function Invoke-Mt5RuntimeScript([string]$scriptName, [string]$resultName) {
             $resultPath = Join-Path $installPath ("MQL5\\Files\\" + $resultName)
