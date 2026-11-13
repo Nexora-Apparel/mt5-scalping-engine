@@ -723,6 +723,7 @@ def evaluate_partition(
             "contract_size_oz_per_lot": verified_commission["contract_size_oz_per_lot"],
             "commission_usd_per_lot_per_side": verified_commission["commission_usd_per_lot_per_side"],
             "source_sha256": verified_commission["source_sha256"],
+            "verification_sha256": verified_commission["verification_sha256"],
             "source_reference": verified_commission["source_reference"],
             "verification_reference": verified_commission["verification_reference"],
             "effective_from_utc": verified_commission["effective_from_utc"],
