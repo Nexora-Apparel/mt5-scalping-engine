@@ -133,10 +133,12 @@ private:
       string payload=BuildPayload(next_sequence,event_type,key,timestamp_msc,value,m_previous_hash);
       string checksum=HashText(payload);
       FileSeek(m_handle,0,SEEK_END);
+      ResetLastError();
       uint written=FileWrite(m_handle,(double)next_sequence,event_type,key,
                              (double)timestamp_msc,value,m_previous_hash,checksum);
       if(written==0)
       { reason="Risk journal append failed; transaction must remain locked"; return false; }
+      ResetLastError();
       FileFlush(m_handle);
       if(GetLastError()!=0)
       { reason="Risk journal flush reported an error; transaction must remain locked"; return false; }
