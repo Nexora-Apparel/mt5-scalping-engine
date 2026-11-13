@@ -213,7 +213,9 @@ def test_execution_coordinator_is_state_only_and_fail_closed():
         "VX_REQUEST_CANCELLED", "Prepare", "MarkSubmitting",
         "RecordBrokerResponse", "RecordFill", "DealAlreadySeen",
         "BeginReconciliation", "ResolveFromBroker", "SetDisconnected",
-        "SetReconnected", "LatchEmergencyStop", "m_emergency_stop",\n        "GlobalVariableCheck", "GlobalVariableGet", "GlobalVariableSet",\n        "GlobalVariablesFlush", "m_emergency_key",
+        "SetReconnected", "LatchEmergencyStop", "m_emergency_stop",
+        "GlobalVariableCheck", "GlobalVariableGet", "GlobalVariableSet",
+        "GlobalVariablesFlush", "m_emergency_key",
     )
     for token in required:
         assert token in source
