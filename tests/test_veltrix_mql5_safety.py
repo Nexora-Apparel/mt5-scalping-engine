@@ -623,3 +623,10 @@ def test_phase7_position_registry_and_broker_history_are_xauusd_scoped():
     assert "SYMBOL_CURRENCY_PROFIT" in registry
     assert 'base=="XAU" && profit=="USD"' in registry
     assert "HistoryDealGetString(deal,DEAL_SYMBOL)!=record.symbol" in reconciler
+
+
+def test_phase7_reconciliation_fails_closed_on_live_symbol_mismatch():
+    source = (ROOT / "MQL5" / "Include" / "Veltrix" / "BrokerReconciler.mqh").read_text(encoding="utf-8")
+    assert 'actual_symbol=PositionGetString(POSITION_SYMBOL)' in source
+    assert 'if(live_symbol!=record.symbol)' in source
+    assert "Live broker position symbol differs from registered XAUUSD contract" in source
