@@ -32,6 +32,7 @@ private:
    int m_consecutive_losses;
    long m_cooldown_until_msc;
    string m_seen_request_ids[];
+   string m_emergency_key;
 
    bool IsXauUsdContract(const string symbol)
    {
@@ -56,6 +57,14 @@ private:
       return false;
    }
 
+   ulong ServerHash(const string server) const
+   {
+      ulong hash=2166136261;
+      for(int i=0;i<StringLen(server);i++)
+         hash=(hash*16777619+(ulong)StringGetCharacter(server,i))%4294967291;
+      return hash;
+   }
+
 public:
    CVxRiskControls(void)
    {
@@ -66,6 +75,7 @@ public:
       m_day_start_equity=0.0;
       m_consecutive_losses=0;
       m_cooldown_until_msc=0;
+      m_emergency_key="";
    }
 
    bool Init(const VxRiskControlConfig &config,string &reason)
@@ -92,6 +102,24 @@ public:
       { reason="Policy requires one position, 30-3600s cooldown, and 1-3 consecutive-loss limit"; return false; }
 
       m_config=config;
+      m_emergency_key=StringFormat("VX_ESTOP_%I64d_%I64u",
+                                   config.expected_demo_login,
+                                   ServerHash(config.expected_demo_server));
+      if(m_emergency_key=="" || StringLen(m_emergency_key)>63)
+      { reason="Emergency-stop persistence key is invalid"; return false; }
+      if(GlobalVariableCheck(m_emergency_key))
+      {
+         double stored=GlobalVariableGet(m_emergency_key);
+         if(!MathIsValidNumber(stored) || stored<0.0)
+         { reason="Persistent emergency-stop state is corrupt; refusing initialization"; return false; }
+         m_emergency_stop=(stored>0.5);
+      }
+      else
+      {
+         if(GlobalVariableSet(m_emergency_key,0.0)==0)
+         { reason="Could not initialize persistent emergency-stop state"; return false; }
+         GlobalVariablesFlush();
+      }
       m_initialized=true;
       return true;
    }
@@ -231,9 +259,16 @@ public:
       return true;
    }
 
-   void LatchEmergencyStop(void)
+   bool LatchEmergencyStop(string &reason)
    {
+      reason="";
       m_emergency_stop=true;
+      if(!m_initialized || m_emergency_key=="")
+      { reason="Emergency stop latched in memory but persistent key is unavailable"; return false; }
+      if(GlobalVariableSet(m_emergency_key,1.0)==0)
+      { reason="Emergency stop latched in memory but persistence write failed"; return false; }
+      GlobalVariablesFlush();
+      return true;
    }
 
    bool IsLocked(void) const
