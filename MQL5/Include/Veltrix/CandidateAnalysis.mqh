@@ -28,6 +28,9 @@ struct VxCandidateResearchSignal
    long signal_window_end_msc;
    long evaluated_at_msc;
    int horizon_seconds;
+   int lookback_seconds;
+   double parameter_threshold;
+   double compression_percentile;
    double signal_strength;
    string reason;
 };
@@ -54,6 +57,9 @@ private:
       signal.signal_window_end_msc=0;
       signal.evaluated_at_msc=0;
       signal.horizon_seconds=horizon_seconds;
+      signal.lookback_seconds=0;
+      signal.parameter_threshold=0.0;
+      signal.compression_percentile=0.0;
       signal.signal_strength=0.0;
       signal.reason="";
    }
@@ -197,6 +203,9 @@ private:
                   const VxCompletedFeatureWindow &window,
                   const long evaluation_time_msc,
                   const ENUM_VX_SIGNAL_DIRECTION direction,
+                  const int lookback_seconds,
+                  const double parameter_threshold,
+                  const double compression_percentile,
                   const double strength,
                   const string reason) const
    {
@@ -205,6 +214,9 @@ private:
       signal.signal_window_start_msc=window.window_start_msc;
       signal.signal_window_end_msc=window.window_start_msc+5000;
       signal.evaluated_at_msc=evaluation_time_msc;
+      signal.lookback_seconds=lookback_seconds;
+      signal.parameter_threshold=parameter_threshold;
+      signal.compression_percentile=compression_percentile;
       signal.signal_strength=strength;
       signal.reason=reason;
    }
