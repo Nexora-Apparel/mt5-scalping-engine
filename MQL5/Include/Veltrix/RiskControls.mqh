@@ -129,6 +129,25 @@ private:
       return true;
    }
 
+   bool LatchPersistentEmergencyStop(const long timestamp_msc,string &reason)
+   {
+      m_emergency_stop=true;
+      long event_time=timestamp_msc;
+      if(event_time<=0)
+         event_time=(long)TimeLocal()*1000;
+      string journal_reason="";
+      bool journal_ok=m_journal.AppendEmergencyStop(event_time,journal_reason);
+      bool state_ok=PersistRiskState();
+      if(!journal_ok || !state_ok)
+      {
+         reason="Emergency stop latched in memory; durable journal/state write failed: "+
+                journal_reason;
+         return false;
+      }
+      reason="";
+      return true;
+   }
+
 public:
    CVxRiskControls(void)
    {
@@ -244,6 +263,20 @@ public:
          if(m_consecutive_losses>=m_config.max_consecutive_losses)
             m_daily_loss_locked=true;
       }
+      bool journal_state_changed=false;
+      if(m_journal.HasEmergencyStop() && !m_emergency_stop)
+      {
+         m_emergency_stop=true;
+         journal_state_changed=true;
+      }
+      if(m_server_day_key>0 && m_journal.HasDailyLock(m_server_day_key) &&
+         !m_daily_loss_locked)
+      {
+         m_daily_loss_locked=true;
+         journal_state_changed=true;
+      }
+      if(journal_state_changed && !PersistRiskState())
+      { reason="Journal contains a permanent lock event but terminal state could not be synchronized"; return false; }
       m_initialized=true;
       return true;
    }
@@ -311,10 +344,20 @@ public:
       if(loss_percent>=m_config.max_daily_loss_percent)
       {
          m_daily_loss_locked=true;
+         long event_time=(long)TimeTradeServer()*1000;
+         string journal_reason="";
+         if(event_time<=0 ||
+            !m_journal.AppendDailyLock(m_server_day_key,event_time,loss_percent,journal_reason))
+         {
+            string latch_reason="";
+            LatchPersistentEmergencyStop(event_time,latch_reason);
+            reason="Daily loss reached but durable daily-lock journal append failed; emergency stop latched: "+journal_reason;
+            return false;
+         }
          if(!PersistRiskState())
          {
-            m_emergency_stop=true;
-            PersistRiskState();
+            string latch_reason="";
+            LatchPersistentEmergencyStop(event_time,latch_reason);
             reason="Daily loss reached and risk-state persistence failed; emergency stop latched";
             return false;
          }
@@ -363,22 +406,33 @@ public:
       }
       if(!PersistRiskState())
       {
-         m_emergency_stop=true;
-         PersistRiskState();
+         string latch_reason="";
+         LatchPersistentEmergencyStop(close_time_msc,latch_reason);
          reason="Could not persist verified close risk state; emergency stop latched";
          return false;
       }
       if(!m_journal.AppendClose(close_key,close_time_msc,net_profit,reason))
       {
-         m_emergency_stop=true;
-         PersistRiskState();
+         string latch_reason="";
+         LatchPersistentEmergencyStop(close_time_msc,latch_reason);
          reason="Could not commit closing-deal journal record after state update; manual reconciliation required";
          return false;
       }
+      if(m_daily_loss_locked)
+      {
+         string lock_reason="";
+         if(!m_journal.AppendDailyLock(m_server_day_key,close_time_msc,0.0,lock_reason))
+         {
+            string latch_reason="";
+            LatchPersistentEmergencyStop(close_time_msc,latch_reason);
+            reason="Consecutive-loss lock could not be committed to journal; emergency stop latched";
+            return false;
+         }
+      }
       if(!ReleaseRiskStateLock(close_time_msc))
       {
-         m_emergency_stop=true;
-         PersistRiskState();
+         string latch_reason="";
+         LatchPersistentEmergencyStop(close_time_msc,latch_reason);
          reason="Could not release risk-state transaction lock; manual reconciliation required";
          return false;
       }
@@ -459,10 +513,9 @@ public:
    bool LatchEmergencyStop(string &reason)
    {
       reason="";
-      m_emergency_stop=true;
-      if(!m_initialized || !PersistRiskState())
-      { reason="Emergency stop latched in memory but persistent risk-state write failed"; return false; }
-      return true;
+      if(!m_initialized)
+      { m_emergency_stop=true; reason="Emergency stop latched in memory; risk controls are not initialized"; return false; }
+      return LatchPersistentEmergencyStop((long)TimeLocal()*1000,reason);
    }
 
    bool IsLocked(void) const
