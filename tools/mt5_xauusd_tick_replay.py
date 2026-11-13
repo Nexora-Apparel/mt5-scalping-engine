@@ -118,6 +118,7 @@ def evaluate_event(
         "direction": direction,
         "horizon_seconds": horizon,
         "signal_window_end_msc": signal_end,
+        "event_origin": event.get("event_origin", "UNSPECIFIED_REPLAY_EVENT"),
         "spread_included_once": True,
         "execution_sent": False,
         "actual_fill_claimed": False,
