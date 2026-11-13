@@ -13,6 +13,8 @@ enum ENUM_VX_INTENT_SIDE
 
 struct VxExecutionIntent
 {
+   long expected_demo_login;
+   string expected_demo_server;
    string symbol;
    ENUM_VX_INTENT_SIDE side;
    double volume;
@@ -60,7 +62,8 @@ public:
       decision.estimated_margin=0.0;
       decision.reason="";
 
-      if(intent.symbol=="" ||
+      if(intent.expected_demo_login<=0 || intent.expected_demo_server=="" ||
+         intent.symbol=="" ||
          (intent.side!=VX_SIDE_BUY && intent.side!=VX_SIDE_SELL) ||
          !MathIsValidNumber(intent.volume) || intent.volume<=0.0 ||
          !MathIsValidNumber(intent.requested_price) ||
@@ -82,6 +85,12 @@ public:
          decision.reason="Account is not a verified DEMO account";
          return false;
       }
+      if((long)AccountInfoInteger(ACCOUNT_LOGIN)!=intent.expected_demo_login ||
+         AccountInfoString(ACCOUNT_SERVER)!=intent.expected_demo_server)
+      {
+         decision.reason="Connected DEMO login or server does not exactly match configured identity";
+         return false;
+      }
 
       if((ENUM_ACCOUNT_MARGIN_MODE)AccountInfoInteger(ACCOUNT_MARGIN_MODE)!=ACCOUNT_MARGIN_MODE_RETAIL_HEDGING)
       {
@@ -99,6 +108,24 @@ public:
          return false;
       }
 
+      string normalized_symbol=intent.symbol;
+      StringToUpper(normalized_symbol);
+      string base_currency="",profit_currency="";
+      if(StringLen(normalized_symbol)<6 ||
+         StringSubstr(normalized_symbol,0,6)!="XAUUSD" ||
+         !SymbolInfoString(intent.symbol,SYMBOL_CURRENCY_BASE,base_currency) ||
+         !SymbolInfoString(intent.symbol,SYMBOL_CURRENCY_PROFIT,profit_currency))
+      {
+         decision.reason="Only a broker-verified XAUUSD contract is permitted";
+         return false;
+      }
+      StringToUpper(base_currency);
+      StringToUpper(profit_currency);
+      if(base_currency!="XAU" || profit_currency!="USD")
+      {
+         decision.reason="Symbol metadata does not confirm XAU base and USD profit currencies";
+         return false;
+      }
       if(!SymbolSelect(intent.symbol,true))
       {
          decision.reason="Requested broker symbol is unavailable";
