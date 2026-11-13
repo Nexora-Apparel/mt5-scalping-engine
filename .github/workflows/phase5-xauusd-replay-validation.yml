@@ -1,0 +1,128 @@
+name: Phase 5 XAUUSD historical replay validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/mt5_xauusd_tick_replay.py"
+      - "tools/mt5_xauusd_feature_research.py"
+      - "tools/mt5_xauusd_feature_diagnostics.py"
+      - "tools/mt5_tick_market_profile.py"
+      - "research/xauusd_strategy_registry_v1.json"
+      - ".github/workflows/phase5-xauusd-replay-validation.yml"
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  historical-replay-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install project dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download certified Exness DEMO Session 8
+        uses: actions/download-artifact@v4
+        with:
+          name: veltrix-exness-demo-ticks-8
+          run-id: 43333365050
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: data/phase5/session8
+
+      - name: Download certified Exness DEMO Session 9
+        uses: actions/download-artifact@v4
+        with:
+          name: veltrix-exness-demo-ticks-9
+          run-id: 43338046880
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: data/phase5/session9
+
+      - name: Rebuild verified five-second features
+        run: |
+          python -m tools.mt5_xauusd_feature_research --csv data/phase5/session8/veltrix_exness_demo_ticks.csv --manifest data/phase5/session8/manifest.json --window-seconds 5 --output data/phase5/session8/features.json
+          python -m tools.mt5_xauusd_feature_research --csv data/phase5/session9/veltrix_exness_demo_ticks.csv --manifest data/phase5/session9/manifest.json --window-seconds 5 --output data/phase5/session9/features.json
+
+      - name: Re-run Phase 3 cross-session diagnostics
+        run: |
+          python -m tools.mt5_xauusd_feature_diagnostics --inputs data/phase5/session8/features.json data/phase5/session9/features.json --output data/phase5/cross-session-diagnostics.json
+
+      - name: Create explicitly synthetic replay smoke events
+        run: |
+          python - <<'PY'
+          import json
+          from datetime import datetime
+          from pathlib import Path
+
+          candidates = [
+              "XAU_MOMENTUM_CONTINUATION_V1",
+              "XAU_MEAN_REVERSION_V1",
+              "XAU_VOLATILITY_BREAKOUT_V1",
+              "XAU_MOMENTUM_CONTINUATION_V1",
+          ]
+          horizons = [5, 15, 30, 60]
+          for session in ("session8", "session9"):
+              feature_path = Path(f"data/phase5/{session}/features.json")
+              features = json.loads(feature_path.read_text())
+              events = []
+              for index, (candidate, horizon) in enumerate(zip(candidates, horizons)):
+                  window = features["features"][index + 2]
+                  start = datetime.fromisoformat(window["window_start_utc"])
+                  end_msc = int(start.timestamp() * 1000) + 5000
+                  events.append({
+                      "signal_id": f"{session}-synthetic-smoke-{index + 1}",
+                      "candidate_id": candidate,
+                      "signal_window_end_msc": end_msc,
+                      "direction": "long" if index % 2 == 0 else "short",
+                      "horizon_seconds": horizon,
+                      "event_origin": "SYNTHETIC_REPLAY_SMOKE_ONLY",
+                  })
+              Path(f"data/phase5/{session}/events.json").write_text(json.dumps({"events": events}, indent=2))
+          PY
+
+      - name: Replay synthetic smoke events against certified ticks
+        run: |
+          python -m tools.mt5_xauusd_tick_replay --csv data/phase5/session8/veltrix_exness_demo_ticks.csv --manifest data/phase5/session8/manifest.json --events data/phase5/session8/events.json --output data/phase5/session8/replay.json
+          python -m tools.mt5_xauusd_tick_replay --csv data/phase5/session9/veltrix_exness_demo_ticks.csv --manifest data/phase5/session9/manifest.json --events data/phase5/session9/events.json --output data/phase5/session9/replay.json
+
+      - name: Assert research-only replay invariants
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          for session in ("session8", "session9"):
+              result = json.loads(Path(f"data/phase5/{session}/replay.json").read_text())
+              assert result["status"] == "PASS"
+              assert result["canonical_symbol"] == "XAUUSD"
+              assert result["account_mode"] == "DEMO"
+              assert result["commission_status"] == "UNVERIFIED_REQUIRED_INPUT"
+              assert result["event_count"] == 4
+              assert result["outcome_available_count"] >= 1
+              for outcome in result["outcomes"]:
+                  assert outcome["execution_sent"] is False
+                  assert outcome["actual_fill_claimed"] is False
+                  assert outcome["event_origin"] == "SYNTHETIC_REPLAY_SMOKE_ONLY"
+                  assert outcome["spread_included_once"] is True
+                  assert outcome["net_after_commission"] is None
+          PY
+
+      - name: Upload reproducible Phase 5 validation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase5-xauusd-replay-validation-${{ github.run_id }}
+          path: data/phase5/
+          if-no-files-found: error
+          retention-days: 90
