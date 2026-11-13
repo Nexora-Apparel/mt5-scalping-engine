@@ -14,6 +14,7 @@
 #include "..\\Include\\Veltrix\\BrokerReconciler.mqh"
 #include "..\\Include\\Veltrix\\ExecutionCoordinator.mqh"
 #include "..\\Include\\Veltrix\\StrategyResearch.mqh"
+#include "..\\Include\\Veltrix\\CandidateAnalysis.mqh"
 #include "..\\Include\\Veltrix\\FeatureCollector.mqh"
 #include "..\\Include\\Veltrix\\FeatureDatasetExporter.mqh"
 #include "..\\Include\\Veltrix\\FeaturePipeline.mqh"
@@ -30,6 +31,7 @@ input long   ExpectedDemoLogin = 0;
 input string ExpectedDemoServer = "";
 
 CVxMarketGuard g_market;
+CVxCandidateAnalysis g_candidate_analysis;
 CVxFeaturePipeline g_feature_pipeline;
 bool g_dataset_fault_reported=false;
 bool g_last_health_state=false;
@@ -157,6 +159,7 @@ int OnInit()
       return INIT_FAILED;
    }
 
+   Print("VELTRIX CANDIDATE RESEARCH MODULE: XAUUSD-only formulas loaded; completed-window adapter required; no order APIs are called.");
    Print("VELTRIX SAFE MODE: market health, read-only reconciliation, and state-only execution coordination. No order APIs are called.");
    return INIT_SUCCEEDED;
 }
