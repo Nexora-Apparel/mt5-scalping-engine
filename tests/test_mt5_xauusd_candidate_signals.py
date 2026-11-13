@@ -216,3 +216,21 @@ def test_mql5_candidate_module_contains_no_order_api_calls():
     source = Path("MQL5/Include/Veltrix/CandidateAnalysis.mqh").read_text(encoding="utf-8")
     forbidden = ("OrderSend(", "OrderSendAsync(", "PositionOpen(", "CTrade")
     assert all(token not in source for token in forbidden)
+
+
+def test_mql5_window_adapter_and_candidate_analyzer_have_no_order_apis():
+    forbidden = ("OrderSend(", "OrderSendAsync(", "PositionOpen(", "CTrade")
+    for path in (
+        Path("MQL5/Include/Veltrix/CandidateAnalysis.mqh"),
+        Path("MQL5/Include/Veltrix/CandidateWindowBuilder.mqh"),
+    ):
+        source = path.read_text(encoding="utf-8")
+        assert all(token not in source for token in forbidden)
+
+
+def test_ea_candidate_analysis_is_opt_in_and_runs_only_on_completed_windows():
+    source = Path("MQL5/Experts/VeltrixScalper.mq5").read_text(encoding="utf-8")
+    assert "input bool   EnableCandidateAnalysis = false;" in source
+    assert "g_candidate_window_builder.PushQuote" in source
+    assert "if(window_completed)" in source
+    assert "EvaluateCompletedCandidateWindow(tick.time_msc);" in source
