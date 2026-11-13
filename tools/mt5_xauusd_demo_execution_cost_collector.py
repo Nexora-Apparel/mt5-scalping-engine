@@ -13,6 +13,7 @@ import hashlib
 import json
 import math
 import os
+import secrets
 import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -52,9 +53,10 @@ def _utc(ms: int) -> str:
     return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).isoformat()
 
 
-def _position_ref(position_id: int) -> str:
-    # Stable pseudonymous grouping key; raw broker position IDs are not exported.
-    return hashlib.sha256(f"veltrix-demo-position:{position_id}".encode()).hexdigest()
+def _position_ref(position_id: int, package_salt: bytes) -> str:
+    # Per-package HMAC prevents public brute-force enumeration of broker IDs and
+    # prevents correlation of the same position across separate collection runs.
+    return hashlib.sha256(package_salt + str(position_id).encode()).hexdigest()
 
 
 def _deal_entry_name(value: int, mt5: Any) -> str:
@@ -117,6 +119,9 @@ def collect_evidence(
         if deals is None:
             raise DiagnosticFailure(f"history_deals_get failed; last_error={mt5.last_error()}")
 
+        # This salt is deliberately not exported. Position references are useful
+        # only for joining rows within this evidence package.
+        package_salt = secrets.token_bytes(32)
         grouped: dict[int, list[dict[str, Any]]] = defaultdict(list)
         sanitized: list[dict[str, Any]] = []
         for deal in deals:
@@ -129,7 +134,7 @@ def collect_evidence(
             entry_value = int(_get(deal, "entry", -1))
             type_value = int(_get(deal, "type", -1))
             row = {
-                "position_ref": _position_ref(position_id),
+                "position_ref": _position_ref(position_id, package_salt),
                 "time_msc": stamp,
                 "time_utc": _utc(stamp),
                 "deal_type": _deal_type_name(type_value, mt5),
@@ -157,7 +162,7 @@ def collect_evidence(
             is_closed = bool(entries and exits and not ambiguous and closed + 1e-8 >= opened)
             commission = sum(row["commission_usd"] for row in rows)
             round_trips.append({
-                "position_ref": _position_ref(position_id),
+                "position_ref": _position_ref(position_id, package_salt),
                 "entry_deal_count": len(entries),
                 "exit_deal_count": len(exits),
                 "opened_volume_lots": round(opened, 8),
@@ -261,6 +266,8 @@ def collect_evidence(
             "captured_at_utc": captured.isoformat(),
             "account_mode": "DEMO",
             "broker_symbol": symbol,
+            "position_reference_scheme": "PER_PACKAGE_SALTED_SHA256",
+            "position_reference_salt_sha256": hashlib.sha256(package_salt).hexdigest(),
             "files": files,
             "commission_schedule_status": summary["commission_schedule_status"],
             "net_performance_allowed": False,
