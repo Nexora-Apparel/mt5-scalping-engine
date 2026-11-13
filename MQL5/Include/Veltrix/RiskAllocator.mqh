@@ -18,8 +18,7 @@ struct VxRiskRequest
    double volume_step;
    double current_open_risk_money;
    double max_portfolio_risk_percent;
-   int    open_positions;
-   int    max_positions;
+   int    open_positions; // Observability only; no position-count ceiling.
 };
 
 struct VxRiskDecision
@@ -80,17 +79,14 @@ bool VxCalculateRiskVolume(const VxRiskRequest &request,
 
    if(request.max_portfolio_risk_percent<=0.0 ||
       request.current_open_risk_money<0.0 ||
-      request.open_positions<0 || request.max_positions<=0)
+      request.open_positions<0)
    {
       decision.reason="Invalid portfolio limits or current exposure";
       return false;
    }
 
-   if(request.open_positions>=request.max_positions)
-   {
-      decision.reason="Maximum simultaneous position count reached";
-      return false;
-   }
+   // Position count is intentionally uncapped. Aggregate open risk and
+   // broker margin are the binding portfolio constraints.
 
    double loss_per_lot=(request.stop_distance_price/request.tick_size)*
                        request.tick_value_loss;
