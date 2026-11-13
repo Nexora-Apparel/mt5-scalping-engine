@@ -41,6 +41,8 @@ def test_broker_margin_and_hedging_constraints_remain_mandatory():
     assert "OrderCalcMargin" in source
     assert "ACCOUNT_MARGIN_FREE" in source
     assert "margin_reserve_money" in source
+    assert "intent.take_profit<=0.0" in source
+    assert "Take-profit is mandatory" in source
     assert "SYMBOL_VOLUME_MIN" in source or "SYMBOL_VOLUME_MIN" in (ROOT / "MQL5/Include/Veltrix/MarketGuard.mqh").read_text(encoding="utf-8")
 
 
