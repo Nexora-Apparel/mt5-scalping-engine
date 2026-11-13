@@ -24,3 +24,4 @@ Before any demo order testing, validate account identity, XAUUSD broker contract
 
 Never commit credentials, tokens, account IDs, or private logs.
 Phase 6 candidate analysis implementation and safety contract: [docs/PHASE6_XAUUSD_CANDIDATE_ANALYSIS.md](docs/PHASE6_XAUUSD_CANDIDATE_ANALYSIS.md).
+Phase 7 DEMO risk controls and safety policy: [docs/PHASE7_DEMO_RISK_CONTROLS.md](docs/PHASE7_DEMO_RISK_CONTROLS.md).
