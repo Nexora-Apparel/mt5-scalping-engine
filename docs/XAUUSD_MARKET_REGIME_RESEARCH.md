@@ -36,7 +36,7 @@ python -m tools.mt5_xauusd_market_regimes \
 ## Safety and research controls
 
 - Input must be a PASS, research-only, XAUUSD feature dataset with a valid SHA-256 source reference.
-- Feature windows must be UTC-epoch-aligned and strictly chronological.
+- Feature windows must be UTC-epoch-aligned and strictly chronological; their tick counts must sum exactly to the declared source record count.
 - No lookahead: current and future observations never enter the current threshold calculation.
 - Tick-count rate is not traded volume. No order, fill, spread-cost, or execution quality is inferred.
 - Regime tags are not trade permission and must not be connected to production scheduling or Telegram.
