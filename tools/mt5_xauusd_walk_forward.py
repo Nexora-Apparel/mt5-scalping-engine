@@ -726,6 +726,10 @@ def evaluate_partition(
             "verification_sha256": verified_commission["verification_sha256"],
             "source_reference": verified_commission["source_reference"],
             "verification_reference": verified_commission["verification_reference"],
+            "reviewer_identity": verified_commission["reviewer_identity"],
+            "reviewer_organization": verified_commission["reviewer_organization"],
+            "reviewer_role": verified_commission["reviewer_role"],
+            "reviewer_key_sha256": verified_commission["reviewer_key_sha256"],
             "effective_from_utc": verified_commission["effective_from_utc"],
             "effective_to_utc": verified_commission["effective_to_utc"],
         }
