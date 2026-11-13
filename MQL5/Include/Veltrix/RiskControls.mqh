@@ -31,8 +31,12 @@ private:
    double m_day_start_equity;
    int m_consecutive_losses;
    long m_cooldown_until_msc;
-   string m_seen_request_ids[];
    string m_emergency_key;
+   string m_day_key_name;
+   string m_day_equity_name;
+   string m_daily_lock_name;
+   string m_loss_streak_name;
+   string m_cooldown_name;
 
    bool IsXauUsdContract(const string symbol)
    {
@@ -49,20 +53,37 @@ private:
       return (base=="XAU" && profit=="USD");
    }
 
-   bool RequestSeen(const string request_id) const
-   {
-      for(int i=0;i<ArraySize(m_seen_request_ids);i++)
-         if(m_seen_request_ids[i]==request_id)
-            return true;
-      return false;
-   }
-
-   ulong ServerHash(const string server) const
+   ulong ServerHash(const string value) const
    {
       ulong hash=2166136261;
-      for(int i=0;i<StringLen(server);i++)
-         hash=(hash*16777619+(ulong)StringGetCharacter(server,i))%4294967291;
+      for(int i=0;i<StringLen(value);i++)
+         hash=(hash*16777619+(ulong)StringGetCharacter(value,i))%4294967291;
       return hash;
+   }
+
+   string RequestKey(const string request_id) const
+   {
+      return StringFormat("VX_REQ_%I64d_%I64u_%I64u",
+                          m_config.expected_demo_login,
+                          ServerHash(m_config.expected_demo_server),
+                          ServerHash(request_id));
+   }
+
+   bool PersistRiskState(void)
+   {
+      if(m_emergency_key=="" || m_day_key_name=="" ||
+         m_day_equity_name=="" || m_daily_lock_name=="" ||
+         m_loss_streak_name=="" || m_cooldown_name=="")
+         return false;
+      if(GlobalVariableSet(m_emergency_key,(m_emergency_stop ? 1.0 : 0.0))==0 ||
+         GlobalVariableSet(m_day_key_name,(double)m_server_day_key)==0 ||
+         GlobalVariableSet(m_day_equity_name,m_day_start_equity)==0 ||
+         GlobalVariableSet(m_daily_lock_name,(m_daily_loss_locked ? 1.0 : 0.0))==0 ||
+         GlobalVariableSet(m_loss_streak_name,(double)m_consecutive_losses)==0 ||
+         GlobalVariableSet(m_cooldown_name,(double)m_cooldown_until_msc)==0)
+         return false;
+      GlobalVariablesFlush();
+      return true;
    }
 
 public:
@@ -76,6 +97,11 @@ public:
       m_consecutive_losses=0;
       m_cooldown_until_msc=0;
       m_emergency_key="";
+      m_day_key_name="";
+      m_day_equity_name="";
+      m_daily_lock_name="";
+      m_loss_streak_name="";
+      m_cooldown_name="";
    }
 
    bool Init(const VxRiskControlConfig &config,string &reason)
@@ -102,23 +128,58 @@ public:
       { reason="Policy requires one position, 30-3600s cooldown, and 1-3 consecutive-loss limit"; return false; }
 
       m_config=config;
-      m_emergency_key=StringFormat("VX_ESTOP_%I64d_%I64u",
-                                   config.expected_demo_login,
-                                   ServerHash(config.expected_demo_server));
-      if(m_emergency_key=="" || StringLen(m_emergency_key)>63)
-      { reason="Emergency-stop persistence key is invalid"; return false; }
-      if(GlobalVariableCheck(m_emergency_key))
+      string suffix=StringFormat("%I64d_%I64u",
+                                 config.expected_demo_login,
+                                 ServerHash(config.expected_demo_server));
+      m_emergency_key="VX_ESTOP_"+suffix;
+      m_day_key_name="VX_DAY_"+suffix;
+      m_day_equity_name="VX_EQ_"+suffix;
+      m_daily_lock_name="VX_LOCK_"+suffix;
+      m_loss_streak_name="VX_LS_"+suffix;
+      m_cooldown_name="VX_CD_"+suffix;
+      if(StringLen(m_emergency_key)>63 || StringLen(m_day_key_name)>63 ||
+         StringLen(m_day_equity_name)>63 || StringLen(m_daily_lock_name)>63 ||
+         StringLen(m_loss_streak_name)>63 || StringLen(m_cooldown_name)>63)
+      { reason="Risk-state persistence key is invalid"; return false; }
+
+      string keys[6];
+      keys[0]=m_emergency_key; keys[1]=m_day_key_name;
+      keys[2]=m_day_equity_name; keys[3]=m_daily_lock_name;
+      keys[4]=m_loss_streak_name; keys[5]=m_cooldown_name;
+      int present=0;
+      for(int i=0;i<6;i++)
+         if(GlobalVariableCheck(keys[i])) present++;
+      if(present!=0 && present!=6)
+      { reason="Persistent risk state is incomplete; refusing to reset partial state"; return false; }
+      if(present==0)
       {
-         double stored=GlobalVariableGet(m_emergency_key);
-         if(!MathIsValidNumber(stored) || (stored!=0.0 && stored!=1.0))
-         { reason="Persistent emergency-stop state is corrupt; refusing initialization"; return false; }
-         m_emergency_stop=(stored>0.5);
+         if(!PersistRiskState())
+         { reason="Could not initialize persistent risk state"; return false; }
       }
       else
       {
-         if(GlobalVariableSet(m_emergency_key,0.0)==0)
-         { reason="Could not initialize persistent emergency-stop state"; return false; }
-         GlobalVariablesFlush();
+         double emergency=GlobalVariableGet(m_emergency_key);
+         double day=GlobalVariableGet(m_day_key_name);
+         double equity=GlobalVariableGet(m_day_equity_name);
+         double daily_lock=GlobalVariableGet(m_daily_lock_name);
+         double losses=GlobalVariableGet(m_loss_streak_name);
+         double cooldown=GlobalVariableGet(m_cooldown_name);
+         if(!MathIsValidNumber(emergency) || !MathIsValidNumber(day) ||
+            !MathIsValidNumber(equity) || !MathIsValidNumber(daily_lock) ||
+            !MathIsValidNumber(losses) || !MathIsValidNumber(cooldown) ||
+            (emergency!=0.0 && emergency!=1.0) ||
+            (daily_lock!=0.0 && daily_lock!=1.0) ||
+            day<0.0 || equity<0.0 || losses<0.0 || losses>3.0 ||
+            MathFloor(losses)!=losses || cooldown<0.0)
+         { reason="Persistent risk state is corrupt; refusing initialization"; return false; }
+         m_emergency_stop=(emergency>0.5);
+         m_server_day_key=(long)day;
+         m_day_start_equity=equity;
+         m_daily_loss_locked=(daily_lock>0.5);
+         m_consecutive_losses=(int)losses;
+         m_cooldown_until_msc=(long)cooldown;
+         if(m_consecutive_losses>=m_config.max_consecutive_losses)
+            m_daily_loss_locked=true;
       }
       m_initialized=true;
       return true;
@@ -159,6 +220,13 @@ public:
       m_daily_loss_locked=false;
       m_consecutive_losses=0;
       // A cooldown and emergency stop deliberately survive a day boundary.
+      if(!PersistRiskState())
+      {
+         m_emergency_stop=true;
+         PersistRiskState();
+         reason="Could not persist new server-day risk baseline; emergency stop latched";
+         return false;
+      }
       return true;
    }
 
@@ -176,6 +244,13 @@ public:
       if(loss_percent>=m_config.max_daily_loss_percent)
       {
          m_daily_loss_locked=true;
+         if(!PersistRiskState())
+         {
+            m_emergency_stop=true;
+            PersistRiskState();
+            reason="Daily loss reached and risk-state persistence failed; emergency stop latched";
+            return false;
+         }
          reason="Maximum daily equity loss reached; new intents locked until next server day";
          return false;
       }
@@ -195,12 +270,18 @@ public:
          {
             m_daily_loss_locked=true;
             reason="Consecutive-loss limit reached; daily lock latched";
-            return true;
          }
       }
       else if(net_profit>0.0)
       {
          m_consecutive_losses=0;
+      }
+      if(!PersistRiskState())
+      {
+         m_emergency_stop=true;
+         PersistRiskState();
+         reason="Could not persist verified close risk state; emergency stop latched";
+         return false;
       }
       return true;
    }
@@ -246,16 +327,16 @@ public:
       { reason="Only a verified XAUUSD contract is permitted"; return false; }
       if(active_positions>=m_config.max_positions)
       { reason="Maximum simultaneous position exposure reached"; return false; }
-      if(RequestSeen(request_id))
-      { reason="Duplicate request identifier rejected"; return false; }
       if(m_cooldown_until_msc>0 && now_msc<m_cooldown_until_msc)
       { reason="Post-loss cooldown is active"; return false; }
-      if(ArraySize(m_seen_request_ids)>=10000)
-      { reason="Request deduplication capacity exhausted; fail closed"; return false; }
-      int size=ArraySize(m_seen_request_ids);
-      if(ArrayResize(m_seen_request_ids,size+1)!=size+1)
-      { reason="Request deduplication allocation failed"; return false; }
-      m_seen_request_ids[size]=request_id;
+      string request_key=RequestKey(request_id);
+      if(request_key=="" || StringLen(request_key)>63)
+      { reason="Request deduplication key is invalid"; return false; }
+      if(GlobalVariableCheck(request_key))
+      { reason="Duplicate request identifier rejected"; return false; }
+      if(GlobalVariableSet(request_key,(double)now_msc)==0)
+      { reason="Could not persist request deduplication state; fail closed"; return false; }
+      GlobalVariablesFlush();
       return true;
    }
 
@@ -263,11 +344,8 @@ public:
    {
       reason="";
       m_emergency_stop=true;
-      if(!m_initialized || m_emergency_key=="")
-      { reason="Emergency stop latched in memory but persistent key is unavailable"; return false; }
-      if(GlobalVariableSet(m_emergency_key,1.0)==0)
-      { reason="Emergency stop latched in memory but persistence write failed"; return false; }
-      GlobalVariablesFlush();
+      if(!m_initialized || !PersistRiskState())
+      { reason="Emergency stop latched in memory but persistent risk-state write failed"; return false; }
       return true;
    }
 
