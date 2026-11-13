@@ -242,3 +242,31 @@ def test_walk_forward_cli_writes_explicit_blocked_report_for_empty_catalog(tmp_p
     assert report["status"] == "BLOCKED_INSUFFICIENT_DATA"
     assert report["candidate_scoring_performed"] is False
     assert "missing_session_ids" in report
+def test_selection_freeze_git_commit_timestamp_is_verified(tmp_path, monkeypatch):
+    import subprocess
+    import tools.mt5_xauusd_walk_forward as wf
+
+    freeze = tmp_path / "selection-freeze.json"
+    freeze.write_text("{}", encoding="utf-8")
+    responses = [
+        subprocess.CompletedProcess(args=["git"], returncode=0, stdout=str(tmp_path), stderr=""),
+        subprocess.CompletedProcess(args=["git"], returncode=0, stdout="2026-11-13T02:00:00+00:00\n", stderr=""),
+    ]
+    monkeypatch.setattr(wf.subprocess, "run", lambda *args, **kwargs: responses.pop(0))
+    result = wf._git_commit_utc(freeze, tmp_path)
+    assert result.isoformat() == "2026-11-13T02:00:00+00:00"
+
+
+def test_selection_freeze_rejects_uncommitted_report(tmp_path, monkeypatch):
+    import subprocess
+    import tools.mt5_xauusd_walk_forward as wf
+
+    report = tmp_path / "validation-report.json"
+    report.write_text("{}", encoding="utf-8")
+    responses = [
+        subprocess.CompletedProcess(args=["git"], returncode=0, stdout=str(tmp_path), stderr=""),
+        subprocess.CompletedProcess(args=["git"], returncode=0, stdout="", stderr=""),
+    ]
+    monkeypatch.setattr(wf.subprocess, "run", lambda *args, **kwargs: responses.pop(0))
+    with pytest.raises(WalkForwardError, match="must be committed"):
+        wf._git_commit_utc(report, tmp_path)
