@@ -61,5 +61,6 @@
 - Phase 4: complete.
 - Phase 5: complete.
 - Phase 6: complete.
-- Phase 7: in progress.
-- Phases 8–10: locked until preceding phase gates pass.
+- Phase 7: complete for the read-only safety-control implementation and synthetic terminal-runtime certification.
+- Phase 8: unlocked; chronological research validation may begin.
+- Phases 9–10: remain gated by Phase 8 and the prospective DEMO/release criteria.
