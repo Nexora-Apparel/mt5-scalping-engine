@@ -214,6 +214,9 @@ def replay_events(
         for event in events
     ]
     profile = source_profile or {}
+    source_hash = profile.get("sha256", manifest.get("sha256"))
+    development_hashes = registry["known_development_data"]["source_sha256"]
+    data_role = "DEVELOPMENT_ONLY" if source_hash in development_hashes else "UNCLASSIFIED_NOT_HOLDOUT"
     return {
         "status": "PASS",
         "research_only": True,
@@ -221,7 +224,9 @@ def replay_events(
         "canonical_symbol": "XAUUSD",
         "broker_symbol": spec.get("broker_symbol"),
         "account_mode": "DEMO",
-        "source_sha256": profile.get("sha256", manifest.get("sha256")),
+        "source_sha256": source_hash,
+        "data_role": data_role,
+        "final_holdout_eligible": False,
         "source_records": len(ticks),
         "source_span_start_msc": ticks[0].time_msc,
         "source_span_end_msc": ticks[-1].time_msc,
