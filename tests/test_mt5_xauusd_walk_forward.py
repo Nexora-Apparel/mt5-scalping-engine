@@ -33,6 +33,13 @@ def test_plan_rejects_promoting_development_data_to_holdout():
         validate_plan(changed, REGISTRY)
 
 
+def test_plan_rejects_missing_manifest_and_artifact_provenance():
+    changed = json.loads(json.dumps(PLAN))
+    changed["development_sessions"][0]["expected_manifest_sha256"] = "invalid"
+    with pytest.raises(WalkForwardError, match="expected_manifest_sha256"):
+        validate_plan(changed, REGISTRY)
+
+
 def test_validation_stage_blocks_until_all_future_validation_sessions_exist():
     catalog = {
         "sessions": [
