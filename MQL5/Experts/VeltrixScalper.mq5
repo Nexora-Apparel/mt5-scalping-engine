@@ -247,23 +247,38 @@ void EvaluateCompletedCandidateWindow(const long evaluation_time_msc)
             }
 }
 
+bool IsFreshCandidateTick(const MqlTick &tick,string &reason)
+{
+   if(tick.time_msc<=0 || tick.bid<=0.0 || tick.ask<=tick.bid ||
+      !MathIsValidNumber(tick.bid) || !MathIsValidNumber(tick.ask))
+   { reason="Candidate quote is invalid"; return false; }
+   datetime server_now=TimeTradeServer();
+   if(server_now<=0)
+   { reason="Broker server time is unavailable"; return false; }
+   long age=(long)server_now*1000-tick.time_msc+999;
+   if(age<0 || (ulong)age>MaxQuoteAgeMilliseconds)
+   { reason="Candidate quote is stale or ahead of broker time"; return false; }
+   reason="";
+   return true;
+}
+
 void OnTick()
 {
    if(!EnableCandidateAnalysis || g_candidate_faulted)
       return;
-   VxQuoteSnapshot quote;
+   MqlTick tick;
    string reason;
-   if(!g_market.ReadQuote(quote,reason))
+   if(!SymbolInfoTick(_Symbol,tick) || !IsFreshCandidateTick(tick,reason))
       return;
    bool window_completed=false;
-   if(!g_candidate_window_builder.PushQuote(_Symbol,quote.tick,window_completed,reason))
+   if(!g_candidate_window_builder.PushQuote(_Symbol,tick,window_completed,reason))
    {
       g_candidate_faulted=true;
       Print("CANDIDATE ANALYSIS FAULTED | ",reason);
       return;
    }
    if(window_completed)
-      EvaluateCompletedCandidateWindow(quote.tick.time_msc);
+      EvaluateCompletedCandidateWindow(tick.time_msc);
 }
 
 void OnTimer()
