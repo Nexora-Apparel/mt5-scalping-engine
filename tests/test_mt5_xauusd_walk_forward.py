@@ -333,3 +333,62 @@ def test_walk_forward_evaluator_requires_manifest_bound_validation_session_id():
     source = (ROOT / "tools/mt5_xauusd_walk_forward.py").read_text(encoding="utf-8")
     assert 'manifest.get("session_id") != sid' in source
     assert "validation manifest session_id does not match" in source
+
+
+def test_verified_commission_is_subtracted_once_from_each_slippage_scenario():
+    import tools.mt5_xauusd_walk_forward as wf
+
+    outcome = {
+        "status": "OUTCOME_AVAILABLE",
+        "entry_executable_price": 2000.0,
+        "slippage_sensitivity": [
+            {"slippage_points_per_side": points, "return_before_commission_bps": 1.0 - points * 0.1}
+            for points in (0, 1, 2, 5)
+        ],
+    }
+    verified = {
+        "status": "VERIFIED",
+        "contract_size_oz_per_lot": 100.0,
+        "commission_usd_per_lot_per_side": 3.5,
+    }
+    wf._apply_verified_commission(outcome, verified)
+    assert [row["net_after_commission_bps"] for row in outcome["slippage_sensitivity"]] == [
+        0.65, 0.55, 0.45, 0.15
+    ]
+    assert outcome["commission_status"] == "VERIFIED_FROM_EXNESS_ACCOUNT_SCHEDULE"
+
+
+def test_net_summary_uses_session_clustered_confidence_intervals():
+    import tools.mt5_xauusd_walk_forward as wf
+
+    def row(net):
+        return {
+            "status": "OUTCOME_AVAILABLE",
+            "signal_window_end_msc": 1000,
+            "entry_time_msc": 1001,
+            "exit_time_msc": 2001,
+            "slippage_sensitivity": [{
+                "slippage_points_per_side": 0,
+                "return_before_commission_bps": 1.0,
+                "net_after_commission_bps": net,
+            }],
+        }
+
+    result = wf._summarize_group(
+        {"date_a": [row(0.5)], "date_b": [row(0.7)]},
+        [0],
+        commission_verified=True,
+    )
+    aggregate = result["aggregate_cost_sensitivity"]["0"]
+    assert aggregate["mean_net_after_commission_bps"] == 0.6
+    assert aggregate["session_clustered_net_mean_ci_95"]["lower_95"] > 0
+    assert result["commission_status"] == "VERIFIED_FROM_EXNESS_ACCOUNT_SCHEDULE"
+
+
+def test_holdout_requires_runtime_commission_evidence_before_catalog_inspection():
+    result = run_walk_forward(
+        PLAN, REGISTRY, {"sessions": []}, stage="holdout", base_dir=ROOT,
+    )
+    assert result["status"] == "BLOCKED_COMMISSION_UNVERIFIED"
+    assert result["holdout_opened"] is False
+    assert result["candidate_scoring_performed"] is False
