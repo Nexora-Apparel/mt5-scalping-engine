@@ -234,3 +234,14 @@ def test_ea_candidate_analysis_is_opt_in_and_runs_only_on_completed_windows():
     assert "g_candidate_window_builder.PushQuote" in source
     assert "if(window_completed)" in source
     assert "EvaluateCompletedCandidateWindow(tick.time_msc);" in source
+
+
+def test_last_observed_window_is_never_treated_as_completed(registry):
+    features = make_features()
+    last_index = len(features["features"]) - 1
+    features["features"][last_index]["mid_close"] = 101.0
+    features["features"][last_index]["mid_high"] = 101.001
+    features["features"][last_index]["mid_low"] = 100.999
+    result = generate_candidate_events(features, registry)
+    assert result["completed_window_count"] == last_index
+    assert not [event for event in result["events"] if event["signal_window_index"] == last_index]
