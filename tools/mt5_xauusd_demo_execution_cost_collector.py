@@ -54,8 +54,8 @@ def _utc(ms: int) -> str:
 
 
 def _position_ref(position_id: int, package_salt: bytes) -> str:
-    # Per-package HMAC prevents public brute-force enumeration of broker IDs and
-    # prevents correlation of the same position across separate collection runs.
+    # A fresh, unexported per-package salt prevents package-only brute-force
+    # enumeration and cross-run correlation. This is salted SHA-256, not HMAC.
     return hashlib.sha256(package_salt + str(position_id).encode()).hexdigest()
 
 
@@ -104,6 +104,12 @@ def collect_evidence(
         if identity["trade_mode"] != DEMO_TRADE_MODE:
             raise DiagnosticFailure("execution-cost evidence requires a DEMO account")
         account = mt5.account_info()
+        broker_identity = " ".join((
+            str(_get(account, "company", "") or ""),
+            str(_get(account, "server", "") or ""),
+        )).lower()
+        if "exness" not in broker_identity:
+            raise DiagnosticFailure("connected broker company/server does not identify Exness")
         symbol = discover_symbol(mt5, "XAUUSD")
         info = mt5.symbol_info(symbol)
         if info is None:
