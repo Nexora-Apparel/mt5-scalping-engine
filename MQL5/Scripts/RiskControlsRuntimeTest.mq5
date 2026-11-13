@@ -1,0 +1,199 @@
+#include "../Include/Veltrix/RiskControls.mqh"
+
+#define VX_CONTROLS_RESULT "veltrix_risk_controls_runtime_test.result"
+
+ulong TestHash64(const string value)
+{
+   ulong hash=14695981039346656037;
+   for(int i=0;i<StringLen(value);i++)
+   {
+      hash^=(ulong)StringGetCharacter(value,i);
+      hash*=1099511628211;
+   }
+   return hash;
+}
+
+string TestSuffix(const long login,const string server)
+{
+   return StringFormat("%I64d_%I64u",login,TestHash64(server));
+}
+
+void WriteControlsResult(const string value)
+{
+   int handle=FileOpen(VX_CONTROLS_RESULT,FILE_WRITE|FILE_TXT|FILE_ANSI);
+   if(handle==INVALID_HANDLE)
+   {
+      Print("RISK CONTROLS RUNTIME TEST FAIL | could not write result sentinel");
+      return;
+   }
+   FileWriteString(handle,value);
+   FileFlush(handle);
+   FileClose(handle);
+}
+
+void FailControlsTest(const string message)
+{
+   Print("RISK CONTROLS RUNTIME TEST FAIL | ",message);
+   WriteControlsResult("FAIL | "+message);
+}
+
+bool BuildConfig(const long login,const string server,VxRiskControlConfig &config)
+{
+   config.expected_demo_login=login;
+   config.expected_demo_server=server;
+   config.risk_per_trade_percent=0.10;
+   config.max_portfolio_risk_percent=0.25;
+   config.max_daily_loss_percent=1.00;
+   config.max_positions=1;
+   config.cooldown_seconds=30;
+   config.max_consecutive_losses=3;
+   return true;
+}
+
+bool SeedEmergencyStop(const long login,const string server,
+                       const VxRiskControlConfig &config,string &reason)
+{
+   CVxRiskControls controls;
+   if(!controls.Init(config,reason))
+      return false;
+   if(!controls.LatchEmergencyStop(reason))
+      return false;
+   return controls.IsEmergencyStopped();
+}
+
+bool AppendSyntheticDailyLock(const long login,const string server,
+                              const long day_key,const long timestamp_msc,
+                              string &reason)
+{
+   CVxRiskJournal journal;
+   if(!journal.Init(login,server,reason))
+      return false;
+   bool ok=journal.AppendDailyLock(day_key,timestamp_msc,1.0,reason);
+   journal.Close();
+   return ok;
+}
+
+bool VerifyRestoredLocks(const long login,const string server,
+                         const VxRiskControlConfig &config,string &reason)
+{
+   CVxRiskControls controls;
+   if(!controls.Init(config,reason))
+      return false;
+   if(!controls.IsEmergencyStopped())
+   { reason="Permanent emergency-stop event was not restored"; return false; }
+   if(!controls.IsDailyLossLocked())
+   { reason="Server-day loss-lock event was not restored"; return false; }
+   return true;
+}
+
+bool ExpectInitFailure(const long login,const string server,
+                       const VxRiskControlConfig &config,
+                       const string expected_fragment,string &reason)
+{
+   CVxRiskControls controls;
+   string actual_reason="";
+   bool initialized=controls.Init(config,actual_reason);
+   if(initialized)
+   { reason="Risk controls unexpectedly initialized despite injected failure"; return false; }
+   if(StringFind(actual_reason,expected_fragment)<0)
+   { reason="Unexpected fail-closed reason: "+actual_reason; return false; }
+   reason="";
+   return true;
+}
+
+void OnStart()
+{
+   // Synthetic identity only. No broker account or credential is read.
+   long test_login=900000000+(long)(GetTickCount64()%900000000);
+   string test_server="VELTRIX_RISK_CONTROLS_RUNTIME_TEST";
+   string suffix=TestSuffix(test_login,test_server);
+   string emergency_key="VX_ESTOP_"+suffix;
+   string day_key_name="VX_DAY_"+suffix;
+   string equity_key="VX_EQ_"+suffix;
+   string daily_lock_key="VX_LOCK_"+suffix;
+   string loss_key="VX_LS_"+suffix;
+   string cooldown_key="VX_CD_"+suffix;
+   string checksum_key="VX_CSUM_"+suffix;
+   string transaction_lock_key="VX_LOCKTX_"+suffix;
+   string journal_file=StringFormat("VELTRIX_XAUUSD_RISK_%I64d_%I64u.csv",
+                                    test_login,TestHash64(test_server));
+   long now_msc=(long)TimeLocal()*1000;
+   long day_key=20261113;
+   VxRiskControlConfig config;
+   BuildConfig(test_login,test_server,config);
+   string reason="";
+
+   if(!SeedEmergencyStop(test_login,test_server,config,reason))
+   {
+      FailControlsTest("seed emergency stop | "+reason);
+      return;
+   }
+
+   if(!AppendSyntheticDailyLock(test_login,test_server,day_key,now_msc+1,reason))
+   {
+      FailControlsTest("append synthetic daily lock | "+reason);
+      return;
+   }
+
+   // Populate a verified-looking baseline and matching checksum for the
+   // synthetic identity. This test does not call broker-sensitive methods.
+   double equity=10000.0;
+   string serialized=StringFormat("1|%I64d|%.17g|0|0|0",
+                                  day_key,equity);
+   double checksum=(double)(TestHash64(serialized)%9007199254740991);
+   if(GlobalVariableSet(day_key_name,(double)day_key)==0 ||
+      GlobalVariableSet(equity_key,equity)==0 ||
+      GlobalVariableSet(daily_lock_key,0.0)==0 ||
+      GlobalVariableSet(loss_key,0.0)==0 ||
+      GlobalVariableSet(cooldown_key,0.0)==0 ||
+      GlobalVariableSet(emergency_key,1.0)==0 ||
+      GlobalVariableSet(checksum_key,checksum)==0 ||
+      GlobalVariableSet(transaction_lock_key,0.0)==0)
+   {
+      FailControlsTest("could not prepare synthetic terminal-global risk state");
+      return;
+   }
+
+   if(!VerifyRestoredLocks(test_login,test_server,config,reason))
+   {
+      FailControlsTest("journal lock restoration | "+reason);
+      return;
+   }
+
+   // An abandoned transaction lock must block startup.
+   if(GlobalVariableSet(transaction_lock_key,(double)(now_msc+2))==0 ||
+      !ExpectInitFailure(test_login,test_server,config,
+                         "prior risk-state transaction did not finish",reason))
+   {
+      FailControlsTest("abandoned transaction-lock fail-closed test | "+reason);
+      return;
+   }
+   GlobalVariableSet(transaction_lock_key,0.0);
+
+   // Alter one state value without updating the commit checksum. Startup
+   // must reject the inconsistent snapshot; restore it before cleanup.
+   if(GlobalVariableSet(equity_key,equity+1.0)==0 ||
+      !ExpectInitFailure(test_login,test_server,config,
+                         "checksum mismatch",reason))
+   {
+      FailControlsTest("risk-state checksum fail-closed test | "+reason);
+      return;
+   }
+   GlobalVariableSet(equity_key,equity);
+
+   if(!FileDelete(journal_file,FILE_COMMON))
+   {
+      FailControlsTest("synthetic journal cleanup failed");
+      return;
+   }
+   string keys[8];
+   keys[0]=emergency_key; keys[1]=day_key_name;
+   keys[2]=equity_key; keys[3]=daily_lock_key;
+   keys[4]=loss_key; keys[5]=cooldown_key;
+   keys[6]=checksum_key; keys[7]=transaction_lock_key;
+   for(int i=0;i<8;i++)
+      GlobalVariableDel(keys[i]);
+
+   PrintFormat("RISK CONTROLS RUNTIME TEST PASS | synthetic_identity=true emergency_stop_restore=true daily_lock_restore=true abandoned_lock_blocked=true checksum_mismatch_blocked=true cleanup=true");
+   WriteControlsResult("PASS | emergency-stop restore, daily-lock restore, abandoned transaction-lock rejection, checksum mismatch rejection, cleanup");
+}
