@@ -500,7 +500,7 @@ def test_phase7_risk_controls_are_demo_xauusd_only_and_fail_closed():
         "max_daily_loss_percent>1.00",
         "config.max_positions!=1", "cooldown_seconds<30",
         "max_consecutive_losses>3", "BeginServerDay",
-        "EvaluateDailyLoss", "RecordVerifiedClose",
+        "EvaluateDailyLoss", "RecordVerifiedClose", "closing_deal_ticket",\n        "VX_CLOSE_", "Duplicate verified closing deal ignored",
         "RegisterApprovedIntent", "RequestKey", "GlobalVariableCheck(request_key)",
         "GlobalVariableSet(request_key",
         "LatchEmergencyStop", "m_emergency_stop",
@@ -568,7 +568,7 @@ def test_phase7_sizing_and_intent_registration_recheck_live_account_and_daily_lo
     assert "EvaluateDailyLoss(current_equity,reason)" in registration
     assert "active_positions>=m_config.max_positions" in registration
     assert "GlobalVariableCheck(request_key)" in registration
-    assert "GlobalVariableSet(request_key" in registration
+    assert "GlobalVariableSet(request_key" in registration\n    close_record = source.split("bool RecordVerifiedClose", 1)[1].split("bool CalculateVolume", 1)[0]\n    assert "GlobalVariableCheck(close_key)" in close_record\n    assert "GlobalVariableSet(close_key,1.0)" in close_record
 
 
 def test_phase7_execution_preflight_binds_account_and_symbol_contract():
