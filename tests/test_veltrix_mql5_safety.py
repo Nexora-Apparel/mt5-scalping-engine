@@ -526,7 +526,7 @@ def test_phase7_risk_controls_are_included_but_not_enabled_for_execution():
 
 
 def test_phase7_daily_loss_lock_and_emergency_stop_are_distinct():
-    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8").read_text(encoding="utf-8")
+    source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
     assert "m_daily_loss_locked=false;" in source
     assert "m_emergency_stop=true;" in source
     day_reset = source.split("bool BeginServerDay", 1)[1].split("bool EvaluateDailyLoss", 1)[0]
