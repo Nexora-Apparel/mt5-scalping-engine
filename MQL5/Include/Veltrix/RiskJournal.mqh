@@ -15,6 +15,8 @@ private:
    string m_previous_hash;
    string m_request_keys[];
    string m_close_keys[];
+   string m_daily_lock_keys[];
+   bool m_emergency_stop;
    bool m_initialized;
    bool m_created_new;
 
@@ -69,6 +71,8 @@ private:
       m_previous_hash="0";
       ArrayResize(m_request_keys,0);
       ArrayResize(m_close_keys,0);
+      ArrayResize(m_daily_lock_keys,0);
+      m_emergency_stop=false;
       FileSeek(m_handle,0,SEEK_SET);
       while(!FileIsEnding(m_handle))
       {
@@ -87,7 +91,7 @@ private:
             sequence_number!=(double)(m_sequence+1) ||
             timestamp_number<=0.0 || key=="" ||
             previous_hash!=m_previous_hash ||
-            (event_type!="REQUEST" && event_type!="CLOSE"))
+            (event_type!="REQUEST" && event_type!="CLOSE" &&\n             event_type!="ESTOP" && event_type!="DAILY_LOCK"))
          {
             reason="Risk journal contains an incomplete, malformed, or out-of-sequence record";
             return false;
@@ -105,10 +109,21 @@ private:
             if(!AddUnique(m_request_keys,key))
             { reason="Risk journal contains a duplicate request key"; return false; }
          }
-         else
+         else if(event_type=="CLOSE")
          {
             if(!AddUnique(m_close_keys,key))
             { reason="Risk journal contains a duplicate closing-deal key"; return false; }
+         }
+         else if(event_type=="ESTOP")
+         {
+            if(key!="LATCHED" || m_emergency_stop)
+            { reason="Risk journal contains an invalid or duplicate emergency-stop event"; return false; }
+            m_emergency_stop=true;
+         }
+         else if(event_type=="DAILY_LOCK")
+         {
+            if(!AddUnique(m_daily_lock_keys,key))
+            { reason="Risk journal contains a duplicate daily-lock event"; return false; }
          }
          m_sequence=sequence;
          m_previous_hash=checksum;
@@ -123,7 +138,7 @@ private:
       reason="";
       if(!m_initialized || m_handle==INVALID_HANDLE ||
          key=="" || timestamp_msc<=0 || !MathIsValidNumber(value) ||
-         (event_type!="REQUEST" && event_type!="CLOSE"))
+         (event_type!="REQUEST" && event_type!="CLOSE" &&\n          event_type!="ESTOP" && event_type!="DAILY_LOCK"))
       { reason="Risk journal is not initialized or append fields are invalid"; return false; }
       if(event_type=="REQUEST" && Contains(m_request_keys,key))
       { reason="Duplicate request identifier rejected by durable journal"; return false; }
@@ -149,10 +164,21 @@ private:
          if(!AddUnique(m_request_keys,key))
          { reason="Risk journal in-memory request index allocation failed"; return false; }
       }
-      else
+      else if(event_type=="CLOSE")
       {
          if(!AddUnique(m_close_keys,key))
          { reason="Risk journal in-memory close index allocation failed"; return false; }
+      }
+      else if(event_type=="ESTOP")
+      {
+         if(key!="LATCHED" || m_emergency_stop)
+         { reason="Risk journal emergency-stop state is already latched"; return false; }
+         m_emergency_stop=true;
+      }
+      else if(event_type=="DAILY_LOCK")
+      {
+         if(!AddUnique(m_daily_lock_keys,key))
+         { reason="Risk journal in-memory daily-lock index allocation failed"; return false; }
       }
       m_sequence=next_sequence;
       m_previous_hash=checksum;
@@ -168,6 +194,7 @@ public:
       m_previous_hash="0";
       m_initialized=false;
       m_created_new=false;
+      m_emergency_stop=false;
    }
 
    ~CVxRiskJournal(void)
@@ -233,6 +260,31 @@ public:
    bool HasClose(const string key) const
    {
       return Contains(m_close_keys,key);
+   }
+
+   bool HasEmergencyStop(void) const { return m_emergency_stop; }
+
+   bool HasDailyLock(const long day_key) const
+   {
+      return Contains(m_daily_lock_keys,StringFormat("%I64d",day_key));
+   }
+
+   bool AppendEmergencyStop(const long timestamp_msc,string &reason)
+   {
+      if(m_emergency_stop)
+      { reason=""; return true; }
+      return Append("ESTOP","LATCHED",timestamp_msc,1.0,reason);
+   }
+
+   bool AppendDailyLock(const long day_key,const long timestamp_msc,
+                        const double loss_percent,string &reason)
+   {
+      if(day_key<=0)
+      { reason="Daily-lock journal key is invalid"; return false; }
+      string key=StringFormat("%I64d",day_key);
+      if(Contains(m_daily_lock_keys,key))
+      { reason=""; return true; }
+      return Append("DAILY_LOCK",key,timestamp_msc,loss_percent,reason);
    }
 
    bool AppendRequest(const string key,const long timestamp_msc,string &reason)
