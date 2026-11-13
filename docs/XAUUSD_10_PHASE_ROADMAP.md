@@ -31,9 +31,10 @@
    - Replay chronological bid/ask ticks; model spread-aware entries/exits, quote freshness, latency assumptions, and conservative execution constraints.
    - Evidence: PR #42 merged; 153 tests passed. Historical replay workflow #43378951998 rebuilt features and diagnostics from both certified artifacts, then produced 8/8 synthetic quote-replay smoke outcomes with zero entry/exit timeouts. The evidence artifact is [14015811691](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/43378951998/artifacts/14015811691). Replay confirmed XAUUSD DEMO provenance, Ask/Bid quote crossing, spread included once, no orders or actual-fill claims, and null net-after-commission. Both sessions remain development-only, not holdout.
 
-6. **Strategy implementation and MQL5 research integration — IN PROGRESS**
+6. **Strategy implementation and MQL5 research integration — COMPLETE**
    - Implement candidate analysis logic behind strict XAUUSD contract guards; keep collector and diagnostic workflows read-only; separate analysis from any order interface.
-   - Gate: unit/integration tests, deterministic outputs, and no order path in research workflows.
+   - Evidence: PR #47 passed 172 Python tests; MQL5 compile reported 0 errors and 0 warnings across four configured targets; certified Sessions 8 and 9 passed provenance-checked candidate smoke generation (10,652 generated research events across 719 completed windows). Final partial windows were excluded. The bounded MQL5 five-second adapter is opt-in and journal-only. See `docs/PHASE6_XAUUSD_CANDIDATE_ANALYSIS.md`.
+   - Limitation: live terminal runtime behavior remains untested; generated events are not trade outcomes or evidence of predictive edge. No execution authorization is implied.
 
 7. **Risk engine and DEMO safety controls**
    - Implement risk-based sizing, maximum exposure, protective stops, loss limits, cooldowns, duplicate-order protection, emergency stop, and reconciliation.
@@ -58,5 +59,6 @@
 - Phase 3: complete.
 - Phase 4: complete.
 - Phase 5: complete.
-- Phase 6: in progress.
-- Phases 7–10: locked until preceding phase gates pass.
+- Phase 6: complete.
+- Phase 7: in progress.
+- Phases 8–10: locked until preceding phase gates pass.
