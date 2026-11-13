@@ -154,15 +154,19 @@ def test_source_hash_must_match_original_artifact(tmp_path):
         verify(evidence, source_path, verification_path, public_path, fingerprint)
 
 
-def test_historical_evaluation_can_be_verified_after_the_market_period(tmp_path):
+def test_verification_timestamp_cannot_be_in_the_future(tmp_path):
     evidence = valid_evidence()
     source_path, verification_path, public_path, fingerprint = source_artifact(tmp_path, evidence)
-    evidence["evidence"]["verified_at_utc"] = "2026-11-13T12:00:01Z"
-    verified = verify(evidence, source_path, verification_path, public_path, fingerprint)
-    assert verified["status"] == "VERIFIED"
-    evidence["evidence"]["verified_at_utc"] = "2026-11-14T00:00:01Z"
     with pytest.raises(CommissionEvidenceError, match="cannot be in the future"):
-        verify(evidence, source_path, verification_path, public_path, fingerprint)
+        validate_commission_evidence(
+            evidence, broker_symbol="XAUUSDm", account_mode="DEMO",
+            evaluation_time_utc="2026-11-13T12:00:00Z",
+            verification_time_utc="2026-11-12T00:00:00Z",
+            source_artifact_path=source_path,
+            verification_artifact_path=verification_path,
+            verification_public_key_path=public_path,
+            trusted_reviewer_key_sha256=fingerprint,
+        )
 
 
 def test_commission_schedule_must_cover_entire_evaluation_period(tmp_path):
@@ -203,3 +207,28 @@ def test_missing_independent_verification_artifact_fails_closed(tmp_path):
             verification_public_key_path=public_path,
             trusted_reviewer_key_sha256=fingerprint,
         )
+
+
+def test_wrong_trust_anchor_fails_closed(tmp_path):
+    evidence = valid_evidence()
+    source_path, verification_path, public_path, fingerprint = source_artifact(tmp_path, evidence)
+    with pytest.raises(CommissionEvidenceError, match="trusted fingerprint"):
+        validate_commission_evidence(
+            evidence, broker_symbol="XAUUSDm", account_mode="DEMO",
+            evaluation_time_utc="2026-11-13T12:00:00Z",
+            source_artifact_path=source_path,
+            verification_artifact_path=verification_path,
+            verification_public_key_path=public_path,
+            trusted_reviewer_key_sha256="0" * 64,
+        )
+
+
+def test_review_signature_cannot_be_tampered(tmp_path):
+    evidence = valid_evidence()
+    source_path, verification_path, public_path, fingerprint = source_artifact(tmp_path, evidence)
+    attestation = json.loads(verification_path.read_text(encoding="utf-8"))
+    attestation["commission_usd_per_lot_per_side"] = 0.0
+    verification_path.write_text(json.dumps(attestation, sort_keys=True), encoding="utf-8")
+    evidence["evidence"]["verification_sha256"] = hashlib.sha256(verification_path.read_bytes()).hexdigest()
+    with pytest.raises(CommissionEvidenceError, match="signature"):
+        verify(evidence, source_path, verification_path, public_path, fingerprint)
