@@ -64,9 +64,21 @@ void OnStart()
       FailRiskJournalTest("duplicate closing-deal identifier was accepted");
       return;
    }
-   if(journal.Count()!=2)
+   if(!journal.AppendDailyLock(20261113,now_msc+4,1.0,reason) ||
+      !journal.HasDailyLock(20261113))
    {
-      FailRiskJournalTest("record count did not equal two");
+      FailRiskJournalTest("daily-lock event append/read | "+reason);
+      return;
+   }
+   if(!journal.AppendEmergencyStop(now_msc+5,reason) ||
+      !journal.HasEmergencyStop())
+   {
+      FailRiskJournalTest("emergency-stop event append/read | "+reason);
+      return;
+   }
+   if(journal.Count()!=4)
+   {
+      FailRiskJournalTest("record count did not equal four");
       return;
    }
 
@@ -77,15 +89,16 @@ void OnStart()
       FailRiskJournalTest("restart replay | "+reason);
       return;
    }
-   if(replay.Count()!=2 || !replay.HasRequest(request_key) ||
-      !replay.HasClose(close_key))
+   if(replay.Count()!=4 || !replay.HasRequest(request_key) ||
+      !replay.HasClose(close_key) || !replay.HasDailyLock(20261113) ||
+      !replay.HasEmergencyStop())
    {
       FailRiskJournalTest("replayed records or idempotency index did not match");
       return;
    }
 
-   PrintFormat("RISK JOURNAL RUNTIME TEST PASS | sequence=%I64d request_duplicate_blocked=true close_duplicate_blocked=true restart_replay=true synthetic_login=%I64d",
+   PrintFormat("RISK JOURNAL RUNTIME TEST PASS | sequence=%I64d request_duplicate_blocked=true close_duplicate_blocked=true daily_lock_replay=true emergency_stop_replay=true restart_replay=true synthetic_login=%I64d",
                replay.Count(),test_login);
-   WriteRiskJournalResult("PASS | append, duplicate rejection, checksum-chain replay, restart recovery");
+   WriteRiskJournalResult("PASS | append, duplicate rejection, daily-lock and emergency-stop replay, checksum-chain replay, restart recovery");
    replay.Close();
 }
