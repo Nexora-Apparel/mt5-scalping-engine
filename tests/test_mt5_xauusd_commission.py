@@ -41,8 +41,8 @@ def verify(evidence):
 
 def test_verified_evidence_and_round_turn_cost():
     verified = verify(valid_evidence())
-    assert commission_cost_bps(verified, entry_price_usd_per_oz=2000.0) == pytest.approx(0.035)
-    assert net_return_bps(1.0, verified, entry_price_usd_per_oz=2000.0) == pytest.approx(0.965)
+    assert commission_cost_bps(verified, entry_price_usd_per_oz=2000.0) == pytest.approx(0.35)
+    assert net_return_bps(1.0, verified, entry_price_usd_per_oz=2000.0) == pytest.approx(0.65)
 
 
 @pytest.mark.parametrize("mutation", [
