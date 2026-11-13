@@ -177,6 +177,45 @@ def _validate_selected_configurations(selected: list[Any], registry: dict[str, A
     return normalized
 
 
+def _validate_selection_against_validation_report(
+    selected: list[dict[str, Any]],
+    validation_report: dict[str, Any],
+) -> None:
+    """Permit holdout selection only from independently cost-qualified validation rows."""
+    if validation_report.get("commission_status") != "VERIFIED_FROM_EXNESS_ACCOUNT_SCHEDULE":
+        raise WalkForwardError("validation report commission is not verified; selection freeze is blocked")
+    if validation_report.get("net_performance_allowed") is not True:
+        raise WalkForwardError("validation report does not permit net-performance decisions")
+    candidates = validation_report.get("candidate_results")
+    if not isinstance(candidates, list):
+        raise WalkForwardError("validation report has no candidate result table")
+
+    eligible: set[str] = set()
+    for row in candidates:
+        if not isinstance(row, dict):
+            continue
+        if row.get("sample_size_gate_passed") is not True:
+            continue
+        if row.get("net_validation_gate_passed") is not True:
+            continue
+        if row.get("candidate_approval") != "VALIDATION_ELIGIBLE_FOR_HOLDOUT":
+            continue
+        signature = json.dumps({
+            "candidate_id": row.get("candidate_id"),
+            "parameters": row.get("parameters"),
+            "horizon_seconds": row.get("horizon_seconds"),
+        }, sort_keys=True, separators=(",", ":"))
+        eligible.add(signature)
+
+    for item in selected:
+        signature = json.dumps(item, sort_keys=True, separators=(",", ":"))
+        if signature not in eligible:
+            raise WalkForwardError(
+                "selection-freeze may include only configurations that passed validation "
+                "sample-size, net-return, and all registered benchmark gates"
+            )
+
+
 def assess_session_catalog(
     plan: dict[str, Any],
     registry: dict[str, Any],
@@ -279,6 +318,7 @@ def assess_session_catalog(
         if on_disk_freeze != selection_freeze:
             raise WalkForwardError("selection-freeze object differs from the committed file")
         selected_configurations = _validate_selected_configurations(selected, registry)
+        _validate_selection_against_validation_report(selected_configurations, validation_report)
 
     expected_ids = set(development) | set(validation_ids)
     if stage == "holdout":
