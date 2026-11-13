@@ -1,0 +1,12 @@
+{
+  "schema": "VELTRIX_XAUUSD_REPLAY_CONFIG_V1",
+  "max_quote_delay_ms": 1000,
+  "quote_tolerance_frozen": true,
+  "holding_horizons_seconds": [5, 10, 15, 30, 60],
+  "lookback_populated_windows": 60,
+  "minimum_valid_prior_observations": 30,
+  "commission_bps": null,
+  "slippage_bps": null,
+  "forward_fill": false,
+  "trade_execution": false
+}

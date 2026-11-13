@@ -23,12 +23,12 @@
    - Compare independent sessions without pooling away session identity; report distributions, null coverage, correlations, and median drift; reject duplicate or overlapping sessions and incompatible schemas.
    - Evidence: cross-session diagnostics merged in PR #35; 124 tests passed; both certified sessions compared; session identity and source hashes retained.
 
-4. **Strategy hypotheses and candidate specification — IN PROGRESS**
+4. **Strategy hypotheses and candidate specification — COMPLETE**
    - Freeze falsifiable XAUUSD-only hypotheses, entry context, direction, invalidation, 5–60 second evaluation horizons, and cost-aware outcomes before any candidate testing.
-   - Gate: versioned pre-registration and validation of registry constraints; no threshold tuning on holdout data.
+   - Evidence: preregistered hypothesis registry merged in PR #36; 127 tests passed; all hypotheses remain explicitly UNTESTED.
 
-5. **Tick replay and deterministic research simulator**
-   - Replay chronological bid/ask ticks; model spread-aware entries/exits, quote freshness, latency assumptions, and conservative execution constraints.
+5. **Tick replay and deterministic research simulator — IN PROGRESS**
+   - Replay chronological bid/ask ticks; model spread-aware entries/exits, quote freshness, invalidation touches, and frozen latency/quote-delay assumptions.
    - Gate: deterministic replay, timestamp integrity, no lookahead, and audited cost assumptions.
 
 6. **Strategy implementation and MQL5 research integration**
@@ -56,5 +56,6 @@
 - Phase 1: complete.
 - Phase 2: complete.
 - Phase 3: complete.
-- Phase 4: in progress.
-- Phases 5–10: locked until preceding phase gates pass.
+- Phase 4: complete.
+- Phase 5: in progress.
+- Phases 6–10: locked until preceding phase gates pass.

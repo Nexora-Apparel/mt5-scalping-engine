@@ -3,7 +3,13 @@
   "status": "PREREGISTERED_UNTESTED",
   "instrument": "XAUUSD",
   "account_scope": "Exness DEMO research data only",
-  "holding_horizons_seconds": [5, 10, 15, 30, 60],
+  "holding_horizons_seconds": [
+    5,
+    10,
+    15,
+    30,
+    60
+  ],
   "feature_window_seconds": 5,
   "threshold_policy": {
     "method": "rolling empirical quantiles",
@@ -31,9 +37,20 @@
       "entry_context": "At a completed 5-second window, trend_efficiency is at or above its prior-window p75 and absolute return_bps is at or above the prior-window p75 of absolute returns.",
       "direction": "Sign of the completed window return_bps.",
       "invalidation_reference": "The opposite extreme of the trigger window; evaluate stop-touch ordering using actual chronological ticks.",
-      "evaluation_horizons_seconds": [5, 10, 15, 30, 60],
+      "evaluation_horizons_seconds": [
+        5,
+        10,
+        15,
+        30,
+        60
+      ],
       "primary_outcome": "Side-adjusted future bid/ask return after spread, commission, and slippage assumptions.",
-      "confounders": ["spread expansion", "quote gaps", "news volatility", "session transitions"]
+      "confounders": [
+        "spread expansion",
+        "quote gaps",
+        "news volatility",
+        "session transitions"
+      ]
     },
     {
       "id": "H2_RANGE_REVERSION",
@@ -42,9 +59,20 @@
       "entry_context": "At a completed 5-second window, trend_efficiency is at or below its prior-window p25 and absolute return_bps is at or above the prior-window p75 of absolute returns.",
       "direction": "Opposite the sign of the completed window return_bps.",
       "invalidation_reference": "Continuation beyond the trigger-window extreme; evaluate stop-touch ordering using actual chronological ticks.",
-      "evaluation_horizons_seconds": [5, 10, 15, 30, 60],
+      "evaluation_horizons_seconds": [
+        5,
+        10,
+        15,
+        30,
+        60
+      ],
       "primary_outcome": "Side-adjusted future bid/ask return after spread, commission, and slippage assumptions.",
-      "confounders": ["trend regime transitions", "spread expansion", "quote gaps", "news volatility"]
+      "confounders": [
+        "trend regime transitions",
+        "spread expansion",
+        "quote gaps",
+        "news volatility"
+      ]
     },
     {
       "id": "H3_ACTIVITY_CONFIRMED_EXPANSION",
@@ -53,9 +81,20 @@
       "entry_context": "At a completed 5-second window, ticks_per_second and realized_volatility_bps are both at or above their respective prior-window p75 values, with non-zero return_bps.",
       "direction": "Sign of the completed window return_bps.",
       "invalidation_reference": "The opposite extreme of the trigger window; evaluate stop-touch ordering using actual chronological ticks.",
-      "evaluation_horizons_seconds": [5, 10, 15, 30, 60],
+      "evaluation_horizons_seconds": [
+        5,
+        10,
+        15,
+        30,
+        60
+      ],
       "primary_outcome": "Incremental side-adjusted future bid/ask return versus H1 and matched baseline windows.",
-      "confounders": ["feed burstiness", "quote duplication", "spread expansion", "news volatility"]
+      "confounders": [
+        "feed burstiness",
+        "quote duplication",
+        "spread expansion",
+        "news volatility"
+      ]
     }
   ],
   "prohibitions": [
@@ -65,5 +104,11 @@
     "No conversion of tick counts into traded volume.",
     "No trade signals, order placement, or execution permission from this registry.",
     "No production deployment, Telegram activation, or scheduling."
-  ]
+  ],
+  "baseline": {
+    "id": "BASELINE_NONZERO_RETURN",
+    "definition": "Every eligible completed window with non-zero return_bps that does not satisfy H1, H2, or H3.",
+    "direction": "Sign of the completed window return_bps.",
+    "status": "DESCRIPTIVE_CONTROL_ONLY"
+  }
 }
