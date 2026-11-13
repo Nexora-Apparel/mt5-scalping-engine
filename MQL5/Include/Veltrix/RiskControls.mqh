@@ -267,7 +267,7 @@ public:
       string close_key=StringFormat("VX_CLOSE_%I64d_%I64u_%I64u",
                                     m_config.expected_demo_login,
                                     ServerHash(m_config.expected_demo_server),
-                                    ServerHash((string)closing_deal_ticket));
+                                    ServerHash(StringFormat("%I64u",closing_deal_ticket)));
       if(close_key=="" || StringLen(close_key)>63)
       { reason="Closing-deal deduplication key is invalid"; return false; }
       if(GlobalVariableCheck(close_key))
