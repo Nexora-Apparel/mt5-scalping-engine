@@ -21,7 +21,7 @@
 
 3. **Cross-session feature stability and research diagnostics — COMPLETE**
    - Compare independent sessions without pooling away session identity; report distributions, null coverage, correlations, and median drift; reject duplicate or overlapping sessions and incompatible schemas.
-   - Evidence: cross-session diagnostics merged in PR #35; 124 tests passed; both certified sessions compared; session identity and source hashes retained.
+   - Evidence: cross-session diagnostics merged in PR #35; 124 tests passed; two certified sessions processed into 721 five-second windows (12,838 source ticks). Provenance hashes, distributions, null coverage, descriptive correlations, and median drift are recorded in `docs/PHASE3_XAUUSD_CROSS_SESSION_REPORT.md`. Median spread was 240 points (0.240 price units), a material cost constraint for short-horizon scalping.
 
 4. **Strategy hypotheses and candidate specification — IN PROGRESS**
    - Freeze falsifiable XAUUSD-only hypotheses, entry context, direction, invalidation, 5–60 second evaluation horizons, and cost-aware outcomes before any candidate testing.
