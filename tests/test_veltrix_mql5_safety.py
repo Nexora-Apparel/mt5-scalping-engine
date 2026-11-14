@@ -598,6 +598,8 @@ def test_phase7_public_state_mutations_require_exact_connected_demo_identity():
     assert "VerifyExactDemoAccount(reason)" in loss
     assert "VerifyExactDemoAccount(reason)" in close
     assert "ACCOUNT_TRADE_MODE_DEMO" in source
+    assert 'AccountInfoString(ACCOUNT_CURRENCY)!="USD"' in source
+    assert "USD-denominated DEMO account" in source
     assert "TERMINAL_CONNECTED" in source
 
 
