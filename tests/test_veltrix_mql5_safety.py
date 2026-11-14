@@ -743,6 +743,9 @@ def test_phase7_manual_daily_reactivation_is_owner_confirmed_and_journaled():
     assert 'event_type=="DAILY_REARM"' in journal
     assert "AppendDailyRearm" in journal
     assert "HasDailyRearm" in journal
+    assert "ActiveDailyLockDay" in controls
+    assert "LatestDailyRearmEquity" in controls
+    assert "ActiveDailyLockCount" in journal
     assert "RemoveValue(m_daily_lock_keys,key)" in journal
 
 
