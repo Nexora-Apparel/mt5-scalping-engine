@@ -37,6 +37,14 @@ private:
       return -1;
    }
 
+   int FindByTicket(const ulong ticket) const
+   {
+      for(int i=0;i<ArraySize(m_items);i++)
+         if(m_items[i].ticket==ticket)
+            return i;
+      return -1;
+   }
+
 public:
    int Count(void) const
    {
@@ -64,9 +72,9 @@ public:
          reason="Exposure identity, stop risk, or margin is invalid";
          return false;
       }
-      if(Find(identifier)>=0)
+      if(Find(identifier)>=0 || FindByTicket(ticket)>=0)
       {
-         reason="Duplicate position identifier rejected";
+         reason="Duplicate position identifier or ticket rejected";
          return false;
       }
       int size=ArraySize(m_items);
@@ -107,6 +115,18 @@ public:
       if(index<0 || m_items[index].state==VX_EXPOSURE_CLOSED)
          return false;
       m_items[index].state=VX_EXPOSURE_PROTECTION_FAILURE;
+      return true;
+   }
+
+   bool UpdateMargin(const long identifier,const double current_margin_money)
+   {
+      int index=Find(identifier);
+      if(index<0 || m_items[index].state==VX_EXPOSURE_CLOSED ||
+         !MathIsValidNumber(current_margin_money) || current_margin_money<=0.0)
+         return false;
+      // Margin may change with broker conditions; only a fresh validated
+      // broker calculation should be passed to this update method.
+      m_items[index].margin_money=current_margin_money;
       return true;
    }
 
