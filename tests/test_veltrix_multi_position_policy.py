@@ -86,6 +86,7 @@ def test_closed_position_registry_has_explicit_memory_compaction():
     registry = (ROOT / "MQL5/Include/Veltrix/PositionRegistry.mqh").read_text(encoding="utf-8")
     ledger = (ROOT / "MQL5/Include/Veltrix/PortfolioExposureLedger.mqh").read_text(encoding="utf-8")
     assert "int PruneClosed(void)" in registry
+    assert "return (PruneClosed()>0);" in registry
     assert "broker_close_deal_confirmed" in registry
     assert "ArrayResize(m_records,size-1)" in registry
     assert "ArrayResize(m_items,size-1)" in ledger
