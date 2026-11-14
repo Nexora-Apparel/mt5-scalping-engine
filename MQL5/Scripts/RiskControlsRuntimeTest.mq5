@@ -160,7 +160,7 @@ bool RunPortfolioLedgerTests(string &reason)
    string duplicate_reason="";
    if(ledger.Register(2,9999,1.0,1.0,duplicate_reason))
    { reason="duplicate position identifier was accepted"; return false; }
-   if(ledger.Register(99,1001,1.0,1.0,duplicate_reason))
+   if(ledger.Register(99,1002,1.0,1.0,duplicate_reason))
    { reason="duplicate broker ticket was accepted"; return false; }
    if(!ledger.UpdateMargin(5,6.0) ||
       MathAbs(ledger.AggregateMarginMoney()-46.0)>1e-8)
