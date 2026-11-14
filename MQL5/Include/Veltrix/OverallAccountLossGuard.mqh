@@ -70,8 +70,18 @@ private:
       FileSeek(handle,0,SEEK_SET);
       while(!FileIsEnding(handle))
       {
+         long record_start=FileTell(handle);
          double seq_number=FileReadNumber(handle);
-         if(FileIsEnding(handle) && seq_number==0.0) break;
+         if(FileIsEnding(handle) && seq_number==0.0)
+         {
+            if(FileTell(handle)>record_start)
+            {
+               FileClose(handle);
+               reason="Overall-loss audit journal ends with a malformed partial record";
+               return false;
+            }
+            break;
+         }
          string event_type=FileReadString(handle);
          string operator_id=FileReadString(handle);
          string detail=FileReadString(handle);
