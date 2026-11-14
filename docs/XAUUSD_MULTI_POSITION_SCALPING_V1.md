@@ -63,6 +63,7 @@ The frozen Phase 8 evaluation plan explicitly requires one open position per can
 - Aggregate open risk and broker margin remain the binding portfolio constraints.
 - The position registry already maintains independent per-position lifecycle and 10-60 second close deadlines.
 - `OverallAccountLossGuard.mqh` is integrated into `CVxRiskControls` intent approval and uses account equity (therefore floating P/L and costs already reflected by the broker in equity); it does not infer the original deposit from current balance. Any additional verified costs not yet reflected in account equity still require explicit accounting. Overall-loss reactivation uses the local manual owner script and checksum-chained audit; operator attribution remains self-asserted rather than cryptographic.
+- The offline multi-position simulator now requires an explicitly owner-verified original-deposit baseline, enforces the independent 50.00% overall-loss boundary, recalculates per-trade and aggregate risk budgets from marked equity at each entry, and adjusts available margin for realized/floating gross PnL. Synthetic robustness tests cover this guard, dynamic sizing, overlapping aggregate exposure, and 0/1/2/5-point slippage sensitivity. They validate mechanics, not profitability; commission remains unverified and net scoring is disabled.
 - No order submission, modification, or closure APIs are added.
 - No live or DEMO execution is enabled.
 
