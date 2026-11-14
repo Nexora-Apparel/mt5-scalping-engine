@@ -288,6 +288,17 @@ public:
          m_daily_loss_locked=true;
          journal_state_changed=true;
       }
+      else if(m_server_day_key>0 && !m_journal.HasDailyLock(m_server_day_key) &&
+              m_journal.HasDailyRearm(m_server_day_key))
+      {
+         double rearmed_equity=m_journal.DailyRearmEquity(m_server_day_key);
+         if(!MathIsValidNumber(rearmed_equity) || rearmed_equity<=0.0)
+         { reason="Daily-rearm journal baseline is invalid; refusing startup"; return false; }
+         m_day_start_equity=rearmed_equity;
+         m_daily_loss_locked=false;
+         m_consecutive_losses=0;
+         journal_state_changed=true;
+      }
       if(journal_state_changed && !PersistRiskState())
       { reason="Journal contains a permanent lock event but terminal state could not be synchronized"; return false; }
       m_initialized=true;
@@ -377,6 +388,37 @@ public:
          reason="Maximum daily equity loss reached; new intents locked pending audited owner reactivation";
          return false;
       }
+      return true;
+   }
+
+   bool RearmDailyLossLock(const double verified_current_equity,
+                           const long now_msc,const bool owner_confirmed,
+                           string &reason)
+   {
+      reason="";
+      if(!m_initialized || !m_daily_loss_locked)
+      { reason="Daily loss lock is not active or risk controls are uninitialized"; return false; }
+      if(!owner_confirmed)
+      { reason="Explicit owner confirmation is required to reactivate the daily lock"; return false; }
+      if(now_msc<=0 || !MathIsValidNumber(verified_current_equity) || verified_current_equity<=0.0 || m_server_day_key<=0)
+      { reason="Manual reactivation requires a valid timestamp, server day, and verified current equity"; return false; }
+      if(!VerifyExactDemoAccount(reason)) return false;
+      if(m_emergency_stop)
+      { reason="Emergency stop remains independently latched; daily reactivation cannot clear it"; return false; }
+      if(!m_journal.AppendDailyRearm(m_server_day_key,now_msc,verified_current_equity,reason))
+         return false;
+      m_day_start_equity=verified_current_equity;
+      m_daily_loss_locked=false;
+      m_consecutive_losses=0;
+      m_cooldown_until_msc=0;
+      if(!PersistRiskState())
+      {
+         string latch_reason="";
+         LatchPersistentEmergencyStop(now_msc,latch_reason);
+         reason="Daily rearm was journaled but terminal-state persistence failed; emergency stop latched";
+         return false;
+      }
+      reason="Daily loss lock manually reactivated; new baseline durably recorded";
       return true;
    }
 
@@ -551,6 +593,7 @@ public:
 
    bool IsEmergencyStopped(void) const { return m_emergency_stop; }
    bool IsDailyLossLocked(void) const { return m_daily_loss_locked; }
+   double DailyStartingEquity(void) const { return m_day_start_equity; }
    int ConsecutiveLosses(void) const { return m_consecutive_losses; }
    long CooldownUntilMsc(void) const { return m_cooldown_until_msc; }
    long ServerDayKey(void) const { return m_server_day_key; }
