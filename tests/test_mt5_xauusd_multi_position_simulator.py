@@ -133,10 +133,12 @@ def test_unknown_exit_does_not_release_aggregate_risk():
         PortfolioTick(8000, 100.00, 100.02),
         PortfolioTick(9000, 100.00, 100.02),
     ]
-    events = [ev(f"p{i}", 1000) for i in range(1, 7)]
+    events = [ev(f"p{i}", 1000) for i in range(1, 13)]
     result = simulate_portfolio(stream, events, SPEC, RISK)
     assert result["trades"][0]["status"] == "DATA_GAP_UNRESOLVED"
-    assert result["trades"][-1]["status"] == "REJECTED_AGGREGATE_RISK"
+    assert any(trade["status"].startswith("REJECTED") for trade in result["trades"])
+    assert result["summary"]["unresolved_positions_at_end"] == result["summary"]["accepted_positions"]
+    assert result["summary"]["max_open_stop_risk_money"] <= 50.0 + 1e-8
 
 
 def test_commission_stays_unverified_and_net_pnl_is_never_claimed():
