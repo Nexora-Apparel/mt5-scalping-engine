@@ -155,6 +155,12 @@ def simulate_portfolio(
     _validate_events(events)
     spec = _validate_spec(broker_spec)
     equity = _finite_positive(risk_config.get("equity"), "equity")
+    original_deposit = _finite_positive(risk_config.get("original_deposit"), "original_deposit")
+    if risk_config.get("original_deposit_verified") is not True:
+        raise PortfolioSimulationError("original_deposit must be explicitly owner-verified")
+    overall_loss_pct = float(risk_config.get("max_overall_account_loss_percent", 50.0))
+    if not math.isfinite(overall_loss_pct) or overall_loss_pct <= 0 or overall_loss_pct > 50.0:
+        raise PortfolioSimulationError("max_overall_account_loss_percent must be positive and no greater than the 50.00% policy ceiling")
     risk_pct = _finite_positive(risk_config.get("risk_per_trade_percent"), "risk_per_trade_percent")
     portfolio_pct = _finite_positive(risk_config.get("max_portfolio_risk_percent"), "max_portfolio_risk_percent")
     free_margin = _finite_positive(risk_config.get("initial_free_margin"), "initial_free_margin")
@@ -173,12 +179,13 @@ def simulate_portfolio(
 
     stamps = [tick.time_msc for tick in ticks]
     slip = slippage_points_per_side * spec["point_size"]
-    portfolio_limit = equity * portfolio_pct / 100.0
-    per_trade_budget = equity * risk_pct / 100.0
+    initial_portfolio_limit = equity * portfolio_pct / 100.0
+    initial_per_trade_budget = equity * risk_pct / 100.0
     active: list[dict[str, Any]] = []
     trades: list[dict[str, Any]] = []
     daily_realized_pnl = 0.0
     daily_loss_locked = False
+    overall_loss_locked = ((original_deposit - equity) / original_deposit * 100.0) >= overall_loss_pct
     max_concurrent = 0
     max_open_risk = 0.0
     max_margin_used = 0.0
@@ -210,6 +217,16 @@ def simulate_portfolio(
             unrealized_pnl += (signed_delta / spec["tick_size"]) * tick_value * position["volume"]
         marked_equity = equity + daily_realized_pnl + unrealized_pnl
         daily_drawdown_pct = max(0.0, (equity - marked_equity) / equity * 100.0)
+        overall_drawdown_pct = max(0.0, (original_deposit - marked_equity) / original_deposit * 100.0)
+        if overall_drawdown_pct >= overall_loss_pct:
+            overall_loss_locked = True
+        if overall_loss_locked:
+            trades.append({
+                "signal_id": event["signal_id"], "status": "REJECTED_OVERALL_LOSS_LOCK",
+                "overall_drawdown_percent": round(overall_drawdown_pct, 8),
+                "overall_loss_limit_percent": overall_loss_pct, "execution_sent": False,
+            })
+            continue
         if daily_drawdown_pct >= daily_loss_pct:
             daily_loss_locked = True
         if daily_loss_locked:
@@ -229,6 +246,10 @@ def simulate_portfolio(
         loss_per_lot = (stop_distance / spec["tick_size"]) * spec["tick_value_loss"]
         if not math.isfinite(loss_per_lot) or loss_per_lot <= 0:
             raise PortfolioSimulationError(f"{event['signal_id']}: invalid loss_per_lot")
+        # Recalculate risk budgets from marked equity at each decision point.
+        # This preserves automatic sizing after realized and floating PnL changes.
+        portfolio_limit = max(0.0, marked_equity) * portfolio_pct / 100.0
+        per_trade_budget = max(0.0, marked_equity) * risk_pct / 100.0
         remaining_portfolio_risk = portfolio_limit - current_open_risk
         allowed_loss = min(per_trade_budget, remaining_portfolio_risk)
         if allowed_loss <= 0:
@@ -252,11 +273,12 @@ def simulate_portfolio(
         if risk_money > allowed_loss + 1e-8:
             trades.append({"signal_id": event["signal_id"], "status": "REJECTED_ROUNDING_RISK", "execution_sent": False})
             continue
-        if free_margin - margin_used - margin_money < margin_reserve:
+        available_free_margin = free_margin + daily_realized_pnl + unrealized_pnl - margin_used
+        if available_free_margin - margin_money < margin_reserve:
             trades.append({
                 "signal_id": event["signal_id"], "status": "REJECTED_MARGIN_RESERVE",
                 "margin_required_money": round(margin_money, 8),
-                "free_margin_before_entry": round(free_margin - margin_used, 8),
+                "free_margin_before_entry": round(available_free_margin, 8),
                 "execution_sent": False,
             })
             continue
@@ -297,6 +319,9 @@ def simulate_portfolio(
             "take_profit_price": round(target_price, 9),
             "volume": volume,
             "risk_money": round(risk_money, 8),
+            "risk_budget_at_entry_money": round(per_trade_budget, 8),
+            "portfolio_limit_at_entry_money": round(portfolio_limit, 8),
+            "equity_at_entry": round(marked_equity, 8),
             "margin_money": round(margin_money, 8),
             "gross_pnl_money": round(pnl, 8) if pnl is not None else None,
             "commission_status": "UNVERIFIED_REQUIRED_INPUT",
@@ -339,8 +364,11 @@ def simulate_portfolio(
         final_unrealized += (signed_delta / spec["tick_size"]) * tick_value * position["volume"]
     final_equity = equity + daily_realized_pnl + final_unrealized
     final_daily_drawdown_pct = max(0.0, (equity - final_equity) / equity * 100.0)
+    final_overall_drawdown_pct = max(0.0, (original_deposit - final_equity) / original_deposit * 100.0)
     if final_daily_drawdown_pct >= daily_loss_pct:
         daily_loss_locked = True
+    if final_overall_drawdown_pct >= overall_loss_pct:
+        overall_loss_locked = True
     unresolved = [item for item in active if item["exit_time_msc"] is None]
     return {
         "status": "PASS",
@@ -352,15 +380,18 @@ def simulate_portfolio(
         "slippage_points_per_side": slippage_points_per_side,
         "risk_config": {
             "equity": equity,
+            "original_deposit": original_deposit,
+            "original_deposit_verified": True,
+            "max_overall_account_loss_percent": overall_loss_pct,
             "risk_per_trade_percent": risk_pct,
             "max_portfolio_risk_percent": portfolio_pct,
-            "per_trade_budget_money": round(per_trade_budget, 8),
-            "portfolio_limit_money": round(portfolio_limit, 8),
+            "initial_per_trade_budget_money": round(initial_per_trade_budget, 8),
+            "initial_portfolio_limit_money": round(initial_portfolio_limit, 8),
             "max_daily_loss_percent": daily_loss_pct,
             "daily_profit_target_money": None,
             "daily_profit_cap_money": None,
-            "overall_account_loss_limit_percent": 50.0,
-            "overall_account_loss_enforcement": "NOT_IMPLEMENTED_RESEARCH_ONLY",
+            "overall_account_loss_limit_percent": overall_loss_pct,
+            "overall_account_loss_enforcement": "IMPLEMENTED_RESEARCH_ONLY",
         },
         "summary": {
             "event_count": len(events),
@@ -374,12 +405,16 @@ def simulate_portfolio(
             "daily_unrealized_gross_pnl_money": round(final_unrealized, 8),
             "daily_drawdown_percent_at_end": round(final_daily_drawdown_pct, 8),
             "daily_loss_locked": daily_loss_locked,
+            "overall_drawdown_percent_at_end": round(final_overall_drawdown_pct, 8),
+            "overall_loss_locked": overall_loss_locked,
         },
         "trades": trades,
         "limitations": [
             "Theoretical bid/ask replay only; no orders or actual fills are created.",
             "Broker margin_per_lot and tick economics must come from the verified account/symbol snapshot.",
             "Commission remains unverified and net PnL is deliberately null.",
+            "Overall account-loss lock is measured against the explicitly owner-verified original-deposit input; daily and overall locks are independent.",
+            "Risk sizing recalculates from marked equity at every entry decision; this is a research approximation and does not replace broker-side pre-trade validation.",
             "A tick gap beyond the configured freshness bound leaves exposure unresolved and reserves its risk.",
             "SL/TP triggers are evaluated on observed ticks; gaps can conceal intratick price paths.",
             "This simulator is separate from the frozen Phase 8 one-position evaluation.",
