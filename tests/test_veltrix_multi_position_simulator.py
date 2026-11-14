@@ -268,3 +268,33 @@ def test_overall_loss_lock_latches_after_breach_even_if_equity_recovers():
     assert result["trades"][1]["status"] == "REJECTED_OVERALL_LOSS_LOCK"
     assert result["trades"][2]["status"] == "REJECTED_OVERALL_LOSS_LOCK"
     assert result["summary"]["overall_loss_locked"] is True
+
+
+def test_simulator_rejects_boolean_risk_and_timing_values():
+    ticks = [
+        PortfolioTick(1000, 2000.0, 2000.02),
+        PortfolioTick(1100, 2000.0, 2000.02),
+    ]
+    event = [{
+        "signal_id": "strict-inputs",
+        "signal_window_end_msc": 1000,
+        "direction": "long",
+        "hold_seconds": 15,
+        "stop_distance_price": 0.5,
+        "take_profit_distance_price": 0.5,
+    }]
+    for key in (
+        "max_overall_account_loss_percent",
+        "max_daily_loss_percent",
+        "margin_reserve_money",
+    ):
+        with pytest.raises(PortfolioSimulationError, match="numeric"):
+            simulate_portfolio(ticks, event, BROKER, {**risk_config(), key: True})
+    with pytest.raises(PortfolioSimulationError, match="positive integers"):
+        simulate_portfolio(ticks, event, BROKER, risk_config(), max_tick_gap_ms=True)
+    bad_ticks = [
+        PortfolioTick(1000, True, 2000.02),
+        PortfolioTick(1100, 2000.0, 2000.02),
+    ]
+    with pytest.raises(PortfolioSimulationError, match="finite numeric"):
+        simulate_portfolio(bad_ticks, event, BROKER, risk_config())
