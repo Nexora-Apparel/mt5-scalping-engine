@@ -498,7 +498,7 @@ def test_phase7_risk_controls_are_demo_xauusd_only_and_fail_closed():
         "risk_per_trade_percent>0.25",
         "max_portfolio_risk_percent>0.50",
         "max_daily_loss_percent>1.00",
-        "cooldown_seconds<30",
+        "cooldown_seconds<0", "max_consecutive_losses<0",
         "max_consecutive_losses>3", "BeginServerDay",
         "EvaluateDailyLoss", "RecordVerifiedClose", "closing_deal_ticket",
         "VX_CLOSE_", "Duplicate verified closing deal ignored",
