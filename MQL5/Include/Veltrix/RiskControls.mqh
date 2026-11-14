@@ -282,8 +282,7 @@ public:
          m_emergency_stop=true;
          journal_state_changed=true;
       }
-      if(m_server_day_key>0 && m_journal.HasDailyLock(m_server_day_key) &&
-         !m_daily_loss_locked)
+      if(m_journal.ActiveDailyLockCount()>0 && !m_daily_loss_locked)
       {
          m_daily_loss_locked=true;
          journal_state_changed=true;
