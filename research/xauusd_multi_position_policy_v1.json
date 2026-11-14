@@ -46,7 +46,9 @@
     "daily_loss_baseline": "verified_server_day_starting_equity",
     "overall_account_loss_reactivation": "MANUAL_OWNER_CONFIRMATION_REQUIRED",
     "overall_account_loss_baseline": "owner_verified_original_deposit",
-    "current_implementation_reactivation": "DAILY_REARM_JOURNAL_PENDING_LATEST_RUNTIME_VALIDATION; OVERALL_LOSS_GUARD_INTEGRATED_IN_CVX_RISK_CONTROLS_PENDING_LATEST_COMPILE_RUNTIME_AND_TRUSTED_OWNER_INTERFACE"
+    "current_implementation_reactivation": "DAILY_REARM_JOURNAL_PENDING_LATEST_RUNTIME_VALIDATION; OVERALL_LOSS_GUARD_INTEGRATED_IN_CVX_RISK_CONTROLS_PENDING_LATEST_COMPILE_RUNTIME_AND_TRUSTED_OWNER_INTERFACE",
+    "overall_loss_runtime_validation": "NEW_DEDICATED_MQL5_TEST_ADDED_PENDING_LATEST_CI",
+    "owner_reactivation": "BOOLEAN_ASSERTION_ONLY_NOT_AUTHENTICATION; TRUSTED_OWNER_ONLY_INTERFACE_REQUIRED"
   },
   "evaluation": {
     "slippage_points_per_side": [
@@ -68,6 +70,7 @@
     "The 15.00% daily loss value is a hard shutdown ceiling, never a loss target; the separate 50.00% overall account-loss ceiling is measured from the owner-verified original deposit and never resets.",
     "No daily profit target or profit cap exists. Floating PnL and verified trading costs count toward both loss limits.",
     "Daily rearm journal/API and the 50% original-deposit loss guard are integrated into CVxRiskControls. Latest-head compile/runtime validation and a trusted owner-only reactivation interface remain required; the boolean confirmation argument is not authentication. No broker execution is enabled.",
-    "No broker execution is enabled."
+    "No broker execution is enabled.",
+    "A dedicated overall-loss guard runtime test now covers 50% threshold activation, persistent replay, immutable baseline, rearm conditions, checksum tampering and partial-state rejection. Latest-head MQL5 workflow execution is still pending."
   ]
 }
