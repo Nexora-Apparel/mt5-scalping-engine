@@ -230,10 +230,15 @@ public:
       bool valid_target=(intent.side==VX_SIDE_BUY ?
                          intent.take_profit>price :
                          intent.take_profit<price);
+      double target_distance=(intent.side==VX_SIDE_BUY ?
+                              intent.take_profit-price :
+                              price-intent.take_profit);
       if(!valid_target || !MathIsValidNumber(target_ticks) ||
-         MathAbs(target_ticks-MathRound(target_ticks))>1e-6)
+         MathAbs(target_ticks-MathRound(target_ticks))>1e-6 ||
+         !MathIsValidNumber(target_distance) || target_distance<=0.0 ||
+         target_distance+point*1e-6<(double)stops_level*point)
       {
-         decision.reason="Take-profit is mandatory and must be on the correct side and aligned to broker tick size";
+         decision.reason="Take-profit is mandatory, correctly sided, tick-aligned, and must respect broker stop distance";
          return false;
       }
 
