@@ -123,6 +123,17 @@ void OnStart()
    { Fail("checksum corruption was not rejected | "+reason); return; }
    GlobalVariableSet(checksum_key,saved_checksum);
 
+   int audit_handle=FileOpen(audit_file,FILE_READ|FILE_WRITE|FILE_TXT|FILE_COMMON);
+   if(audit_handle==INVALID_HANDLE)
+   { Fail("could not open audit file for tamper test"); return; }
+   FileSeek(audit_handle,0,SEEK_END);
+   FileWriteString(audit_handle,"BROKEN_AUDIT_RECORD");
+   FileFlush(audit_handle);
+   FileClose(audit_handle);
+   if(!ExpectInitFailure(login,server,10000.0,true,
+                         "audit journal",reason))
+   { Fail("audit-chain corruption was not rejected | "+reason); return; }
+
    GlobalVariableDel(lock_key);
    if(!ExpectInitFailure(login,server,10000.0,true,
                          "persistent state is partial",reason))
