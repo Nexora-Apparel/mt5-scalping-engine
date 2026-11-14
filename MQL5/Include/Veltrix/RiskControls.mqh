@@ -152,6 +152,42 @@ private:
       return true;
    }
 
+   bool RearmDailyLossLockCore(const double verified_current_equity,
+                              const long now_msc,const string operator_id,
+                              const string owner_reason,const string evidence_ref,
+                              const string confirmation_phrase,string &reason)
+   {
+      reason="";
+      if(!m_initialized || !m_daily_loss_locked)
+      { reason="Daily loss lock is not active or risk controls are uninitialized"; return false; }
+      if(confirmation_phrase!="VELTRIX OWNER CONFIRM DAILY REACTIVATION")
+      { reason="Exact manual owner confirmation phrase is required for daily reactivation"; return false; }
+      if(now_msc<=0 || !MathIsValidNumber(verified_current_equity) ||
+         verified_current_equity<=0.0 || m_server_day_key<=0)
+      { reason="Manual reactivation requires a valid timestamp, server day, and verified current equity"; return false; }
+      if(m_emergency_stop)
+      { reason="Emergency stop remains independently latched; daily reactivation cannot clear it"; return false; }
+      long locked_day=m_journal.ActiveDailyLockDay();
+      if(locked_day<=0)
+      { reason="No active daily-lock journal event exists for manual reactivation"; return false; }
+      if(!m_journal.AppendDailyRearm(locked_day,now_msc,verified_current_equity,
+                                     operator_id,owner_reason,evidence_ref,reason))
+         return false;
+      m_day_start_equity=verified_current_equity;
+      m_daily_loss_locked=false;
+      m_consecutive_losses=0;
+      m_cooldown_until_msc=0;
+      if(!PersistRiskState())
+      {
+         string latch_reason="";
+         LatchPersistentEmergencyStop(now_msc,latch_reason);
+         reason="Daily rearm was journaled but terminal-state persistence failed; emergency stop latched";
+         return false;
+      }
+      reason="Daily loss lock manually reactivated; operator, reason, evidence reference and new baseline durably recorded";
+      return true;
+   }
+
 public:
    CVxRiskControls(void)
    {
@@ -412,31 +448,26 @@ public:
       { reason="Daily loss lock is not active or risk controls are uninitialized"; return false; }
       if(confirmation_phrase!="VELTRIX OWNER CONFIRM DAILY REACTIVATION")
       { reason="Exact manual owner confirmation phrase is required for daily reactivation"; return false; }
-      if(now_msc<=0 || !MathIsValidNumber(verified_current_equity) || verified_current_equity<=0.0 || m_server_day_key<=0)
+      if(now_msc<=0 || !MathIsValidNumber(verified_current_equity) ||
+         verified_current_equity<=0.0 || m_server_day_key<=0)
       { reason="Manual reactivation requires a valid timestamp, server day, and verified current equity"; return false; }
       if(!VerifyExactDemoAccount(reason)) return false;
-      if(m_emergency_stop)
-      { reason="Emergency stop remains independently latched; daily reactivation cannot clear it"; return false; }
-      long locked_day=m_journal.ActiveDailyLockDay();
-      if(locked_day<=0)
-      { reason="No active daily-lock journal event exists for manual reactivation"; return false; }
-      if(!m_journal.AppendDailyRearm(locked_day,now_msc,verified_current_equity,
-                                     operator_id,owner_reason,evidence_ref,reason))
-         return false;
-      m_day_start_equity=verified_current_equity;
-      m_daily_loss_locked=false;
-      m_consecutive_losses=0;
-      m_cooldown_until_msc=0;
-      if(!PersistRiskState())
-      {
-         string latch_reason="";
-         LatchPersistentEmergencyStop(now_msc,latch_reason);
-         reason="Daily rearm was journaled but terminal-state persistence failed; emergency stop latched";
-         return false;
-      }
-      reason="Daily loss lock manually reactivated; operator, reason, evidence reference and new baseline durably recorded";
-      return true;
+      return RearmDailyLossLockCore(verified_current_equity,now_msc,operator_id,
+                                    owner_reason,evidence_ref,confirmation_phrase,reason);
    }
+
+#ifdef VELTRIX_RISK_TEST
+   // Test-only seam bypasses terminal account identity while exercising the
+   // same journal, audit, lock, and persistence implementation.
+   bool RearmDailyLossLockForTest(const double verified_current_equity,
+                                  const long now_msc,const string operator_id,
+                                  const string owner_reason,const string evidence_ref,
+                                  const string confirmation_phrase,string &reason)
+   {
+      return RearmDailyLossLockCore(verified_current_equity,now_msc,operator_id,
+                                    owner_reason,evidence_ref,confirmation_phrase,reason);
+   }
+#endif
 
    bool RecordVerifiedClose(const ulong closing_deal_ticket,const double net_profit,
                             const long close_time_msc,string &reason)
