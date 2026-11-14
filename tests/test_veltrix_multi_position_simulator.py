@@ -114,11 +114,11 @@ def test_risk_sizing_recalculates_from_marked_equity_after_realized_profit():
 
 def test_aggregate_risk_caps_overlapping_positions_without_a_position_count_cap():
     ticks = [
-        PortfolioTick(1000, 2000.00, 2000.02),
-        PortfolioTick(1100, 2000.00, 2000.02),
-        PortfolioTick(6100, 2000.00, 2000.02),
-        PortfolioTick(11100, 2000.00, 2000.02),
-        PortfolioTick(16100, 2000.00, 2000.02),
+        PortfolioTick(1000, 2000.00, 2000.00),
+        PortfolioTick(1100, 2000.00, 2000.00),
+        PortfolioTick(6100, 2000.00, 2000.00),
+        PortfolioTick(11100, 2000.00, 2000.00),
+        PortfolioTick(16100, 2000.00, 2000.00),
     ]
     events = [
         {
