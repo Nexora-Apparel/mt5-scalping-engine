@@ -110,3 +110,57 @@ def test_risk_sizing_recalculates_from_marked_equity_after_realized_profit():
     assert result["risk_config"]["overall_account_loss_enforcement"] == "IMPLEMENTED_RESEARCH_ONLY"
     assert all(trade["net_pnl_money"] is None for trade in result["trades"])
     assert result["net_performance_allowed"] is False
+
+
+def test_aggregate_risk_caps_overlapping_positions_without_a_position_count_cap():
+    ticks = [
+        PortfolioTick(1000, 2000.00, 2000.02),
+        PortfolioTick(1100, 2000.00, 2000.02),
+        PortfolioTick(6100, 2000.00, 2000.02),
+        PortfolioTick(11100, 2000.00, 2000.02),
+        PortfolioTick(16100, 2000.00, 2000.02),
+    ]
+    events = [
+        {
+            "signal_id": f"overlap-{index}",
+            "signal_window_end_msc": 1000 + index,
+            "direction": "long",
+            "hold_seconds": 15,
+            "stop_distance_price": 0.5,
+            "take_profit_distance_price": 5.0,
+        }
+        for index in range(3)
+    ]
+    result = simulate_portfolio(ticks, events, BROKER, risk_config())
+    assert [trade["status"] for trade in result["trades"]] == [
+        "TIME_STOP", "TIME_STOP", "REJECTED_AGGREGATE_RISK"
+    ]
+    assert result["summary"]["max_concurrent_positions"] == 2
+    assert result["summary"]["max_open_stop_risk_money"] <= 50.0 + 1e-8
+
+
+def test_slippage_sensitivity_never_improves_gross_result_on_flat_quotes():
+    ticks = [
+        PortfolioTick(1000, 2000.00, 2000.02),
+        PortfolioTick(1100, 2000.00, 2000.02),
+        PortfolioTick(6100, 2000.00, 2000.02),
+        PortfolioTick(11100, 2000.00, 2000.02),
+        PortfolioTick(16100, 2000.00, 2000.02),
+    ]
+    event = [{
+        "signal_id": "slippage-stress",
+        "signal_window_end_msc": 1000,
+        "direction": "long",
+        "hold_seconds": 15,
+        "stop_distance_price": 0.5,
+        "take_profit_distance_price": 5.0,
+    }]
+    pnl = []
+    for points in (0, 1, 2, 5):
+        result = simulate_portfolio(
+            ticks, event, BROKER, risk_config(),
+            slippage_points_per_side=points,
+        )
+        pnl.append(result["trades"][0]["gross_pnl_money"])
+    assert pnl == sorted(pnl, reverse=True)
+    assert all(value is not None for value in pnl)
