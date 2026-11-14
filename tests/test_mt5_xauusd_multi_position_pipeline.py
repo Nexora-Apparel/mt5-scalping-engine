@@ -55,7 +55,8 @@ def test_candidate_to_multi_position_portfolio_pipeline_end_to_end():
         PortfolioTick(signal_end + 15100, 100.00, 100.02),
     ]
     risk = {
-        "equity": 10000.0, "risk_per_trade_percent": 0.10,
+        "equity": 10000.0, "original_deposit": 10000.0,
+        "original_deposit_verified": True, "risk_per_trade_percent": 0.10,
         "max_portfolio_risk_percent": 0.50,
         "max_daily_loss_percent": 1.0,
         "initial_free_margin": 10000.0, "margin_reserve_money": 100.0,
