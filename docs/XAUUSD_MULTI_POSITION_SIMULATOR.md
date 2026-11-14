@@ -41,7 +41,7 @@ The broker snapshot must provide:
 - `volume_min`, `volume_max`, `volume_step`.
 - `margin_per_lot`: a broker-calculated, time-stamped margin estimate per lot for the relevant XAUUSD contract and account leverage.
 
-Do not infer contract size, tick economics, or margin from generic XAUUSD assumptions. The simulator requires explicit values. A static `margin_per_lot` snapshot is an approximation; live preflight must independently call the broker's current margin calculator for every proposed volume.
+Do not infer contract size, tick economics, or margin from generic XAUUSD assumptions. The simulator requires explicit values. A static `margin_per_lot` snapshot is an approximation; live preflight must independently call the broker's current margin calculator for every proposed volume. The simulator also requires a separately owner-verified original-deposit baseline and enforces the 50.00% overall-loss ceiling against that immutable baseline.
 
 The CLI accepts a wrapper with `account_mode: DEMO`, `trading_enabled: false`, and `instrument_specs.XAUUSD`. The symbol/account metadata must come from a provenance-verified Exness DEMO snapshot before research reports can be treated as broker-specific.
 
@@ -49,13 +49,15 @@ The CLI accepts a wrapper with `account_mode: DEMO`, `trading_enabled: false`, a
 
 Required fields:
 
-- `equity`
+- `equity`: current starting account equity for this replay window.
+- `original_deposit`: original deposit baseline, sourced from the owner-reviewed broker funding record.
+- `original_deposit_verified`: must be boolean `true`; an unverified baseline is rejected.
 - `risk_per_trade_percent` (positive, no greater than 0.25)
 - `max_portfolio_risk_percent` (positive, no greater than 0.50)
 - `initial_free_margin`
 - `margin_reserve_money`
 
-For each entry, volume is the lesser of the per-trade risk budget and remaining aggregate open-stop-risk capacity, divided by loss-per-lot. Volume is rounded down to the broker step. The trade is rejected if the minimum broker volume would breach the risk budget or if the margin reserve would be violated.
+For each entry, the per-trade and aggregate risk budgets are recalculated from current marked equity after realized and floating gross PnL. Volume is the lesser of the dynamic per-trade risk budget and remaining aggregate open-stop-risk capacity, divided by loss-per-lot. Volume is rounded down to the broker step. The trade is rejected if the minimum broker volume would breach the risk budget or if the margin reserve would be violated. Available free margin is also adjusted by realized and floating gross PnL before the reserve check.
 
 There is no fixed maximum number of simultaneous positions. The portfolio risk budget, free margin, and broker volume constraints are the binding limits. Every open or unresolved position continues to reserve its stop-risk and margin until a simulated close is confirmed; data gaps do not release exposure.
 
@@ -68,6 +70,7 @@ There is no fixed maximum number of simultaneous positions. The portfolio risk b
 - A quote gap beyond the freshness limit or a missing deadline quote leaves the position unresolved and reserves exposure.
 - Observed bid/ask crossing includes spread once. Slippage is an explicit sensitivity assumption, not measured execution quality.
 - Commission remains unverified; net PnL is always null and net-performance claims remain disabled. Gross money PnL uses broker tick-value profit/loss economics, not raw price change multiplied by lots. The daily drawdown latch is evaluated using realized gross PnL plus marked-to-market open PnL; commission is excluded because it is not verified.
+- The overall-loss latch independently compares marked equity with the owner-verified original-deposit baseline and blocks new entries at or above the configured limit (hard-capped at 50.00%). It is not reset by daily accounting.
 
 A stop can be crossed between recorded ticks. This tick-only simulator cannot reconstruct intratick paths or guarantee stop fill price. Gaps can therefore produce worse real fills than the theoretical result.
 
@@ -89,7 +92,7 @@ The ticks JSON is an array of objects with `time_msc`, `bid`, and `ask`. The eve
 
 - No execution APIs, terminal connection, credentials, or broker requests are used.
 - No daily trade-count cap or profit cap is introduced.
-- The policy specifies a 15.00% daily equity-loss ceiling and a separate 50.00% overall account-loss ceiling from the owner-verified original deposit. The daily ceiling is not a loss target; no profit target/cap exists. Floating PnL and verified trading costs count toward both limits. MQL5 manual reactivation and the persistent overall-loss latch remain release blockers. The 0.25% per-trade and 0.50% aggregate open-risk ceilings remain independent.
+- The policy specifies a 15.00% daily equity-loss ceiling and a separate 50.00% overall account-loss ceiling from the owner-verified original deposit. The daily ceiling is not a loss target; no profit target/cap exists. Floating PnL and verified trading costs count toward both limits. The simulator implements the overall-loss check for research replay; MQL5 manual reactivation and prospective DEMO validation remain release blockers. The 0.25% per-trade and 0.50% aggregate open-risk ceilings remain independent.
 - The legacy `NexoraScalper.mq5` prototype contains a disabled order-send path and is not the VELTRIX strategy integration target. Keep `EnableDemoOrders=false` and `EmergencyStop=true`; do not attach it for this research task.
 - Phase 8 remains frozen with one position per candidate configuration. Multi-position portfolio results are a separate research track and cannot be substituted for Phase 8 evidence.
 - This simulator is not certified for DEMO forward validation or execution. Its event source, broker snapshot provenance, commission, and prospective multi-position performance still require validation.
