@@ -123,6 +123,7 @@ bool RunDailyRearmControlTests(string &reason)
    string overall_checksum_key="VX_OVERALL_SUM_"+suffix;
    string journal_file=StringFormat("VELTRIX_XAUUSD_RISK_%I64d_%I64u.csv",
                                     login,TestHash64(server));
+   string overall_audit_file="VELTRIX_OVERALL_AUDIT_"+suffix+".csv";
    long now_msc=(long)TimeLocal()*1000;
    long day_key=20261114;
    double initial_equity=10000.0;
@@ -229,6 +230,7 @@ bool RunDailyRearmControlTests(string &reason)
    }
 
    FileDelete(journal_file,FILE_COMMON);
+   FileDelete(overall_audit_file,FILE_COMMON);
    string keys[8];
    keys[0]=emergency_key; keys[1]=day_key_name;
    keys[2]=equity_key; keys[3]=daily_lock_key;
