@@ -101,3 +101,6 @@ The simulator now permits demonstrated concurrency above two positions when per-
 
 
 The event adapter additionally rejects naive/non-UTC feature timestamps and candidate events whose signal-end timestamp does not exactly match the indexed five-second feature window. A discontinuity between the past-only volatility lookback and signal window is skipped rather than bridged. Regression tests retain the future-feature mutation check to guard against lookahead leakage.
+
+
+The owner-operated procedure is consolidated in docs/VELTRIX_OWNER_REACTIVATION_RUNBOOK.md. It defines DEMO/USD preflight, evidence review, audit preservation, post-reactivation restart checks, and incident handling. It explicitly records that operator IDs are self-asserted and local terminal access is the ownership boundary, not cryptographic identity.
