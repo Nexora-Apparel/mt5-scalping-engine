@@ -6,7 +6,7 @@
 
 ## Signal-to-event adaptation
 
-The candidate engine produces research signals, not trade instructions. Use `tools/mt5_xauusd_multi_position_event_adapter.py` to convert those events into the simulator's SL/TP event schema. It reads the separate `research/xauusd_multi_position_policy_v1.json` grid, uses volatility from strictly preceding completed windows, enforces broker minimum stop distance, rounds distances upward to tick size, and excludes the legacy five-second horizon. The separate grid explores stop volatility multiples of 1.0/1.5/2.0 and take-profit reward multiples of 0.5R/1.0R/1.5R; these are hypotheses only and are not selected or certified. The adapter verifies that feature and candidate source hashes match.
+The candidate engine produces research signals, not trade instructions. Use `tools/mt5_xauusd_multi_position_event_adapter.py` to convert those events into the simulator's SL/TP event schema. It reads the separate `research/xauusd_multi_position_policy_v1.json` grid, uses volatility from strictly preceding completed windows, enforces broker minimum stop distance for both SL and TP, rounds distances upward to tick size, and excludes the legacy five-second horizon. The separate grid explores stop volatility multiples of 1.0/1.5/2.0 and take-profit reward multiples of 0.5R/1.0R/1.5R; these are hypotheses only and are not selected or certified. The adapter verifies that feature and candidate source hashes match.
 
 Run the adapter first:
 
