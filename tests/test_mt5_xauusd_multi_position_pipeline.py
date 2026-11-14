@@ -51,6 +51,7 @@ def test_candidate_to_multi_position_portfolio_pipeline_end_to_end():
         PortfolioTick(signal_end + 100, 100.00, 100.02),
         PortfolioTick(signal_end + 5000, 100.00, 100.02),
         PortfolioTick(signal_end + 10000, 100.00, 100.02),
+        PortfolioTick(signal_end + 15000, 100.00, 100.02),
         PortfolioTick(signal_end + 15100, 100.00, 100.02),
     ]
     risk = {
