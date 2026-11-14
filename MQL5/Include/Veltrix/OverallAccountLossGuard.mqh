@@ -70,7 +70,7 @@ private:
       FileSeek(handle,0,SEEK_SET);
       while(!FileIsEnding(handle))
       {
-         long record_start=FileTell(handle);
+         ulong record_start=FileTell(handle);
          double seq_number=FileReadNumber(handle);
          if(FileIsEnding(handle) && seq_number==0.0)
          {
