@@ -19,6 +19,8 @@ SPEC = {
 }
 RISK = {
     "equity": 10000.0,
+    "original_deposit": 10000.0,
+    "original_deposit_verified": True,
     "risk_per_trade_percent": 0.10,
     "max_portfolio_risk_percent": 0.50,
     "initial_free_margin": 10000.0,
