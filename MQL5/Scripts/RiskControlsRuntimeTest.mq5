@@ -136,6 +136,27 @@ bool RunPortfolioLedgerTests(string &reason)
       ledger.ActiveCount()!=11)
    { reason="confirmed broker close did not release exposure"; return false; }
 
+   VxRiskRequest request;
+   request.equity=10000.0;
+   request.risk_percent=0.10;
+   request.stop_distance_price=0.10;
+   request.tick_size=0.01;
+   request.tick_value_loss=1.0;
+   request.volume_min=0.01;
+   request.volume_max=100.0;
+   request.volume_step=0.01;
+   request.current_open_risk_money=0.0; // Must be overwritten from the ledger.
+   request.max_portfolio_risk_percent=0.50;
+   request.open_positions=0;
+   VxRiskDecision sizing;
+   if(!VxCalculateRiskVolume(request,sizing))
+   { reason="baseline risk sizing unexpectedly failed"; return false; }
+   request.current_open_risk_money=ledger.AggregateOpenRiskMoney();
+   request.open_positions=ledger.ActiveCount();
+   if(!VxCalculateRiskVolume(request,sizing) || sizing.volume<=0.0 ||
+      MathAbs(sizing.portfolio_capacity_money-24.0)>1e-8)
+   { reason="aggregate ledger capacity was not applied to dynamic lot sizing"; return false; }
+
    string duplicate_reason="";
    if(ledger.Register(2,9999,1.0,1.0,duplicate_reason))
    { reason="duplicate position identifier was accepted"; return false; }
