@@ -46,7 +46,7 @@
     "daily_loss_baseline": "verified_server_day_starting_equity",
     "overall_account_loss_reactivation": "MANUAL_OWNER_CONFIRMATION_REQUIRED",
     "overall_account_loss_baseline": "owner_verified_original_deposit",
-    "current_implementation_reactivation": "LOCK_REMAINS_LATCHED_ACROSS_DAY_BOUNDARY_PENDING_AUDITED_MANUAL_REARM"
+    "current_implementation_reactivation": "DAILY_REARM_API_AND_JOURNAL_EVENT_ADDED_PENDING_RUNTIME_VALIDATION_AND_TRUSTED_OWNER_INTERFACE"
   },
   "evaluation": {
     "slippage_points_per_side": [
@@ -67,7 +67,7 @@
     "There is no fixed position-count cap. Aggregate stop risk, margin, broker volume rules, and safety controls are binding.",
     "The 15.00% daily loss value is a hard shutdown ceiling, never a loss target; the separate 50.00% overall account-loss ceiling is measured from the owner-verified original deposit and never resets.",
     "No daily profit target or profit cap exists. Floating PnL and verified trading costs count toward both loss limits.",
-    "The MQL5 persistent overall-loss latch and audited manual-rearm implementation remain release blockers.",
+    "The daily manual-rearm API and durable journal event are implemented but require terminal runtime validation and a trusted owner-only interface. The persistent overall-deposit baseline/lock remains a release blocker.",
     "No broker execution is enabled."
   ]
 }
