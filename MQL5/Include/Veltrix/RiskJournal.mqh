@@ -158,6 +158,8 @@ private:
          }
          else if(event_type=="DAILY_REARM")
          {
+            if(!Contains(m_daily_lock_keys,key))
+            { reason="Risk journal contains a daily rearm without a preceding active daily lock"; return false; }
             if(!AddDailyRearm(key,value))
             { reason="Risk journal contains an invalid daily-rearm event"; return false; }
             RemoveValue(m_daily_lock_keys,key);
