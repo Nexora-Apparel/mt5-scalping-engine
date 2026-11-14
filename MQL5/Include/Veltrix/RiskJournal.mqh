@@ -54,6 +54,10 @@ private:
    {
       int length=StringLen(value);
       if(length<minimum || length>maximum) return false;
+      string trimmed=value;
+      StringTrimLeft(trimmed);
+      StringTrimRight(trimmed);
+      if(trimmed=="") return false;
       for(int i=0;i<length;i++)
       {
          ushort ch=StringGetCharacter(value,i);
