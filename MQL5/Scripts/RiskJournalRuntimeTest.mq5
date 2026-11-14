@@ -70,11 +70,22 @@ void OnStart()
       FailRiskJournalTest("daily-lock event append/read | "+reason);
       return;
    }
-   if(!journal.AppendDailyRearm(20261113,now_msc+5,9875.50,reason) ||
-      journal.HasDailyLock(20261113) || !journal.HasDailyRearm(20261113) ||
-      MathAbs(journal.DailyRearmEquity(20261113)-9875.50)>1e-8)
+   if(journal.AppendDailyRearm(20261113,now_msc+5,9875.50,
+                                "","Too short","evidence-2026",reason))
    {
-      FailRiskJournalTest("owner-confirmed daily-rearm event append/read | "+reason);
+      FailRiskJournalTest("daily rearm accepted missing operator attribution");
+      return;
+   }
+   if(!journal.AppendDailyRearm(20261113,now_msc+5,9875.50,
+                                "owner-01","Manual recovery after equity and statement review",
+                                "statement-2026-11-14",reason) ||
+      journal.HasDailyLock(20261113) || !journal.HasDailyRearm(20261113) ||
+      MathAbs(journal.DailyRearmEquity(20261113)-9875.50)>1e-8 ||
+      journal.DailyRearmOperatorId(20261113)!="owner-01" ||
+      journal.DailyRearmReason(20261113)!="Manual recovery after equity and statement review" ||
+      journal.DailyRearmEvidenceReference(20261113)!="statement-2026-11-14")
+   {
+      FailRiskJournalTest("audited daily-rearm event append/read | "+reason);
       return;
    }
    if(!journal.AppendEmergencyStop(now_msc+6,reason) ||
@@ -100,6 +111,9 @@ void OnStart()
       !replay.HasClose(close_key) || replay.HasDailyLock(20261113) ||
       !replay.HasDailyRearm(20261113) ||
       MathAbs(replay.DailyRearmEquity(20261113)-9875.50)>1e-8 ||
+      replay.DailyRearmOperatorId(20261113)!="owner-01" ||
+      replay.DailyRearmReason(20261113)!="Manual recovery after equity and statement review" ||
+      replay.DailyRearmEvidenceReference(20261113)!="statement-2026-11-14" ||
       !replay.HasEmergencyStop())
    {
       FailRiskJournalTest("replayed records or idempotency index did not match");
@@ -108,6 +122,6 @@ void OnStart()
 
    PrintFormat("RISK JOURNAL RUNTIME TEST PASS | sequence=%I64d request_duplicate_blocked=true close_duplicate_blocked=true daily_lock_replay=true daily_rearm_replay=true emergency_stop_replay=true restart_replay=true synthetic_login=%I64d",
                replay.Count(),test_login);
-   WriteRiskJournalResult("PASS | append, duplicate rejection, daily-lock and manual daily-rearm replay, emergency-stop replay, checksum-chain replay, restart recovery");
+   WriteRiskJournalResult("PASS | append, duplicate rejection, operator/reason/evidence-attributed daily rearm, restart replay, emergency-stop replay, checksum-chain replay");
    replay.Close();
 }
