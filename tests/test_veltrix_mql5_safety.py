@@ -497,7 +497,7 @@ def test_phase7_risk_controls_are_demo_xauusd_only_and_fail_closed():
         "ACCOUNT_TRADE_MODE_DEMO", "ACCOUNT_LOGIN", "ACCOUNT_SERVER",
         "risk_per_trade_percent>0.25",
         "max_portfolio_risk_percent>0.50",
-        "max_daily_loss_percent>1.00",
+        "max_daily_loss_percent>15.00",
         "cooldown_seconds<0", "max_consecutive_losses<0",
         "max_consecutive_losses>3", "BeginServerDay",
         "EvaluateDailyLoss", "RecordVerifiedClose", "closing_deal_ticket",
@@ -509,7 +509,7 @@ def test_phase7_risk_controls_are_demo_xauusd_only_and_fail_closed():
         "Only a verified XAUUSD contract is permitted",
         "Duplicate request identifier rejected",
         "Post-loss cooldown is active",
-        "daily loss lock is latched until the next verified server day",
+        "daily loss lock remains latched until audited owner reactivation",
     )
     for token in required:
         assert token.lower() in source.lower()
@@ -535,7 +535,8 @@ def test_phase7_daily_loss_lock_and_emergency_stop_are_distinct():
     assert "m_daily_loss_locked=false;" in source
     assert "m_emergency_stop=true;" in source
     day_reset = source.split("bool BeginServerDay", 1)[1].split("bool EvaluateDailyLoss", 1)[0]
-    assert "m_daily_loss_locked=false;" in day_reset
+    assert "m_daily_loss_locked=false;" not in day_reset
+    assert "owner-rearmed" in day_reset
     assert "m_emergency_stop=false;" not in day_reset
     assert "GlobalVariableCheck(keys[i])" in source
     assert "GlobalVariableSet(m_emergency_key,(m_emergency_stop ? 1.0 : 0.0))" in source
@@ -550,12 +551,12 @@ def test_phase7_risk_policy_reference_boundaries():
     assert not (0.250001 <= 0.25)
     assert 0.50 <= 0.50
     assert not (0.500001 <= 0.50)
-    assert 1.00 <= 1.00
-    assert not (1.000001 <= 1.00)
+    assert 15.00 <= 15.00
+    assert not (15.000001 <= 15.00)
     day_start = 1000.0
-    daily_limit = 1.0
-    assert (day_start - 990.01) / day_start * 100 < daily_limit
-    assert (day_start - 990.0) / day_start * 100 >= daily_limit
+    daily_limit = 15.0
+    assert (day_start - 850.01) / day_start * 100 < daily_limit
+    assert (day_start - 850.0) / day_start * 100 >= daily_limit
 
 
 def test_phase7_sizing_and_intent_registration_recheck_live_account_and_daily_loss():
