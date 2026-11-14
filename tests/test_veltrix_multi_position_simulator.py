@@ -164,3 +164,32 @@ def test_slippage_sensitivity_never_improves_gross_result_on_flat_quotes():
         pnl.append(result["trades"][0]["gross_pnl_money"])
     assert pnl == sorted(pnl, reverse=True)
     assert all(value is not None for value in pnl)
+
+
+def test_simulator_rejects_mixed_portfolio_configurations():
+    ticks = [
+        PortfolioTick(1000, 2000.0, 2000.02),
+        PortfolioTick(1100, 2000.0, 2000.02),
+    ]
+    events = [
+        {
+            "signal_id": "config-a",
+            "portfolio_config_id": "sl1_rr1_h15",
+            "signal_window_end_msc": 1000,
+            "direction": "long",
+            "hold_seconds": 15,
+            "stop_distance_price": 0.5,
+            "take_profit_distance_price": 0.5,
+        },
+        {
+            "signal_id": "config-b",
+            "portfolio_config_id": "sl2_rr1_h15",
+            "signal_window_end_msc": 1000,
+            "direction": "long",
+            "hold_seconds": 15,
+            "stop_distance_price": 1.0,
+            "take_profit_distance_price": 1.0,
+        },
+    ]
+    with pytest.raises(PortfolioSimulationError, match="simulated separately"):
+        simulate_portfolio(ticks, events, BROKER, risk_config())
