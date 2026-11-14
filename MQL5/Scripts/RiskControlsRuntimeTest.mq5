@@ -45,6 +45,8 @@ bool BuildConfig(const long login,const string server,VxRiskControlConfig &confi
    config.risk_per_trade_percent=0.10;
    config.max_portfolio_risk_percent=0.25;
    config.max_daily_loss_percent=15.00;
+   config.verified_original_deposit=10000.0;
+   config.original_deposit_verified=true;
    config.cooldown_seconds=0; // No trade-frequency pause in the multi-position policy.
    config.max_consecutive_losses=0; // No consecutive-loss daily lock.
    return true;
@@ -190,6 +192,9 @@ void OnStart()
    string cooldown_key="VX_CD_"+suffix;
    string checksum_key="VX_CSUM_"+suffix;
    string transaction_lock_key="VX_LOCKTX_"+suffix;
+   string original_deposit_key="VX_ORIGDEP_"+suffix;
+   string overall_lock_key="VX_OVERALL_LOCK_"+suffix;
+   string overall_checksum_key="VX_OVERALL_SUM_"+suffix;
    string journal_file=StringFormat("VELTRIX_XAUUSD_RISK_%I64d_%I64u.csv",
                                     test_login,TestHash64(test_server));
    long now_msc=(long)TimeLocal()*1000;
@@ -268,6 +273,9 @@ void OnStart()
    keys[6]=checksum_key; keys[7]=transaction_lock_key;
    for(int i=0;i<8;i++)
       GlobalVariableDel(keys[i]);
+   GlobalVariableDel(original_deposit_key);
+   GlobalVariableDel(overall_lock_key);
+   GlobalVariableDel(overall_checksum_key);
 
    PrintFormat("RISK CONTROLS RUNTIME TEST PASS | synthetic_identity=true emergency_stop_restore=true daily_lock_restore=true abandoned_lock_blocked=true checksum_mismatch_blocked=true cleanup=true portfolio_exposure_ledger=true uncapped_positions=true unresolved_risk_retained=true");
    WriteControlsResult("PASS | emergency-stop restore, daily-lock restore, abandoned transaction-lock rejection, checksum mismatch rejection, cleanup, multi-position exposure ledger");
