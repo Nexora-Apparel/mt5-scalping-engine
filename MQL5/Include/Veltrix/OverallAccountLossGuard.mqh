@@ -142,17 +142,13 @@ public:
       return true;
    }
 
-   // Account equity includes floating P/L; broker-booked commissions and swaps
-   // reflected in account equity are therefore included in the loss calculation.
-   bool Evaluate(string &reason)
+   bool EvaluateEquityValue(const double equity,string &reason)
    {
       reason="";
       if(!m_initialized)
       { reason="Overall-loss guard is not initialized"; return false; }
-      if(!VerifyAccount(reason)) return false;
       if(m_locked)
       { reason="50% original-deposit loss ceiling is latched pending owner reactivation"; return false; }
-      double equity=AccountInfoDouble(ACCOUNT_EQUITY);
       if(!MathIsValidNumber(equity) || equity<=0.0)
       { reason="Current account equity is unavailable or invalid"; return false; }
       double loss_percent=(m_original_deposit-equity)/m_original_deposit*100.0;
@@ -169,17 +165,13 @@ public:
       return true;
    }
 
-   // This boolean is an explicit call-site assertion, NOT authentication.
-   // Production wiring must expose this only through a trusted owner-only UI.
-   bool Rearm(const bool trusted_owner_confirmed,string &reason)
+   bool RearmEquityValue(const bool trusted_owner_confirmed,const double equity,string &reason)
    {
       reason="";
       if(!m_initialized || !m_locked)
       { reason="Overall-loss lock is not active or guard is uninitialized"; return false; }
       if(!trusted_owner_confirmed)
       { reason="Trusted owner confirmation is required"; return false; }
-      if(!VerifyAccount(reason)) return false;
-      double equity=AccountInfoDouble(ACCOUNT_EQUITY);
       double minimum_equity=m_original_deposit*(1.0-m_loss_limit_percent/100.0);
       if(!MathIsValidNumber(equity) || equity<=minimum_equity)
       { reason="Equity must recover above the 50% loss boundary before manual reactivation"; return false; }
@@ -193,6 +185,42 @@ public:
       reason="Overall-loss lock manually rearmed; immutable original-deposit baseline retained";
       return true;
    }
+
+   // Account equity includes floating P/L; broker-booked commissions and swaps
+   // reflected in account equity are therefore included in the loss calculation.
+   bool Evaluate(string &reason)
+   {
+      reason="";
+      if(!m_initialized)
+      { reason="Overall-loss guard is not initialized"; return false; }
+      if(!VerifyAccount(reason)) return false;
+      return EvaluateEquityValue(AccountInfoDouble(ACCOUNT_EQUITY),reason);
+   }
+
+   // This boolean is an explicit call-site assertion, NOT authentication.
+   // Production wiring must expose this only through a trusted owner-only UI.
+   bool Rearm(const bool trusted_owner_confirmed,string &reason)
+   {
+      reason="";
+      if(!m_initialized || !m_locked)
+      { reason="Overall-loss lock is not active or guard is uninitialized"; return false; }
+      if(!VerifyAccount(reason)) return false;
+      return RearmEquityValue(trusted_owner_confirmed,
+                              AccountInfoDouble(ACCOUNT_EQUITY),reason);
+   }
+
+#ifdef VELTRIX_RISK_TEST
+   // Synthetic equity injection exists only in dedicated runtime-test builds.
+   bool EvaluateEquitySnapshotForTest(const double equity,string &reason)
+   {
+      return EvaluateEquityValue(equity,reason);
+   }
+
+   bool RearmEquitySnapshotForTest(const bool owner_confirmed,const double equity,string &reason)
+   {
+      return RearmEquityValue(owner_confirmed,equity,reason);
+   }
+#endif
 
    bool IsLocked(void) const { return (!m_initialized || m_locked); }
    bool IsInitialized(void) const { return m_initialized; }
