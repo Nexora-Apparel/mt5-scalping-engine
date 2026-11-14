@@ -22,7 +22,7 @@ The simulator does not generate candidate signals or tune stop/target distances.
 
 The broker snapshot must provide:
 
-- `point_size`, `tick_size`, `tick_value_loss`.
+- `point_size`, `tick_size`, `tick_value_loss`, `tick_value_profit`.
 - `volume_min`, `volume_max`, `volume_step`.
 - `margin_per_lot`: a broker-calculated, time-stamped margin estimate per lot for the relevant XAUUSD contract and account leverage.
 
@@ -52,7 +52,7 @@ There is no fixed maximum number of simultaneous positions. The portfolio risk b
 - If neither is touched, the first quote at/after the 10-60 second time deadline is used, subject to the configured exit tolerance.
 - A quote gap beyond the freshness limit or a missing deadline quote leaves the position unresolved and reserves exposure.
 - Observed bid/ask crossing includes spread once. Slippage is an explicit sensitivity assumption, not measured execution quality.
-- Commission remains unverified; net PnL is always null and net-performance claims remain disabled.
+- Commission remains unverified; net PnL is always null and net-performance claims remain disabled. Gross money PnL uses broker tick-value profit/loss economics, not raw price change multiplied by lots. The daily drawdown latch is evaluated using realized gross PnL plus marked-to-market open PnL; commission is excluded because it is not verified.
 
 A stop can be crossed between recorded ticks. This tick-only simulator cannot reconstruct intratick paths or guarantee stop fill price. Gaps can therefore produce worse real fills than the theoretical result.
 
