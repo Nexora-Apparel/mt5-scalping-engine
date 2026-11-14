@@ -96,3 +96,6 @@ The ticks JSON is an array of objects with `time_msc`, `bid`, and `ask`. The eve
 - The legacy `NexoraScalper.mq5` prototype contains a disabled order-send path and is not the VELTRIX strategy integration target. Keep `EnableDemoOrders=false` and `EmergencyStop=true`; do not attach it for this research task.
 - Phase 8 remains frozen with one position per candidate configuration. Multi-position portfolio results are a separate research track and cannot be substituted for Phase 8 evidence.
 - This simulator is not certified for DEMO forward validation or execution. Its event source, broker snapshot provenance, commission, and prospective multi-position performance still require validation.
+
+Each replay must contain one `portfolio_config_id` only. If a configuration ID is present, it must be non-empty and present on every event. The adapter's stop/target/horizon configurations must be replayed independently against the same tick stream; mixing them would make mutually exclusive hypotheses compete for one portfolio risk budget and invalidate cross-configuration comparisons.
+
