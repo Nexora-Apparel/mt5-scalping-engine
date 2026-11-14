@@ -863,3 +863,43 @@ def test_overall_loss_guard_fails_closed_on_unverified_or_tampered_baseline():
     assert "Overall-loss persistent state is partial" in source
     assert "Overall-loss persistent checksum mismatch" in source
     assert "m_original_deposit=stored_baseline" in source
+
+
+OVERALL_GUARD_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "OverallAccountLossGuard.mqh"
+OVERALL_GUARD_RUNTIME = ROOT / "MQL5" / "Scripts" / "OverallAccountLossGuardRuntimeTest.mq5"
+MQL5_WORKFLOW = ROOT / ".github" / "workflows" / "mql5-compile.yml"
+
+
+def test_overall_loss_guard_runtime_covers_threshold_restart_tamper_and_rearm():
+    guard = OVERALL_GUARD_SOURCE.read_text(encoding="utf-8")
+    runtime = OVERALL_GUARD_RUNTIME.read_text(encoding="utf-8")
+    for token in (
+        "ACCOUNT_EQUITY", "m_original_deposit", "m_loss_limit_percent=50.0",
+        "VX_ORIGDEP_", "VX_OVERALL_LOCK_", "VX_OVERALL_SUM_",
+        "StateChecksum", "GlobalVariablesFlush", "EvaluateEquityValue",
+        "RearmEquityValue", "original_deposit_verified",
+    ):
+        assert token in guard
+    for token in (
+        "EvaluateEquitySnapshotForTest(5000.0",
+        "RearmEquitySnapshotForTest(true,5000.0",
+        "RearmEquitySnapshotForTest(true,5001.0",
+        "conflicts with the immutable stored baseline",
+        "checksum mismatch", "persistent state is partial",
+        "restart replay", "GlobalVariableDel",
+    ):
+        assert token in runtime
+    lowered = guard.lower() + runtime.lower()
+    forbidden = (
+        "ordersend(", "ordersendasync(", "ordercheck(", "ctrade",
+        "trade_action_deal", "positionclose(", "positionmodify(",
+    )
+    assert not [token for token in forbidden if token in lowered]
+
+
+def test_overall_loss_guard_runtime_is_wired_into_mql5_ci():
+    workflow = MQL5_WORKFLOW.read_text(encoding="utf-8")
+    assert "Compile overall account-loss guard runtime test script" in workflow
+    assert "OverallAccountLossGuardRuntimeTest.ex5" in workflow
+    assert 'Invoke-Mt5RuntimeScript "OverallAccountLossGuardRuntimeTest"' in workflow
+    assert "veltrix_overall_loss_guard_runtime_test.result" in workflow
