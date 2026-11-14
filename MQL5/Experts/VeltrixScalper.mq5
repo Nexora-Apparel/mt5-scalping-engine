@@ -10,6 +10,7 @@
 #include "..\\Include\\Veltrix\\MarketGuard.mqh"
 #include "..\\Include\\Veltrix\\RiskAllocator.mqh"
 #include "..\\Include\\Veltrix\\RiskControls.mqh"
+#include "..\\Include\\Veltrix\\OverallAccountLossGuard.mqh"
 #include "..\\Include\\Veltrix\\PositionRegistry.mqh"
 #include "..\\Include\\Veltrix\\ExecutionGuard.mqh"
 #include "..\\Include\\Veltrix\\BrokerReconciler.mqh"
