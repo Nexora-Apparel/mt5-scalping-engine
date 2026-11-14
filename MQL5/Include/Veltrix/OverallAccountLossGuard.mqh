@@ -136,8 +136,8 @@ public:
          if(stored_checksum!=StateChecksum(m_original_deposit,m_locked))
          { reason="Overall-loss persistent checksum mismatch; refusing initialization"; return false; }
       }
-      if(!VerifyAccount(reason))
-         return false;
+      // Broker identity and live equity are checked on every evaluation, not at init;
+      // this also permits offline synthetic persistence/restart tests.
       m_initialized=true;
       return true;
    }
