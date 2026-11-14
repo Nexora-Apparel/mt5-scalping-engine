@@ -69,3 +69,12 @@ def test_future_execution_apis_remain_absent_from_risk_components():
     for path in paths:
         lowered = path.read_text(encoding="utf-8").lower()
         assert not [token for token in forbidden if token in lowered], path
+
+
+
+def test_risk_controls_sizes_against_the_portfolio_exposure_ledger():
+    source = CONTROLS.read_text(encoding="utf-8")
+    assert '#include "PortfolioExposureLedger.mqh"' in source
+    assert "const CVxPortfolioExposureLedger &exposures" in source
+    assert "exposures.AggregateOpenRiskMoney()" in source
+    assert "exposures.ActiveCount()" in source
