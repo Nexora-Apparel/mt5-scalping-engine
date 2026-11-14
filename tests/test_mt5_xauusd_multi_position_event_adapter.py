@@ -95,3 +95,27 @@ def test_future_feature_mutations_do_not_change_prior_only_stop_distance():
     assert [e["stop_distance_price"] for e in base["events"]] == [
         e["stop_distance_price"] for e in after["events"]
     ]
+
+
+def test_adapter_rejects_signal_end_timestamp_not_aligned_to_feature_window():
+    features, candidates, broker, policy = fixture_payloads()
+    candidates["events"][1]["signal_window_end_msc"] += 1
+    with pytest.raises(MultiPositionAdapterError, match="must match its indexed"):
+        build_multi_position_events(features, candidates, broker, policy)
+
+
+def test_adapter_rejects_naive_feature_timestamps():
+    features, candidates, broker, policy = fixture_payloads()
+    features["features"][10]["window_start_utc"] = "2027-01-15T08:00:00"
+    with pytest.raises(MultiPositionAdapterError, match="timezone-aware UTC"):
+        build_multi_position_events(features, candidates, broker, policy)
+
+
+def test_adapter_skips_volatility_window_with_gap_into_signal_window():
+    features, candidates, broker, policy = fixture_payloads()
+    features["features"][12]["window_start_utc"] = datetime.fromtimestamp(
+        1_800_000_000 + 12 * 5 + 10, timezone.utc
+    ).isoformat()
+    result = build_multi_position_events(features, candidates, broker, policy)
+    assert result["event_count"] == 0
+    assert result["skipped_incomplete_volatility_events"] == 1
