@@ -1,4 +1,5 @@
 #include "../Include/Veltrix/RiskControls.mqh"
+#include "../Include/Veltrix/PortfolioExposureLedger.mqh"
 
 #define VX_CONTROLS_RESULT "veltrix_risk_controls_runtime_test.result"
 
@@ -100,8 +101,57 @@ bool ExpectInitFailure(const long login,const string server,
    return true;
 }
 
+
+bool RunPortfolioLedgerTests(string &reason)
+{
+   CVxPortfolioExposureLedger ledger;
+   for(int i=1;i<=12;i++)
+   {
+      string local_reason="";
+      if(!ledger.Register(i,(ulong)(1000+i),2.5,4.0,local_reason))
+      { reason="register multi-position exposure "+IntegerToString(i)+": "+local_reason; return false; }
+   }
+   if(ledger.Count()!=12 || ledger.ActiveCount()!=12 ||
+      MathAbs(ledger.AggregateOpenRiskMoney()-30.0)>1e-8 ||
+      MathAbs(ledger.AggregateMarginMoney()-48.0)>1e-8)
+   { reason="uncapped portfolio aggregation mismatch"; return false; }
+
+   if(!ledger.MarkUnknown(1) || !ledger.MarkProtectionFailure(2) ||
+      !ledger.MarkClosePending(3))
+   { reason="could not mark unresolved exposure states"; return false; }
+   if(MathAbs(ledger.AggregateOpenRiskMoney()-30.0)>1e-8 ||
+      MathAbs(ledger.AggregateMarginMoney()-48.0)>1e-8)
+   { reason="unresolved positions were incorrectly removed from exposure"; return false; }
+
+   if(!ledger.UpdateStopRisk(4,1.0) || ledger.UpdateStopRisk(4,3.0))
+   { reason="stop-risk reduction/widening policy failed"; return false; }
+   if(MathAbs(ledger.AggregateOpenRiskMoney()-28.5)>1e-8)
+   { reason="reduced stop risk did not update aggregate exposure"; return false; }
+
+   if(ledger.ConfirmClosed(1,false) ||
+      MathAbs(ledger.AggregateOpenRiskMoney()-28.5)>1e-8)
+   { reason="unconfirmed broker close released risk"; return false; }
+   if(!ledger.ConfirmClosed(1,true) ||
+      MathAbs(ledger.AggregateOpenRiskMoney()-26.0)>1e-8 ||
+      ledger.ActiveCount()!=11)
+   { reason="confirmed broker close did not release exposure"; return false; }
+
+   string duplicate_reason="";
+   if(ledger.Register(2,9999,1.0,1.0,duplicate_reason))
+   { reason="duplicate position identifier was accepted"; return false; }
+   reason="";
+   return true;
+}
+
 void OnStart()
 {
+   string portfolio_reason="";
+   if(!RunPortfolioLedgerTests(portfolio_reason))
+   {
+      FailControlsTest("portfolio exposure ledger | "+portfolio_reason);
+      return;
+   }
+
    // Synthetic identity only. No broker account or credential is read.
    long test_login=900000000+(long)(GetTickCount64()%900000000);
    string test_server="VELTRIX_RISK_CONTROLS_RUNTIME_TEST";
@@ -194,5 +244,5 @@ void OnStart()
       GlobalVariableDel(keys[i]);
 
    PrintFormat("RISK CONTROLS RUNTIME TEST PASS | synthetic_identity=true emergency_stop_restore=true daily_lock_restore=true abandoned_lock_blocked=true checksum_mismatch_blocked=true cleanup=true");
-   WriteControlsResult("PASS | emergency-stop restore, daily-lock restore, abandoned transaction-lock rejection, checksum mismatch rejection, cleanup");
+   WriteControlsResult("PASS | emergency-stop restore, daily-lock restore, abandoned transaction-lock rejection, checksum mismatch rejection, cleanup, multi-position exposure ledger");
 }
