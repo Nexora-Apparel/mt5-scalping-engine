@@ -65,3 +65,11 @@ The frozen Phase 8 evaluation plan explicitly requires one open position per can
 - `OverallAccountLossGuard.mqh` is integrated into `CVxRiskControls` intent approval and uses account equity (therefore floating P/L and costs already reflected by the broker in equity); it does not infer the original deposit from current balance. Any additional verified costs not yet reflected in account equity still require explicit accounting. The boolean rearm assertion is not authentication.
 - No order submission, modification, or closure APIs are added.
 - No live or DEMO execution is enabled.
+
+
+## Overall-loss guard verification suite (2026-11-14)
+- Added a dedicated MQL5 runtime script, `OverallAccountLossGuardRuntimeTest.mq5`, using synthetic equity injection compiled only under `VELTRIX_RISK_TEST`. The production build does not expose that test API.
+- The test covers unverified-baseline rejection, initial immutable baseline, 50% boundary activation, persisted lock replay, conflicting baseline rejection, rearm rejection at/below the threshold, rearm rejection without owner confirmation, successful manual rearm above the threshold, baseline retention after rearm, second threshold breach, checksum tampering and partial-state rejection.
+- Added the script to the Windows MetaTrader compile/runtime workflow and added Python source-level regression assertions.
+- The previous terminal runtime artifact `Veltrix-risk-runtime-results` passed its five existing journal/control/restart/storage checks. It did NOT yet include this new overall-loss test. A fresh workflow run against the latest branch is required before this guard's runtime behavior can be certified.
+- The synthetic test validates the guard's persistence and decision logic. It does not authenticate a human owner; production reactivation remains blocked until a trusted owner-only interface exists.
