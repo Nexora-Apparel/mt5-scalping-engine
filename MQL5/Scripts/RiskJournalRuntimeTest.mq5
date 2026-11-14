@@ -70,13 +70,20 @@ void OnStart()
       FailRiskJournalTest("daily-lock event append/read | "+reason);
       return;
    }
-   if(!journal.AppendEmergencyStop(now_msc+5,reason) ||
+   if(!journal.AppendDailyRearm(20261113,now_msc+5,9875.50,reason) ||
+      journal.HasDailyLock(20261113) || !journal.HasDailyRearm(20261113) ||
+      MathAbs(journal.DailyRearmEquity(20261113)-9875.50)>1e-8)
+   {
+      FailRiskJournalTest("owner-confirmed daily-rearm event append/read | "+reason);
+      return;
+   }
+   if(!journal.AppendEmergencyStop(now_msc+6,reason) ||
       !journal.HasEmergencyStop())
    {
       FailRiskJournalTest("emergency-stop event append/read | "+reason);
       return;
    }
-   if(journal.Count()!=4)
+   if(journal.Count()!=5)
    {
       FailRiskJournalTest("record count did not equal four");
       return;
@@ -89,16 +96,18 @@ void OnStart()
       FailRiskJournalTest("restart replay | "+reason);
       return;
    }
-   if(replay.Count()!=4 || !replay.HasRequest(request_key) ||
-      !replay.HasClose(close_key) || !replay.HasDailyLock(20261113) ||
+   if(replay.Count()!=5 || !replay.HasRequest(request_key) ||
+      !replay.HasClose(close_key) || replay.HasDailyLock(20261113) ||
+      !replay.HasDailyRearm(20261113) ||
+      MathAbs(replay.DailyRearmEquity(20261113)-9875.50)>1e-8 ||
       !replay.HasEmergencyStop())
    {
       FailRiskJournalTest("replayed records or idempotency index did not match");
       return;
    }
 
-   PrintFormat("RISK JOURNAL RUNTIME TEST PASS | sequence=%I64d request_duplicate_blocked=true close_duplicate_blocked=true daily_lock_replay=true emergency_stop_replay=true restart_replay=true synthetic_login=%I64d",
+   PrintFormat("RISK JOURNAL RUNTIME TEST PASS | sequence=%I64d request_duplicate_blocked=true close_duplicate_blocked=true daily_lock_replay=true daily_rearm_replay=true emergency_stop_replay=true restart_replay=true synthetic_login=%I64d",
                replay.Count(),test_login);
-   WriteRiskJournalResult("PASS | append, duplicate rejection, daily-lock and emergency-stop replay, checksum-chain replay, restart recovery");
+   WriteRiskJournalResult("PASS | append, duplicate rejection, daily-lock and manual daily-rearm replay, emergency-stop replay, checksum-chain replay, restart recovery");
    replay.Close();
 }
