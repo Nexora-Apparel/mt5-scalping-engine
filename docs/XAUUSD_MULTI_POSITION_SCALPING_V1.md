@@ -31,6 +31,7 @@ Aggregate exposure must include positions in OPEN, CLOSE_DUE, CLOSE_PENDING, UNK
 
 ## Independent safety constraints
 
+- Daily loss ceiling: 15.00% of server-day starting equity; overall account loss ceiling: 50.00% of original owner-verified deposit. Neither is a profit target.
 - Existing per-trade risk hard ceiling remains 0.25% of equity.
 - Existing aggregate open-risk hard ceiling remains 0.50% of equity.
 - Broker free-margin reserve and broker volume limits remain mandatory.
@@ -39,9 +40,16 @@ Aggregate exposure must include positions in OPEN, CLOSE_DUE, CLOSE_PENDING, UNK
 - Every position has an independent 10-60 second deadline and TP/SL lifecycle.
 - Emergency stop remains independent of strategy signals.
 
-## Daily loss shutdown: unresolved safety deviation
+## Daily and overall account loss shutdown
 
-The owner requested a daily shutdown threshold in the 50-60% account-loss range. The existing risk engine has a stricter hard ceiling of 1.00% daily equity loss and Phase 7 persistence tests are built around that policy. A 50-60% daily loss allowance would permit catastrophic account impairment and is not adopted by this change. The 1.00% hard ceiling remains active until a separate risk-policy review establishes a defensible alternative. Owner requirement: daily-loss lock reactivation must be manual and explicitly confirmed by the user. Current Phase 7 implementation instead clears the daily lock at the next verified server day; this mismatch is not yet implemented. A future rearm must create a durable audit event, rebase the daily-loss baseline transparently, and never clear the independent emergency stop.
+The owner selected two independent loss ceilings:
+
+- Daily drawdown: 15.00% of verified server-day starting equity. This is a hard shutdown threshold, not a loss target.
+- Overall account drawdown: 50.00% of the owner-verified original deposit. This baseline never resets.
+
+There is no daily profit target or profit cap. The strategy may continue seeking valid opportunities while all risk checks pass. Floating PnL and verified trading costs must count toward both loss limits. When either ceiling is reached, new entries stop and existing positions enter the independent protective-exit/emergency handling path.
+
+Both locks require explicit owner-controlled manual reactivation. A daily rearm must append a durable audit event and establish a fresh verified daily baseline; it must not clear the overall account lock or emergency stop. The current MQL5 implementation is being hardened to retain a daily lock across server-day boundaries, but the persistent overall-deposit baseline/lock and audited manual-rearm operation are not yet implemented. No execution is permitted until those controls are implemented and restart-tested.
 
 ## Phase 8 isolation
 
