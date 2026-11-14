@@ -50,11 +50,13 @@ void OnStart()
    string baseline_key="VX_ORIGDEP_"+suffix;
    string lock_key="VX_OVERALL_LOCK_"+suffix;
    string checksum_key="VX_OVERALL_SUM_"+suffix;
+   string audit_file="VELTRIX_OVERALL_AUDIT_"+suffix+".csv";
    string reason="";
 
    GlobalVariableDel(baseline_key);
    GlobalVariableDel(lock_key);
    GlobalVariableDel(checksum_key);
+   FileDelete(audit_file,FILE_COMMON);
 
    if(!ExpectInitFailure(login,server,10000.0,false,
                          "independently owner-verified original deposit",reason))
@@ -82,15 +84,23 @@ void OnStart()
                         "conflicts with the immutable stored baseline",reason)==false)
    { Fail("changed original-deposit baseline was accepted | "+reason); return; }
 
-   if(restarted.RearmEquitySnapshotForTest(true,5000.0,reason) ||
+   if(restarted.RearmEquitySnapshotForTest("TEST_OWNER","Recovered above threshold after review",
+                                           "VELTRIX OWNER CONFIRM REACTIVATION",5000.0,reason) ||
       !restarted.IsLocked())
    { Fail("rearm at or below threshold was accepted"); return; }
 
-   if(restarted.RearmEquitySnapshotForTest(false,6000.0,reason) ||
+   if(restarted.RearmEquitySnapshotForTest("","Recovered above threshold after review",
+                                           "VELTRIX OWNER CONFIRM REACTIVATION",6000.0,reason) ||
       !restarted.IsLocked())
-   { Fail("unconfirmed owner rearm was accepted"); return; }
+   { Fail("reactivation without an operator identity was accepted"); return; }
 
-   if(!restarted.RearmEquitySnapshotForTest(true,5001.0,reason) ||
+   if(restarted.RearmEquitySnapshotForTest("TEST_OWNER","Reviewed account and confirmed manual restart",
+                                           "wrong phrase",6000.0,reason) ||
+      !restarted.IsLocked())
+   { Fail("reactivation without the exact owner confirmation phrase was accepted"); return; }
+
+   if(!restarted.RearmEquitySnapshotForTest("TEST_OWNER","Reviewed account and confirmed manual restart",
+                                            "VELTRIX OWNER CONFIRM REACTIVATION",6000.0,reason) ||
       restarted.IsLocked())
    { Fail("manual rearm above threshold failed | "+reason); return; }
    if(MathAbs(GlobalVariableGet(baseline_key)-10000.0)>0.001)
@@ -98,7 +108,9 @@ void OnStart()
 
    CVxOverallAccountLossGuard after_rearm;
    if(!after_rearm.Init(login,server,10000.0,true,reason) || after_rearm.IsLocked())
-   { Fail("manual rearm did not survive restart | "+reason); return; }
+   { Fail("manual rearm audit did not survive restart | "+reason); return; }
+   if(!FileIsExist(audit_file,FILE_COMMON))
+   { Fail("owner reactivation audit journal was not created"); return; }
 
    if(after_rearm.EvaluateEquitySnapshotForTest(4999.0,reason) ||
       !after_rearm.IsLocked())
@@ -119,7 +131,8 @@ void OnStart()
    GlobalVariableDel(baseline_key);
    GlobalVariableDel(lock_key);
    GlobalVariableDel(checksum_key);
+   FileDelete(audit_file,FILE_COMMON);
 
-   Print("OVERALL LOSS GUARD RUNTIME TEST PASS | verified_baseline=true threshold_latch=true persistent_lock=true immutable_baseline=true manual_rearm=true rearm_threshold=true restart_replay=true checksum_tamper_rejected=true partial_state_rejected=true");
-   WriteResult("PASS | verified original deposit, 50% threshold lock, persistent restart replay, immutable baseline, guarded manual rearm, checksum tamper rejection, partial-state rejection");
+   Print("OVERALL LOSS GUARD RUNTIME TEST PASS | verified_baseline=true threshold_latch=true persistent_lock=true immutable_baseline=true audited_owner_rearm=true invalid_owner_confirmation_rejected=true rearm_threshold=true restart_replay=true checksum_tamper_rejected=true partial_state_rejected=true");
+   WriteResult("PASS | verified original deposit, 50% threshold lock, persistent restart replay, immutable baseline, audited owner reactivation, invalid owner confirmation rejection, checksum tamper rejection, partial-state rejection");
 }
