@@ -1,0 +1,78 @@
+{
+  "policy_schema": "VELTRIX_XAUUSD_MULTI_POSITION_POLICY_V1",
+  "version": 1,
+  "status": "PREREGISTERED_RESEARCH_ONLY",
+  "canonical_symbol": "XAUUSD",
+  "broker": "Exness",
+  "account_mode": "DEMO",
+  "execution_enabled": false,
+  "live_trading_enabled": false,
+  "daily_trade_count_minimum": null,
+  "daily_trade_count_maximum": null,
+  "profit_target_money": null,
+  "profit_cap_money": null,
+  "simultaneous_position_count_cap": null,
+  "holding_seconds": [
+    15,
+    30,
+    60
+  ],
+  "stop_distance_method": "max(past_only_volatility_scale_price * stop_volatility_multiple, broker_minimum_stop_distance), rounded upward to broker tick size",
+  "take_profit_method": "stop_distance * take_profit_reward_r_multiple, rounded upward to broker tick size",
+  "volatility_scale_method": "sqrt(sum(realized_volatility_bps^2)) across the event's registered lookback windows strictly preceding the signal window",
+  "stop_volatility_multipliers": [
+    1,
+    1.5,
+    2
+  ],
+  "take_profit_reward_r_multiples": [
+    0.5,
+    1,
+    1.5
+  ],
+  "risk_controls": {
+    "per_trade_risk_percent_hard_max": 0.25,
+    "aggregate_open_stop_risk_percent_hard_max": 0.5,
+    "daily_loss_percent_hard_max": 15,
+    "overall_account_loss_percent_hard_max": 50,
+    "position_volume_rounding": "down_to_broker_volume_step",
+    "unresolved_positions_reserve_risk_and_margin": true,
+    "margin_reserve_required": true,
+    "stale_or_invalid_market_data": "reject_new_entry",
+    "cooldown_seconds": 0,
+    "max_consecutive_losses": 0,
+    "zero_values_disable_entry_pause": true,
+    "daily_loss_reactivation": "MANUAL_OWNER_CONFIRMATION_REQUIRED",
+    "daily_loss_baseline": "verified_server_day_starting_equity",
+    "overall_account_loss_reactivation": "MANUAL_OWNER_CONFIRMATION_REQUIRED",
+    "overall_account_loss_baseline": "owner_verified_original_deposit",
+    "current_implementation_reactivation": "DAILY_REARM_OPERATOR_REASON_EVIDENCE_AUDIT_SCRIPT_RUNTIME_PASS_2026_11_14; OVERALL_LOSS_AUDIT_CHAINED_MANUAL_DEMO_REARM_RUNTIME_PASS_2026_11_14",
+    "overall_loss_runtime_validation": "MQL5_RUNTIME_PASS_RUN_43549639530_ALL_6_SENTINELS_PASS; PYTHON_CI_291_PASS_RUN_43549639320",
+    "owner_reactivation": "MANUAL_DAILY_AND_OVERALL_DEMO_TERMINAL_SCRIPTS_WITH_OPERATOR_REASON_EVIDENCE_ATTRIBUTION_AND_CHECKSUM_CHAINED_AUDIT; OPERATOR_ID_IS_SELF_ASSERTED_NOT_CRYPTOGRAPHIC_IDENTITY; OWNER_RUNBOOK_DOCS_VELTRIX_OWNER_REACTIVATION_RUNBOOK"
+  },
+  "evaluation": {
+    "slippage_points_per_side": [
+      0,
+      1,
+      2,
+      5
+    ],
+    "commission_status": "UNVERIFIED_REQUIRED_INPUT",
+    "net_performance_allowed": false,
+    "overall_loss_enforcement": "OWNER_VERIFIED_ORIGINAL_DEPOSIT_50_PERCENT_HARD_LOCK_IN_RESEARCH_SIMULATOR",
+    "dynamic_risk_sizing": "RECALCULATE_FROM_MARKED_EQUITY_AT_EACH_ENTRY",
+    "phase8_isolation": true,
+    "no_holdout_tuning": true
+  },
+  "notes": [
+    "This is a separate multi-position research policy; it does not alter the frozen Phase 8 registry.",
+    "The five-second holding horizon from the legacy candidate registry is excluded from this policy because the user's minimum intended holding window is 10 seconds.",
+    "The stop and target grids are research hypotheses, not selected or profitable settings.",
+    "There is no fixed position-count cap. Aggregate stop risk, margin, broker volume rules, and safety controls are binding.",
+    "The 15.00% daily loss value is a hard shutdown ceiling, never a loss target; the separate 50.00% overall account-loss ceiling is measured from the owner-verified original deposit and never resets.",
+    "No daily profit target or profit cap exists. Floating PnL and verified trading costs count toward both loss limits.",
+    "Daily reactivation now uses a manually launched DEMO/USD-only terminal script with operator, reason and evidence-reference attribution stored in the checksum-chained journal. Overall-loss reactivation uses a dedicated manually launched DEMO-only terminal script, operator/reason/evidence-reference attribution, an exact confirmation phrase, equity recovery above the threshold, and a checksum-chained audit journal. Operator attribution is self-asserted, not cryptographic identity. The EA must be reinitialized after the separate script completes to reload the unlocked state. Latest MQL5 compile/runtime validation passed in run 43549639530; all six sentinels passed. The risk-controls sentinel exercises the complete daily reactivation core, invalid confirmation and missing operator rejection, operator/reason/evidence replay, persisted baseline replacement, and restart recovery. The shared production account-verification path also requires USD currency. Latest Python CI passed 291 tests in run 43549639320, including five-way overlapping-position capacity, unresolved-gap exposure reservation, rejection of cross-UTC-date replays, UTC-aware feature timestamps, exact signal-window alignment, and USD-only account-control source enforcement. The manual script has not been run against a real DEMO account. No broker execution is enabled.",
+    "No broker execution is enabled.",
+    "The audit-chain/manual-script implementation (including the traceable evidence-reference input) passed the dedicated overall-loss terminal runtime test and all five companion runtime sentinels in run 43545106284. Python CI passed 285 tests in run 43549639320. The manual script itself has not been executed against a real DEMO account."
+  ]
+}

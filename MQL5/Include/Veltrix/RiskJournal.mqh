@@ -16,6 +16,11 @@ private:
    string m_request_keys[];
    string m_close_keys[];
    string m_daily_lock_keys[];
+   string m_daily_rearm_days[];
+   double m_daily_rearm_equity[];
+   string m_daily_rearm_operator_ids[];
+   string m_daily_rearm_reasons[];
+   string m_daily_rearm_evidence_refs[];
    bool m_emergency_stop;
    bool m_initialized;
    bool m_created_new;
@@ -45,6 +50,55 @@ private:
       return false;
    }
 
+   bool SafeRearmText(const string value,const int minimum,const int maximum) const
+   {
+      int length=StringLen(value);
+      if(length<minimum || length>maximum) return false;
+      string trimmed=value;
+      StringTrimLeft(trimmed);
+      StringTrimRight(trimmed);
+      if(trimmed=="") return false;
+      for(int i=0;i<length;i++)
+      {
+         ushort ch=StringGetCharacter(value,i);
+         if(ch=='|' || ch=='\r' || ch=='\n' || ch==0)
+            return false;
+      }
+      return true;
+   }
+
+   bool ParseDailyRearmKey(const string encoded,string &day_key,
+                           string &operator_id,string &owner_reason,
+                           string &evidence_ref) const
+   {
+      day_key="";
+      operator_id="";
+      owner_reason="";
+      evidence_ref="";
+      string fields[];
+      int count=StringSplit(encoded,(ushort)StringGetCharacter("|",0),fields);
+      if(count==1)
+      {
+         // Backward-compatible replay of historical unattributed rearm records.
+         day_key=fields[0];
+         operator_id="LEGACY_UNATTRIBUTED";
+         owner_reason="LEGACY_UNATTRIBUTED";
+         evidence_ref="LEGACY_UNATTRIBUTED";
+         return (StringToInteger(day_key)>0);
+      }
+      if(count!=4) return false;
+      day_key=fields[0];
+      operator_id=fields[1];
+      owner_reason=fields[2];
+      evidence_ref=fields[3];
+      if(StringToInteger(day_key)<=0 ||
+         !SafeRearmText(operator_id,3,64) ||
+         !SafeRearmText(owner_reason,10,150) ||
+         !SafeRearmText(evidence_ref,6,80))
+         return false;
+      return true;
+   }
+
    bool AddUnique(string &items[],const string value)
    {
       if(value=="" || Contains(items,value))
@@ -53,6 +107,52 @@ private:
       if(ArrayResize(items,size+1)!=size+1)
          return false;
       items[size]=value;
+      return true;
+   }
+
+   bool RemoveValue(string &items[],const string value)
+   {
+      for(int i=0;i<ArraySize(items);i++)
+      {
+         if(items[i]!=value) continue;
+         int size=ArraySize(items);
+         for(int j=i;j<size-1;j++) items[j]=items[j+1];
+         ArrayResize(items,size-1);
+         return true;
+      }
+      return false;
+   }
+
+   bool AddDailyRearm(const string day_key,const double equity,
+                      const string operator_id,const string owner_reason,
+                      const string evidence_ref)
+   {
+      if(day_key=="" || !MathIsValidNumber(equity) || equity<=0.0 ||
+         !SafeRearmText(operator_id,3,64) ||
+         !SafeRearmText(owner_reason,10,150) ||
+         !SafeRearmText(evidence_ref,6,80)) return false;
+      int size=ArraySize(m_daily_rearm_days);
+      if(ArrayResize(m_daily_rearm_days,size+1)!=size+1) return false;
+      if(ArrayResize(m_daily_rearm_equity,size+1)!=size+1)
+      { ArrayResize(m_daily_rearm_days,size); return false; }
+      if(ArrayResize(m_daily_rearm_operator_ids,size+1)!=size+1)
+      { ArrayResize(m_daily_rearm_days,size); ArrayResize(m_daily_rearm_equity,size); return false; }
+      if(ArrayResize(m_daily_rearm_reasons,size+1)!=size+1)
+      {
+         ArrayResize(m_daily_rearm_days,size); ArrayResize(m_daily_rearm_equity,size);
+         ArrayResize(m_daily_rearm_operator_ids,size); return false;
+      }
+      if(ArrayResize(m_daily_rearm_evidence_refs,size+1)!=size+1)
+      {
+         ArrayResize(m_daily_rearm_days,size); ArrayResize(m_daily_rearm_equity,size);
+         ArrayResize(m_daily_rearm_operator_ids,size); ArrayResize(m_daily_rearm_reasons,size);
+         return false;
+      }
+      m_daily_rearm_days[size]=day_key;
+      m_daily_rearm_equity[size]=equity;
+      m_daily_rearm_operator_ids[size]=operator_id;
+      m_daily_rearm_reasons[size]=owner_reason;
+      m_daily_rearm_evidence_refs[size]=evidence_ref;
       return true;
    }
 
@@ -72,6 +172,11 @@ private:
       ArrayResize(m_request_keys,0);
       ArrayResize(m_close_keys,0);
       ArrayResize(m_daily_lock_keys,0);
+      ArrayResize(m_daily_rearm_days,0);
+      ArrayResize(m_daily_rearm_equity,0);
+      ArrayResize(m_daily_rearm_operator_ids,0);
+      ArrayResize(m_daily_rearm_reasons,0);
+      ArrayResize(m_daily_rearm_evidence_refs,0);
       m_emergency_stop=false;
       FileSeek(m_handle,0,SEEK_SET);
       while(!FileIsEnding(m_handle))
@@ -92,7 +197,8 @@ private:
             timestamp_number<=0.0 || key=="" ||
             previous_hash!=m_previous_hash ||
             (event_type!="REQUEST" && event_type!="CLOSE" &&
-             event_type!="ESTOP" && event_type!="DAILY_LOCK"))
+             event_type!="ESTOP" && event_type!="DAILY_LOCK" &&
+             event_type!="DAILY_REARM"))
          {
             reason="Risk journal contains an incomplete, malformed, or out-of-sequence record";
             return false;
@@ -126,6 +232,16 @@ private:
             if(!AddUnique(m_daily_lock_keys,key))
             { reason="Risk journal contains a duplicate daily-lock event"; return false; }
          }
+         else if(event_type=="DAILY_REARM")
+         {
+            string day_key,operator_id,owner_reason,evidence_ref;
+            if(!ParseDailyRearmKey(key,day_key,operator_id,owner_reason,evidence_ref) ||
+               !Contains(m_daily_lock_keys,day_key))
+            { reason="Risk journal contains a malformed or unattributed daily rearm without an active lock"; return false; }
+            if(!AddDailyRearm(day_key,value,operator_id,owner_reason,evidence_ref))
+            { reason="Risk journal contains an invalid daily-rearm event"; return false; }
+            RemoveValue(m_daily_lock_keys,day_key);
+         }
          m_sequence=sequence;
          m_previous_hash=checksum;
       }
@@ -140,7 +256,8 @@ private:
       if(!m_initialized || m_handle==INVALID_HANDLE ||
          key=="" || timestamp_msc<=0 || !MathIsValidNumber(value) ||
          (event_type!="REQUEST" && event_type!="CLOSE" &&
-          event_type!="ESTOP" && event_type!="DAILY_LOCK"))
+          event_type!="ESTOP" && event_type!="DAILY_LOCK" &&
+          event_type!="DAILY_REARM"))
       { reason="Risk journal is not initialized or append fields are invalid"; return false; }
       if(event_type=="REQUEST" && Contains(m_request_keys,key))
       { reason="Duplicate request identifier rejected by durable journal"; return false; }
@@ -181,6 +298,15 @@ private:
       {
          if(!AddUnique(m_daily_lock_keys,key))
          { reason="Risk journal in-memory daily-lock index allocation failed"; return false; }
+      }
+      else if(event_type=="DAILY_REARM")
+      {
+         string day_key,operator_id,owner_reason,evidence_ref;
+         if(!ParseDailyRearmKey(key,day_key,operator_id,owner_reason,evidence_ref) ||
+            !Contains(m_daily_lock_keys,day_key) ||
+            !AddDailyRearm(day_key,value,operator_id,owner_reason,evidence_ref))
+         { reason="Risk journal in-memory daily-rearm audit append failed"; return false; }
+         RemoveValue(m_daily_lock_keys,day_key);
       }
       m_sequence=next_sequence;
       m_previous_hash=checksum;
@@ -278,6 +404,62 @@ public:
       return Contains(m_daily_lock_keys,StringFormat("%I64d",day_key));
    }
 
+   bool HasDailyRearm(const long day_key) const
+   {
+      string key=StringFormat("%I64d",day_key);
+      for(int i=ArraySize(m_daily_rearm_days)-1;i>=0;i--)
+         if(m_daily_rearm_days[i]==key) return true;
+      return false;
+   }
+
+   double DailyRearmEquity(const long day_key) const
+   {
+      string key=StringFormat("%I64d",day_key);
+      for(int i=ArraySize(m_daily_rearm_days)-1;i>=0;i--)
+         if(m_daily_rearm_days[i]==key) return m_daily_rearm_equity[i];
+      return 0.0;
+   }
+
+   string DailyRearmOperatorId(const long day_key) const
+   {
+      string key=StringFormat("%I64d",day_key);
+      for(int i=ArraySize(m_daily_rearm_days)-1;i>=0;i--)
+         if(m_daily_rearm_days[i]==key) return m_daily_rearm_operator_ids[i];
+      return "";
+   }
+
+   string DailyRearmReason(const long day_key) const
+   {
+      string key=StringFormat("%I64d",day_key);
+      for(int i=ArraySize(m_daily_rearm_days)-1;i>=0;i--)
+         if(m_daily_rearm_days[i]==key) return m_daily_rearm_reasons[i];
+      return "";
+   }
+
+   string DailyRearmEvidenceReference(const long day_key) const
+   {
+      string key=StringFormat("%I64d",day_key);
+      for(int i=ArraySize(m_daily_rearm_days)-1;i>=0;i--)
+         if(m_daily_rearm_days[i]==key) return m_daily_rearm_evidence_refs[i];
+      return "";
+   }
+
+   int ActiveDailyLockCount(void) const { return ArraySize(m_daily_lock_keys); }
+
+   long ActiveDailyLockDay(void) const
+   {
+      if(ArraySize(m_daily_lock_keys)<=0) return 0;
+      return (long)StringToInteger(m_daily_lock_keys[ArraySize(m_daily_lock_keys)-1]);
+   }
+
+   bool HasAnyDailyRearm(void) const { return (ArraySize(m_daily_rearm_days)>0); }
+
+   double LatestDailyRearmEquity(void) const
+   {
+      int size=ArraySize(m_daily_rearm_equity);
+      return (size>0 ? m_daily_rearm_equity[size-1] : 0.0);
+   }
+
    bool AppendEmergencyStop(const long timestamp_msc,string &reason)
    {
       if(m_emergency_stop)
@@ -294,6 +476,24 @@ public:
       if(Contains(m_daily_lock_keys,key))
       { reason=""; return true; }
       return Append("DAILY_LOCK",key,timestamp_msc,loss_percent,reason);
+   }
+
+   bool AppendDailyRearm(const long day_key,const long timestamp_msc,
+                         const double new_starting_equity,const string operator_id,
+                         const string owner_reason,const string evidence_ref,
+                         string &reason)
+   {
+      if(day_key<=0 || timestamp_msc<=0 ||
+         !MathIsValidNumber(new_starting_equity) || new_starting_equity<=0.0 ||
+         !SafeRearmText(operator_id,3,64) ||
+         !SafeRearmText(owner_reason,10,150) ||
+         !SafeRearmText(evidence_ref,6,80))
+      { reason="Daily-rearm audit requires valid day, time, equity, operator, reason and evidence reference"; return false; }
+      string day=StringFormat("%I64d",day_key);
+      if(!Contains(m_daily_lock_keys,day))
+      { reason="Daily loss is not locked for the requested server day"; return false; }
+      string audit_key=day+"|"+operator_id+"|"+owner_reason+"|"+evidence_ref;
+      return Append("DAILY_REARM",audit_key,timestamp_msc,new_starting_equity,reason);
    }
 
    bool AppendRequest(const string key,const long timestamp_msc,string &reason)

@@ -8,6 +8,8 @@
 
 #include "RiskAllocator.mqh"
 #include "RiskJournal.mqh"
+#include "PortfolioExposureLedger.mqh"
+#include "OverallAccountLossGuard.mqh"
 
 struct VxRiskControlConfig
 {
@@ -16,7 +18,8 @@ struct VxRiskControlConfig
    double risk_per_trade_percent;
    double max_portfolio_risk_percent;
    double max_daily_loss_percent;
-   int    max_positions;
+   double verified_original_deposit;
+   bool   original_deposit_verified;
    int    cooldown_seconds;
    int    max_consecutive_losses;
 };
@@ -26,6 +29,7 @@ class CVxRiskControls
 private:
    VxRiskControlConfig m_config;
    CVxRiskJournal m_journal;
+   CVxOverallAccountLossGuard m_overall_guard;
    bool m_initialized;
    bool m_emergency_stop;
    bool m_daily_loss_locked;
@@ -148,6 +152,42 @@ private:
       return true;
    }
 
+   bool RearmDailyLossLockCore(const double verified_current_equity,
+                              const long now_msc,const string operator_id,
+                              const string owner_reason,const string evidence_ref,
+                              const string confirmation_phrase,string &reason)
+   {
+      reason="";
+      if(!m_initialized || !m_daily_loss_locked)
+      { reason="Daily loss lock is not active or risk controls are uninitialized"; return false; }
+      if(confirmation_phrase!="VELTRIX OWNER CONFIRM DAILY REACTIVATION")
+      { reason="Exact manual owner confirmation phrase is required for daily reactivation"; return false; }
+      if(now_msc<=0 || !MathIsValidNumber(verified_current_equity) ||
+         verified_current_equity<=0.0 || m_server_day_key<=0)
+      { reason="Manual reactivation requires a valid timestamp, server day, and verified current equity"; return false; }
+      if(m_emergency_stop)
+      { reason="Emergency stop remains independently latched; daily reactivation cannot clear it"; return false; }
+      long locked_day=m_journal.ActiveDailyLockDay();
+      if(locked_day<=0)
+      { reason="No active daily-lock journal event exists for manual reactivation"; return false; }
+      if(!m_journal.AppendDailyRearm(locked_day,now_msc,verified_current_equity,
+                                     operator_id,owner_reason,evidence_ref,reason))
+         return false;
+      m_day_start_equity=verified_current_equity;
+      m_daily_loss_locked=false;
+      m_consecutive_losses=0;
+      m_cooldown_until_msc=0;
+      if(!PersistRiskState())
+      {
+         string latch_reason="";
+         LatchPersistentEmergencyStop(now_msc,latch_reason);
+         reason="Daily rearm was journaled but terminal-state persistence failed; emergency stop latched";
+         return false;
+      }
+      reason="Daily loss lock manually reactivated; operator, reason, evidence reference and new baseline durably recorded";
+      return true;
+   }
+
 public:
    CVxRiskControls(void)
    {
@@ -176,7 +216,8 @@ public:
       { reason="Exact expected DEMO login and server are mandatory"; return false; }
       if(!MathIsValidNumber(config.risk_per_trade_percent) ||
          !MathIsValidNumber(config.max_portfolio_risk_percent) ||
-         !MathIsValidNumber(config.max_daily_loss_percent))
+         !MathIsValidNumber(config.max_daily_loss_percent) ||
+         !MathIsValidNumber(config.verified_original_deposit))
       { reason="Risk percentages must be finite"; return false; }
       // Conservative hard ceilings are policy limits, not suggested targets.
       if(config.risk_per_trade_percent<=0.0 ||
@@ -184,16 +225,23 @@ public:
          config.max_portfolio_risk_percent<=0.0 ||
          config.max_portfolio_risk_percent>0.50 ||
          config.max_daily_loss_percent<=0.0 ||
-         config.max_daily_loss_percent>1.00)
-      { reason="Risk configuration exceeds hard policy ceilings"; return false; }
-      if(config.max_positions!=1 ||
-         config.cooldown_seconds<30 || config.cooldown_seconds>3600 ||
-         config.max_consecutive_losses<1 || config.max_consecutive_losses>3)
-      { reason="Policy requires one position, 30-3600s cooldown, and 1-3 consecutive-loss limit"; return false; }
+         config.max_daily_loss_percent>15.00)
+      { reason="Risk configuration exceeds hard policy ceilings (0.25% per-trade, 0.50% aggregate, 15.00% daily)"; return false; }
+      if(!config.original_deposit_verified || config.verified_original_deposit<=0.0)
+      { reason="Owner-verified original DEMO deposit is mandatory for the 50% overall-loss guard"; return false; }
+      if(config.cooldown_seconds<0 || config.cooldown_seconds>3600 ||
+         config.max_consecutive_losses<0 || config.max_consecutive_losses>3)
+      { reason="Cooldown must be 0-3600 seconds and consecutive-loss lock must be 0-3 (0 disables each)"; return false; }
+      // There is deliberately no simultaneous-position count limit. Every
+      // new intent must still fit the aggregate open-risk and margin budgets.
 
       m_config=config;
       if(!m_journal.Init(config.expected_demo_login,config.expected_demo_server,reason))
       { reason="Risk journal initialization failed: "+reason; return false; }
+      if(!m_overall_guard.Init(config.expected_demo_login,config.expected_demo_server,
+                               config.verified_original_deposit,
+                               config.original_deposit_verified,reason))
+      { reason="Overall account-loss guard initialization failed: "+reason; return false; }
       string suffix=StringFormat("%I64d_%I64u",
                                  config.expected_demo_login,
                                  ServerHash(config.expected_demo_server));
@@ -262,7 +310,8 @@ public:
          { reason="Persistent risk-state checksum mismatch; refusing initialization"; return false; }
       }
       bool journal_state_changed=false;
-      if(m_consecutive_losses>=m_config.max_consecutive_losses &&
+      if(m_config.max_consecutive_losses>0 &&
+         m_consecutive_losses>=m_config.max_consecutive_losses &&
          !m_daily_loss_locked)
       {
          m_daily_loss_locked=true;
@@ -280,10 +329,21 @@ public:
          m_emergency_stop=true;
          journal_state_changed=true;
       }
-      if(m_server_day_key>0 && m_journal.HasDailyLock(m_server_day_key) &&
-         !m_daily_loss_locked)
+      if(m_journal.ActiveDailyLockCount()>0 && !m_daily_loss_locked)
       {
          m_daily_loss_locked=true;
+         journal_state_changed=true;
+      }
+      else if(m_daily_loss_locked && m_journal.ActiveDailyLockCount()==0 &&
+              m_journal.HasAnyDailyRearm())
+      {
+         double rearmed_equity=m_journal.LatestDailyRearmEquity();
+         if(!MathIsValidNumber(rearmed_equity) || rearmed_equity<=0.0)
+         { reason="Latest daily-rearm journal baseline is invalid; refusing startup"; return false; }
+         m_day_start_equity=rearmed_equity;
+         m_daily_loss_locked=false;
+         m_consecutive_losses=0;
+         m_cooldown_until_msc=0;
          journal_state_changed=true;
       }
       if(journal_state_changed && !PersistRiskState())
@@ -303,6 +363,8 @@ public:
       { reason="Connected account login does not match configured DEMO login"; return false; }
       if(AccountInfoString(ACCOUNT_SERVER)!=m_config.expected_demo_server)
       { reason="Connected broker server does not exactly match configured DEMO server"; return false; }
+      if(AccountInfoString(ACCOUNT_CURRENCY)!="USD")
+      { reason="Risk controls require a USD-denominated DEMO account"; return false; }
       if(!TerminalInfoInteger(TERMINAL_CONNECTED))
       { reason="Terminal is disconnected"; return false; }
       return true;
@@ -326,9 +388,9 @@ public:
       }
       m_server_day_key=day_key;
       m_day_start_equity=starting_equity;
-      m_daily_loss_locked=false;
+      // A daily loss lock is owner-rearmed; a new server day alone must not clear it.
       m_consecutive_losses=0;
-      // A cooldown and emergency stop deliberately survive a day boundary.
+      // A daily-loss lock, cooldown, and emergency stop deliberately survive a day boundary.
       if(!PersistRiskState())
       {
          string latch_reason="";
@@ -348,7 +410,7 @@ public:
       if(!VerifyExactDemoAccount(reason))
          return false;
       if(m_daily_loss_locked)
-      { reason="Daily loss lock is latched until the next verified server day"; return false; }
+      { reason="Daily loss lock remains latched until audited owner reactivation"; return false; }
       double loss_percent=(m_day_start_equity-current_equity)/m_day_start_equity*100.0;
       if(!MathIsValidNumber(loss_percent))
       { reason="Daily loss calculation is non-finite"; return false; }
@@ -372,11 +434,42 @@ public:
             reason="Daily loss reached and risk-state persistence failed; emergency stop latched";
             return false;
          }
-         reason="Maximum daily equity loss reached; new intents locked until next server day";
+         reason="Maximum daily equity loss reached; new intents locked pending audited owner reactivation";
          return false;
       }
       return true;
    }
+
+   bool RearmDailyLossLock(const double verified_current_equity,
+                           const long now_msc,const string operator_id,
+                           const string owner_reason,const string evidence_ref,
+                           const string confirmation_phrase,string &reason)
+   {
+      reason="";
+      if(!m_initialized || !m_daily_loss_locked)
+      { reason="Daily loss lock is not active or risk controls are uninitialized"; return false; }
+      if(confirmation_phrase!="VELTRIX OWNER CONFIRM DAILY REACTIVATION")
+      { reason="Exact manual owner confirmation phrase is required for daily reactivation"; return false; }
+      if(now_msc<=0 || !MathIsValidNumber(verified_current_equity) ||
+         verified_current_equity<=0.0 || m_server_day_key<=0)
+      { reason="Manual reactivation requires a valid timestamp, server day, and verified current equity"; return false; }
+      if(!VerifyExactDemoAccount(reason)) return false;
+      return RearmDailyLossLockCore(verified_current_equity,now_msc,operator_id,
+                                    owner_reason,evidence_ref,confirmation_phrase,reason);
+   }
+
+#ifdef VELTRIX_RISK_TEST
+   // Test-only seam bypasses terminal account identity while exercising the
+   // same journal, audit, lock, and persistence implementation.
+   bool RearmDailyLossLockForTest(const double verified_current_equity,
+                                  const long now_msc,const string operator_id,
+                                  const string owner_reason,const string evidence_ref,
+                                  const string confirmation_phrase,string &reason)
+   {
+      return RearmDailyLossLockCore(verified_current_equity,now_msc,operator_id,
+                                    owner_reason,evidence_ref,confirmation_phrase,reason);
+   }
+#endif
 
    bool RecordVerifiedClose(const ulong closing_deal_ticket,const double net_profit,
                             const long close_time_msc,string &reason)
@@ -403,9 +496,14 @@ public:
       }
       if(net_profit<0.0)
       {
-         m_consecutive_losses++;
-         m_cooldown_until_msc=close_time_msc+(long)m_config.cooldown_seconds*1000;
-         if(m_consecutive_losses>=m_config.max_consecutive_losses)
+         if(m_consecutive_losses<3)
+            m_consecutive_losses++;
+         if(m_config.cooldown_seconds>0)
+            m_cooldown_until_msc=close_time_msc+(long)m_config.cooldown_seconds*1000;
+         else
+            m_cooldown_until_msc=0;
+         if(m_config.max_consecutive_losses>0 &&
+            m_consecutive_losses>=m_config.max_consecutive_losses)
          {
             m_daily_loss_locked=true;
             reason="Consecutive-loss limit reached; daily lock latched";
@@ -464,14 +562,24 @@ public:
       string guard_reason;
       if(!VerifyExactDemoAccount(guard_reason))
       { decision.reason=guard_reason; return false; }
+      if(!m_overall_guard.Evaluate(guard_reason))
+      { decision.reason=guard_reason; return false; }
       if(!EvaluateDailyLoss(source.equity,guard_reason))
       { decision.reason=guard_reason; return false; }
       VxRiskRequest request=source;
       request.risk_percent=m_config.risk_per_trade_percent;
       request.max_portfolio_risk_percent=m_config.max_portfolio_risk_percent;
       request.open_positions=active_positions;
-      request.max_positions=m_config.max_positions;
       return VxCalculateRiskVolume(request,decision);
+   }
+
+   bool CalculateVolume(const VxRiskRequest &source,
+                        const CVxPortfolioExposureLedger &exposures,
+                        VxRiskDecision &decision)
+   {
+      VxRiskRequest request=source;
+      request.current_open_risk_money=exposures.AggregateOpenRiskMoney();
+      return CalculateVolume(request,exposures.ActiveCount(),decision);
    }
 
    bool RegisterApprovedIntent(const string request_id,const string symbol,
@@ -483,15 +591,17 @@ public:
       { reason="Risk controls are uninitialized or locked"; return false; }
       if(!VerifyExactDemoAccount(reason))
          return false;
+      if(!m_overall_guard.Evaluate(reason))
+         return false;
       if(!EvaluateDailyLoss(current_equity,reason))
          return false;
       if(request_id=="" || now_msc<=0 || active_positions<0)
       { reason="Invalid request identity, timestamp, or position count"; return false; }
       if(!IsXauUsdContract(symbol))
       { reason="Only a verified XAUUSD contract is permitted"; return false; }
-      if(active_positions>=m_config.max_positions)
-      { reason="Maximum simultaneous position exposure reached"; return false; }
-      if(m_cooldown_until_msc>0 && now_msc<m_cooldown_until_msc)
+      // active_positions is retained for exposure reporting only; there is no count ceiling.
+      if(m_config.cooldown_seconds>0 &&
+         m_cooldown_until_msc>0 && now_msc<m_cooldown_until_msc)
       { reason="Post-loss cooldown is active"; return false; }
       string request_key=RequestKey(request_id);
       if(request_key=="" || StringLen(request_key)>63)
@@ -531,11 +641,24 @@ public:
 
    bool IsLocked(void) const
    {
-      return (!m_initialized || m_emergency_stop || m_daily_loss_locked);
+      return (!m_initialized || m_emergency_stop || m_daily_loss_locked || m_overall_guard.IsLocked());
+   }
+
+   bool IsOverallAccountLossLocked(void) const { return m_overall_guard.IsLocked(); }
+
+   // Reactivation is intentionally routed through the manually launched
+   // OverallLossOwnerRearm script; this wrapper is not exposed to automation.
+   bool RearmOverallAccountLossLock(const string operator_id,const string owner_reason,
+                                    const string confirmation_phrase,string &reason)
+   {
+      if(!m_initialized)
+      { reason="Risk controls are not initialized"; return false; }
+      return m_overall_guard.Rearm(operator_id,owner_reason,confirmation_phrase,reason);
    }
 
    bool IsEmergencyStopped(void) const { return m_emergency_stop; }
    bool IsDailyLossLocked(void) const { return m_daily_loss_locked; }
+   double DailyStartingEquity(void) const { return m_day_start_equity; }
    int ConsecutiveLosses(void) const { return m_consecutive_losses; }
    long CooldownUntilMsc(void) const { return m_cooldown_until_msc; }
    long ServerDayKey(void) const { return m_server_day_key; }
