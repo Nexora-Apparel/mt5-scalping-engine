@@ -243,6 +243,6 @@ void OnStart()
    for(int i=0;i<8;i++)
       GlobalVariableDel(keys[i]);
 
-   PrintFormat("RISK CONTROLS RUNTIME TEST PASS | synthetic_identity=true emergency_stop_restore=true daily_lock_restore=true abandoned_lock_blocked=true checksum_mismatch_blocked=true cleanup=true");
+   PrintFormat("RISK CONTROLS RUNTIME TEST PASS | synthetic_identity=true emergency_stop_restore=true daily_lock_restore=true abandoned_lock_blocked=true checksum_mismatch_blocked=true cleanup=true portfolio_exposure_ledger=true uncapped_positions=true unresolved_risk_retained=true");
    WriteControlsResult("PASS | emergency-stop restore, daily-lock restore, abandoned transaction-lock rejection, checksum mismatch rejection, cleanup, multi-position exposure ledger");
 }
