@@ -112,7 +112,7 @@ def test_manual_daily_loss_reactivation_requirement_is_explicit_and_not_misrepre
     policy = json.loads((ROOT / "research/xauusd_multi_position_policy_v1.json").read_text(encoding="utf-8"))
     controls = CONTROLS.read_text(encoding="utf-8")
     assert policy["risk_controls"]["daily_loss_reactivation"] == "MANUAL_OWNER_CONFIRMATION_REQUIRED"
-    assert policy["risk_controls"]["current_implementation_reactivation"] == "DAILY_REARM_JOURNAL_PENDING_LATEST_RUNTIME_VALIDATION; OVERALL_LOSS_GUARD_INTEGRATED_IN_CVX_RISK_CONTROLS_PENDING_LATEST_COMPILE_RUNTIME_AND_TRUSTED_OWNER_INTERFACE"
+    assert policy["risk_controls"]["current_implementation_reactivation"] == "DAILY_REARM_JOURNAL_PENDING_LATEST_RUNTIME_VALIDATION; OVERALL_LOSS_AUDIT_CHAINED_MANUAL_DEMO_REARM_SCRIPT_PENDING_LATEST_HEAD_RUNTIME_VALIDATION"
     day_reset = controls.split("bool BeginServerDay", 1)[1].split("bool EvaluateDailyLoss", 1)[0]
     assert "m_daily_loss_locked=false" not in day_reset
     assert "owner-rearmed" in day_reset
@@ -136,7 +136,11 @@ def test_overall_loss_guard_is_mandatory_in_risk_intent_approval_path():
     assert "m_overall_guard.Init" in controls
     assert "m_overall_guard.Evaluate" in controls
     assert "RearmOverallAccountLossLock" in controls
+    assert "operator_id" in controls
     assert "m_overall_guard.IsLocked()" in controls
+    rearm_script = (ROOT / "MQL5/Scripts/OverallLossOwnerRearm.mq5").read_text(encoding="utf-8")
+    assert "guard.Rearm" in rearm_script
+    assert "InpOriginalDepositEvidenceReviewed" in rearm_script
     assert "ACCOUNT_EQUITY" in guard
     assert "m_original_deposit" in guard
     assert "m_loss_limit_percent=50.0" in guard
