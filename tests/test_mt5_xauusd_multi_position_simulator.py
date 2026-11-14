@@ -174,11 +174,14 @@ def test_daily_loss_lock_blocks_new_entries_after_realized_drawdown():
     risk = {**RISK, "risk_per_trade_percent": 0.25, "max_portfolio_risk_percent": 0.50}
     result = simulate_portfolio(
         stream, [ev("loss1", 1000), ev("loss2", 1000), ev("after-lock", 3000)],
-        SPEC, risk,
+        SPEC, {**risk, "max_daily_loss_percent": 0.01},
     )
     assert result["summary"]["daily_loss_locked"] is True
     assert result["trades"][-1]["status"] == "REJECTED_DAILY_LOSS_LOCK"
-    assert result["summary"]["daily_drawdown_percent_at_end"] > 1.0
+    assert result["summary"]["daily_drawdown_percent_at_end"] > 0.01
+    assert result["risk_config"]["daily_profit_target_money"] is None
+    assert result["risk_config"]["daily_profit_cap_money"] is None
+    assert result["risk_config"]["overall_account_loss_limit_percent"] == 50.0
 
 
 def test_tick_value_contract_economics_are_required():
