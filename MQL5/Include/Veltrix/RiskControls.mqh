@@ -363,6 +363,8 @@ public:
       { reason="Connected account login does not match configured DEMO login"; return false; }
       if(AccountInfoString(ACCOUNT_SERVER)!=m_config.expected_demo_server)
       { reason="Connected broker server does not exactly match configured DEMO server"; return false; }
+      if(AccountInfoString(ACCOUNT_CURRENCY)!="USD")
+      { reason="Risk controls require a USD-denominated DEMO account"; return false; }
       if(!TerminalInfoInteger(TERMINAL_CONNECTED))
       { reason="Terminal is disconnected"; return false; }
       return true;
