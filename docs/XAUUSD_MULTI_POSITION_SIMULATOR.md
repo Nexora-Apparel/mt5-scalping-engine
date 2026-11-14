@@ -89,7 +89,7 @@ The ticks JSON is an array of objects with `time_msc`, `bid`, and `ask`. The eve
 
 - No execution APIs, terminal connection, credentials, or broker requests are used.
 - No daily trade-count cap or profit cap is introduced.
-- The existing MQL5 risk-control module currently retains its 1.00% daily loss hard ceiling, 0.25% per-trade ceiling, 0.50% aggregate open-risk ceiling, cooldown, and consecutive-loss lock. The requested 50-60% daily loss threshold is not substituted for these controls.
+- The policy specifies a 15.00% daily equity-loss ceiling and a separate 50.00% overall account-loss ceiling from the owner-verified original deposit. The daily ceiling is not a loss target; no profit target/cap exists. Floating PnL and verified trading costs count toward both limits. MQL5 manual reactivation and the persistent overall-loss latch remain release blockers. The 0.25% per-trade and 0.50% aggregate open-risk ceilings remain independent.
 - The legacy `NexoraScalper.mq5` prototype contains a disabled order-send path and is not the VELTRIX strategy integration target. Keep `EnableDemoOrders=false` and `EmergencyStop=true`; do not attach it for this research task.
 - Phase 8 remains frozen with one position per candidate configuration. Multi-position portfolio results are a separate research track and cannot be substituted for Phase 8 evidence.
 - This simulator is not certified for DEMO forward validation or execution. Its event source, broker snapshot provenance, commission, and prospective multi-position performance still require validation.
