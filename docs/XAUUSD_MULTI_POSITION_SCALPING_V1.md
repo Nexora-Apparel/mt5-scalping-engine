@@ -41,7 +41,7 @@ Aggregate exposure must include positions in OPEN, CLOSE_DUE, CLOSE_PENDING, UNK
 
 ## Daily loss shutdown: unresolved safety deviation
 
-The owner requested a daily shutdown threshold in the 50-60% account-loss range. The existing risk engine has a stricter hard ceiling of 1.00% daily equity loss and Phase 7 persistence tests are built around that policy. A 50-60% daily loss allowance would permit catastrophic account impairment and is not adopted by this change. The 1.00% hard ceiling remains active until a separate risk-policy review establishes a defensible alternative. Manual reactivation must not bypass the daily lock or emergency stop without an audited reset procedure.
+The owner requested a daily shutdown threshold in the 50-60% account-loss range. The existing risk engine has a stricter hard ceiling of 1.00% daily equity loss and Phase 7 persistence tests are built around that policy. A 50-60% daily loss allowance would permit catastrophic account impairment and is not adopted by this change. The 1.00% hard ceiling remains active until a separate risk-policy review establishes a defensible alternative. Owner requirement: daily-loss lock reactivation must be manual and explicitly confirmed by the user. Current Phase 7 implementation instead clears the daily lock at the next verified server day; this mismatch is not yet implemented. A future rearm must create a durable audit event, rebase the daily-loss baseline transparently, and never clear the independent emergency stop.
 
 ## Phase 8 isolation
 
