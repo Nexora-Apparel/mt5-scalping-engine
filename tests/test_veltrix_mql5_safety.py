@@ -832,3 +832,33 @@ def test_phase7_mql5_workflow_executes_terminal_runtime_scripts_without_broker_l
     assert "ShutdownTerminal=1" in source
     assert "veltrix_risk_controls_runtime_test.result" in source
     assert "veltrix_risk_journal_runtime_test.result" in source
+
+
+OVERALL_LOSS_GUARD_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "OverallAccountLossGuard.mqh"
+
+
+def test_overall_loss_guard_uses_immutable_verified_original_deposit_and_persistent_lock():
+    source = OVERALL_LOSS_GUARD_SOURCE.read_text(encoding="utf-8")
+    required = (
+        "original_deposit_verified", "verified_original_deposit",
+        "VX_ORIGDEP_", "VX_OVERALL_LOCK_", "VX_OVERALL_SUM_",
+        "StateChecksum", "GlobalVariablesFlush", "ACCOUNT_EQUITY",
+        "m_loss_limit_percent=50.0", "Rearm",
+        "immutable stored baseline", "Equity must recover above the 50% loss boundary",
+    )
+    for token in required:
+        assert token in source
+    lowered = source.lower()
+    forbidden = ("ordersend(", "ordersendasync(", "ordercheck(",
+                 "ctrade", "trade_action_deal", "positionclose(",
+                 "positionmodify(")
+    assert not [token for token in forbidden if token in lowered]
+
+
+def test_overall_loss_guard_fails_closed_on_unverified_or_tampered_baseline():
+    source = OVERALL_LOSS_GUARD_SOURCE.read_text(encoding="utf-8")
+    assert "independently owner-verified original deposit are mandatory" in source
+    assert "Supplied original-deposit evidence conflicts with the immutable stored baseline" in source
+    assert "Overall-loss persistent state is partial" in source
+    assert "Overall-loss persistent checksum mismatch" in source
+    assert "m_original_deposit=stored_baseline" in source
