@@ -403,14 +403,15 @@ public:
    }
 
    bool RearmDailyLossLock(const double verified_current_equity,
-                           const long now_msc,const bool owner_confirmed,
-                           string &reason)
+                           const long now_msc,const string operator_id,
+                           const string owner_reason,const string evidence_ref,
+                           const string confirmation_phrase,string &reason)
    {
       reason="";
       if(!m_initialized || !m_daily_loss_locked)
       { reason="Daily loss lock is not active or risk controls are uninitialized"; return false; }
-      if(!owner_confirmed)
-      { reason="Explicit owner confirmation is required to reactivate the daily lock"; return false; }
+      if(confirmation_phrase!="VELTRIX OWNER CONFIRM DAILY REACTIVATION")
+      { reason="Exact manual owner confirmation phrase is required for daily reactivation"; return false; }
       if(now_msc<=0 || !MathIsValidNumber(verified_current_equity) || verified_current_equity<=0.0 || m_server_day_key<=0)
       { reason="Manual reactivation requires a valid timestamp, server day, and verified current equity"; return false; }
       if(!VerifyExactDemoAccount(reason)) return false;
@@ -419,7 +420,8 @@ public:
       long locked_day=m_journal.ActiveDailyLockDay();
       if(locked_day<=0)
       { reason="No active daily-lock journal event exists for manual reactivation"; return false; }
-      if(!m_journal.AppendDailyRearm(locked_day,now_msc,verified_current_equity,reason))
+      if(!m_journal.AppendDailyRearm(locked_day,now_msc,verified_current_equity,
+                                     operator_id,owner_reason,evidence_ref,reason))
          return false;
       m_day_start_equity=verified_current_equity;
       m_daily_loss_locked=false;
@@ -432,7 +434,7 @@ public:
          reason="Daily rearm was journaled but terminal-state persistence failed; emergency stop latched";
          return false;
       }
-      reason="Daily loss lock manually reactivated; new baseline durably recorded";
+      reason="Daily loss lock manually reactivated; operator, reason, evidence reference and new baseline durably recorded";
       return true;
    }
 
