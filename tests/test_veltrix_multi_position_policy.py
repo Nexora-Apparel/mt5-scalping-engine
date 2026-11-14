@@ -52,7 +52,7 @@ def test_multi_position_policy_preserves_phase8_and_daily_loss_safety_boundary()
     assert "Phase 8" in source
     assert "one open position per candidate configuration" in source
     assert "0.50% of equity" in source
-    assert "15.00% daily equity drawdown ceiling" in source
+    assert "15.00% of verified server-day starting equity" in source
     assert "50.00% of the owner-verified original deposit" in source
     assert "no daily profit target or profit cap" in source.lower()
     assert "Floating PnL" in source
