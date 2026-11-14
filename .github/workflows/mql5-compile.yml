@@ -406,6 +406,7 @@ jobs:
             C:\\MT5\\MQL5\\Files\\veltrix_risk_restart_seed.result
             C:\\MT5\\MQL5\\Files\\veltrix_risk_restart_verify.result
             C:\\MT5\\MQL5\\Files\\veltrix_risk_journal_failure_test.result
+            C:\\MT5\\MQL5\\Files\\veltrix_overall_loss_guard_runtime_test.result
           if-no-files-found: warn
           retention-days: 30
 
