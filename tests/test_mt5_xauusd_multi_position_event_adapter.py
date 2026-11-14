@@ -65,6 +65,7 @@ def test_stop_and_target_distances_are_tick_aligned_and_stop_respects_broker_min
     minimum = 10 * 0.01
     for event in result["events"]:
         assert event["stop_distance_price"] >= minimum
+        assert event["take_profit_distance_price"] >= minimum
         assert round(event["stop_distance_price"] / 0.01) == pytest.approx(event["stop_distance_price"] / 0.01)
         assert round(event["take_profit_distance_price"] / 0.01) == pytest.approx(event["take_profit_distance_price"] / 0.01)
 
