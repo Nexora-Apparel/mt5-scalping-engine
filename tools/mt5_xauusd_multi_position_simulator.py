@@ -161,9 +161,9 @@ def simulate_portfolio(
     margin_reserve = float(risk_config.get("margin_reserve_money", 0.0))
     if not math.isfinite(margin_reserve) or margin_reserve < 0:
         raise PortfolioSimulationError("margin_reserve_money must be finite and nonnegative")
-    daily_loss_pct = float(risk_config.get("max_daily_loss_percent", 1.0))
-    if not math.isfinite(daily_loss_pct) or daily_loss_pct <= 0 or daily_loss_pct > 1.0:
-        raise PortfolioSimulationError("max_daily_loss_percent must be positive and no greater than the existing 1.00% hard ceiling")
+    daily_loss_pct = float(risk_config.get("max_daily_loss_percent", 15.0))
+    if not math.isfinite(daily_loss_pct) or daily_loss_pct <= 0 or daily_loss_pct > 15.0:
+        raise PortfolioSimulationError("max_daily_loss_percent must be positive and no greater than the 15.00% policy ceiling")
     if risk_pct > 0.25 or portfolio_pct > 0.50:
         raise PortfolioSimulationError("risk configuration exceeds existing 0.25%/0.50% hard ceilings")
     if isinstance(slippage_points_per_side, bool) or not isinstance(slippage_points_per_side, int) or slippage_points_per_side < 0:
@@ -357,6 +357,10 @@ def simulate_portfolio(
             "per_trade_budget_money": round(per_trade_budget, 8),
             "portfolio_limit_money": round(portfolio_limit, 8),
             "max_daily_loss_percent": daily_loss_pct,
+            "daily_profit_target_money": None,
+            "daily_profit_cap_money": None,
+            "overall_account_loss_limit_percent": 50.0,
+            "overall_account_loss_enforcement": "NOT_IMPLEMENTED_RESEARCH_ONLY",
         },
         "summary": {
             "event_count": len(events),
