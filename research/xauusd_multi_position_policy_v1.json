@@ -33,7 +33,8 @@
   "risk_controls": {
     "per_trade_risk_percent_hard_max": 0.25,
     "aggregate_open_stop_risk_percent_hard_max": 0.5,
-    "daily_loss_percent_hard_max": 1,
+    "daily_loss_percent_hard_max": 15,
+    "overall_account_loss_percent_hard_max": 50,
     "position_volume_rounding": "down_to_broker_volume_step",
     "unresolved_positions_reserve_risk_and_margin": true,
     "margin_reserve_required": true,
@@ -42,7 +43,10 @@
     "max_consecutive_losses": 0,
     "zero_values_disable_entry_pause": true,
     "daily_loss_reactivation": "MANUAL_OWNER_CONFIRMATION_REQUIRED",
-    "current_implementation_reactivation": "AUTO_NEXT_VERIFIED_SERVER_DAY_NOT_YET_ALIGNED"
+    "daily_loss_baseline": "verified_server_day_starting_equity",
+    "overall_account_loss_reactivation": "MANUAL_OWNER_CONFIRMATION_REQUIRED",
+    "overall_account_loss_baseline": "owner_verified_original_deposit",
+    "current_implementation_reactivation": "LOCK_REMAINS_LATCHED_ACROSS_DAY_BOUNDARY_PENDING_AUDITED_MANUAL_REARM"
   },
   "evaluation": {
     "slippage_points_per_side": [
@@ -61,7 +65,9 @@
     "The five-second holding horizon from the legacy candidate registry is excluded from this policy because the user's minimum intended holding window is 10 seconds.",
     "The stop and target grids are research hypotheses, not selected or profitable settings.",
     "There is no fixed position-count cap. Aggregate stop risk, margin, broker volume rules, and safety controls are binding.",
-    "The existing 1.00% daily loss hard ceiling is retained; the requested 50-60% daily loss allowance is not adopted.",
+    "The 15.00% daily loss value is a hard shutdown ceiling, never a loss target; the separate 50.00% overall account-loss ceiling is measured from the owner-verified original deposit and never resets.",
+    "No daily profit target or profit cap exists. Floating PnL and verified trading costs count toward both loss limits.",
+    "The MQL5 persistent overall-loss latch and audited manual-rearm implementation remain release blockers.",
     "No broker execution is enabled."
   ]
 }
