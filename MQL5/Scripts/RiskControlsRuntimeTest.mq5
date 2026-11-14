@@ -133,7 +133,7 @@ bool RunPortfolioLedgerTests(string &reason)
    { reason="unconfirmed broker close released risk"; return false; }
    if(!ledger.ConfirmClosed(1,true) ||
       MathAbs(ledger.AggregateOpenRiskMoney()-26.0)>1e-8 ||
-      ledger.ActiveCount()!=11)
+      ledger.Count()!=11 || ledger.ActiveCount()!=11)
    { reason="confirmed broker close did not release exposure"; return false; }
 
    VxRiskRequest request;
