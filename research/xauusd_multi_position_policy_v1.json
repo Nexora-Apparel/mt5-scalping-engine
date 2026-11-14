@@ -40,7 +40,9 @@
     "stale_or_invalid_market_data": "reject_new_entry",
     "cooldown_seconds": 0,
     "max_consecutive_losses": 0,
-    "zero_values_disable_entry_pause": true
+    "zero_values_disable_entry_pause": true,
+    "daily_loss_reactivation": "MANUAL_OWNER_CONFIRMATION_REQUIRED",
+    "current_implementation_reactivation": "AUTO_NEXT_VERIFIED_SERVER_DAY_NOT_YET_ALIGNED"
   },
   "evaluation": {
     "slippage_points_per_side": [
