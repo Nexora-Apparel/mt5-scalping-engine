@@ -731,6 +731,21 @@ def test_phase7_journal_replays_permanent_emergency_and_daily_lock_events():
     assert "AppendDailyLock" in source
 
 
+def test_phase7_manual_daily_reactivation_is_owner_confirmed_and_journaled():
+    controls = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    journal = (ROOT / "MQL5" / "Include" / "Veltrix" / "RiskJournal.mqh").read_text(encoding="utf-8")
+    assert "RearmDailyLossLock" in controls
+    assert "owner_confirmed" in controls
+    assert "Explicit owner confirmation is required" in controls
+    assert "m_journal.AppendDailyRearm" in controls
+    assert "DailyRearmEquity" in controls
+    assert "Emergency stop remains independently latched" in controls
+    assert 'event_type=="DAILY_REARM"' in journal
+    assert "AppendDailyRearm" in journal
+    assert "HasDailyRearm" in journal
+    assert "RemoveValue(m_daily_lock_keys,key)" in journal
+
+
 def test_phase7_risk_controls_restore_journal_locks_and_persist_loss_locks():
     source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
     assert "m_journal.HasEmergencyStop()" in source
