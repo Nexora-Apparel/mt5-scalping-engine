@@ -62,7 +62,7 @@ The frozen Phase 8 evaluation plan explicitly requires one open position per can
 - The risk-control configuration no longer requires exactly one simultaneous position.
 - Aggregate open risk and broker margin remain the binding portfolio constraints.
 - The position registry already maintains independent per-position lifecycle and 10-60 second close deadlines.
-- `OverallAccountLossGuard.mqh` is integrated into `CVxRiskControls` intent approval and uses account equity (therefore floating P/L and costs already reflected by the broker in equity); it does not infer the original deposit from current balance. Any additional verified costs not yet reflected in account equity still require explicit accounting. The boolean rearm assertion is not authentication.
+- `OverallAccountLossGuard.mqh` is integrated into `CVxRiskControls` intent approval and uses account equity (therefore floating P/L and costs already reflected by the broker in equity); it does not infer the original deposit from current balance. Any additional verified costs not yet reflected in account equity still require explicit accounting. Overall-loss reactivation uses the local manual owner script and checksum-chained audit; operator attribution remains self-asserted rather than cryptographic.
 - No order submission, modification, or closure APIs are added.
 - No live or DEMO execution is enabled.
 
