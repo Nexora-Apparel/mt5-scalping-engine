@@ -148,7 +148,13 @@ public:
       int index=Find(identifier);
       if(index<0 || !broker_close_confirmed)
          return false;
-      m_items[index].state=VX_EXPOSURE_CLOSED;
+      // The close is broker-confirmed, so its exposure can be removed from
+      // the active ledger. The durable risk journal remains the audit record.
+      int size=ArraySize(m_items);
+      for(int i=index;i<size-1;i++)
+         m_items[i]=m_items[i+1];
+      if(ArrayResize(m_items,size-1)!=size-1)
+         return false;
       return true;
    }
 
