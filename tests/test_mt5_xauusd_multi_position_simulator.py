@@ -11,6 +11,7 @@ SPEC = {
     "point_size": 0.01,
     "tick_size": 0.01,
     "tick_value_loss": 1.0,
+    "tick_value_profit": 1.0,
     "volume_min": 0.01,
     "volume_max": 100.0,
     "volume_step": 0.01,
@@ -160,3 +161,27 @@ def test_slippage_is_applied_adversely_on_both_sides():
     no_slip = simulate_portfolio(ticks(), [ev("base", 1000)], SPEC, RISK, slippage_points_per_side=0)
     with_slip = simulate_portfolio(ticks(), [ev("slip", 1000)], SPEC, RISK, slippage_points_per_side=2)
     assert with_slip["trades"][0]["gross_pnl_money"] < no_slip["trades"][0]["gross_pnl_money"]
+
+
+def test_daily_loss_lock_blocks_new_entries_after_realized_drawdown():
+    stream = [
+        PortfolioTick(1000, 100.00, 100.02),
+        PortfolioTick(1100, 100.00, 100.02),
+        PortfolioTick(2100, 98.00, 98.02),
+        PortfolioTick(3000, 98.00, 98.02),
+        PortfolioTick(4000, 98.00, 98.02),
+    ]
+    risk = {**RISK, "risk_per_trade_percent": 0.25, "max_portfolio_risk_percent": 0.50}
+    result = simulate_portfolio(
+        stream, [ev("loss1", 1000), ev("loss2", 1000), ev("after-lock", 3000)],
+        SPEC, risk,
+    )
+    assert result["summary"]["daily_loss_locked"] is True
+    assert result["trades"][-1]["status"] == "REJECTED_DAILY_LOSS_LOCK"
+    assert result["summary"]["daily_drawdown_percent_at_end"] > 1.0
+
+
+def test_tick_value_contract_economics_are_required():
+    bad_spec = {key: value for key, value in SPEC.items() if key != "tick_value_profit"}
+    with pytest.raises(PortfolioSimulationError, match="tick_value_profit"):
+        simulate_portfolio(ticks(), [ev("p1", 1000)], bad_spec, RISK)
