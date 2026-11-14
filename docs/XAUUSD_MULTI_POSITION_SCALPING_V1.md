@@ -98,3 +98,6 @@ The 240-point spread corresponds to 0.240 in XAUUSD price units on the manifest'
 ## Additional portfolio robustness checks
 
 The simulator now permits demonstrated concurrency above two positions when per-position risk is lower, while enforcing the same 0.50% aggregate open-stop-risk ceiling. A synthetic five-position overlap test confirms that no fixed count ceiling is applied. A separate gap stress test confirms that two unresolved positions retain their risk reservation and prevent a third entry from overbooking the aggregate budget. Replay input is restricted to one UTC trading date per invocation; cross-date streams are rejected rather than silently applying one daily-equity baseline across multiple days. These are deterministic mechanics tests only. The 288-test Python CI run `43547866604` passed.
+
+
+The event adapter additionally rejects naive/non-UTC feature timestamps and candidate events whose signal-end timestamp does not exactly match the indexed five-second feature window. A discontinuity between the past-only volatility lookback and signal window is skipped rather than bridged. Regression tests retain the future-feature mutation check to guard against lookahead leakage.
