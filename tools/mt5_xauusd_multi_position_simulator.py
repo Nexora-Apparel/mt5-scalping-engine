@@ -79,6 +79,8 @@ def _validate_events(events: list[dict[str, Any]]) -> None:
     # comparison. Run each config independently against the same tick stream.
     config_values = [event.get("portfolio_config_id") for event in events
                      if isinstance(event, dict) and "portfolio_config_id" in event]
+    candidate_values = [event.get("candidate_id") for event in events
+                        if isinstance(event, dict) and "candidate_id" in event]
     if config_values:
         if len(config_values) != len(events) or any(
             not isinstance(value, str) or not value.strip() for value in config_values
@@ -89,6 +91,17 @@ def _validate_events(events: list[dict[str, Any]]) -> None:
         if len(set(config_values)) != 1:
             raise PortfolioSimulationError(
                 "events from multiple portfolio configurations must be simulated separately"
+            )
+    if candidate_values:
+        if len(candidate_values) != len(events) or any(
+            not isinstance(value, str) or not value.strip() for value in candidate_values
+        ):
+            raise PortfolioSimulationError(
+                "candidate_id must be present and non-empty on every event when used"
+            )
+        if len(set(candidate_values)) != 1:
+            raise PortfolioSimulationError(
+                "events from multiple candidate strategies must be simulated separately"
             )
     seen: set[str] = set()
     for index, event in enumerate(events):
