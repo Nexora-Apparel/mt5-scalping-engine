@@ -59,6 +59,8 @@
     ],
     "commission_status": "UNVERIFIED_REQUIRED_INPUT",
     "net_performance_allowed": false,
+    "overall_loss_enforcement": "OWNER_VERIFIED_ORIGINAL_DEPOSIT_50_PERCENT_HARD_LOCK_IN_RESEARCH_SIMULATOR",
+    "dynamic_risk_sizing": "RECALCULATE_FROM_MARKED_EQUITY_AT_EACH_ENTRY",
     "phase8_isolation": true,
     "no_holdout_tuning": true
   },
