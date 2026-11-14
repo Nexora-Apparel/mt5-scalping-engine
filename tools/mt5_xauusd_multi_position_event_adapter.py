@@ -106,19 +106,34 @@ def build_multi_position_events(features: dict[str, Any], candidates: dict[str, 
             continue
         prior = rows[index - n:index]
         stamps = [row.get("window_start_utc") for row in prior]
-        if any(not isinstance(stamp, str) for stamp in stamps):
+        signal_stamp = rows[index].get("window_start_utc")
+        if any(not isinstance(stamp, str) for stamp in stamps) or not isinstance(signal_stamp, str):
             skipped_incomplete_scale += 1
             continue
-        # The feature generator guarantees UTC-aligned windows; this explicit
-        # contiguity check prevents a volatility scale spanning a data gap.
-        from datetime import datetime
+        # Require timezone-aware UTC timestamps and contiguous prior windows
+        # through the signal window; a gap must never be bridged by volatility.
+        from datetime import datetime, timezone
         try:
-            millis = [int(datetime.fromisoformat(x.replace("Z", "+00:00")).timestamp() * 1000) for x in stamps]
+            parsed = [datetime.fromisoformat(x.replace("Z", "+00:00")) for x in stamps]
+            signal_dt = datetime.fromisoformat(signal_stamp.replace("Z", "+00:00"))
         except ValueError as exc:
-            raise MultiPositionAdapterError("prior feature timestamp is invalid") from exc
-        if any(millis[i] - millis[i-1] != 5000 for i in range(1, len(millis))):
+            raise MultiPositionAdapterError("feature timestamp is invalid") from exc
+        if any(value.tzinfo is None or value.utcoffset() != timezone.utc.utcoffset(value)
+               for value in parsed + [signal_dt]):
+            raise MultiPositionAdapterError("feature timestamps must be timezone-aware UTC")
+        millis = [int(value.timestamp() * 1000) for value in parsed]
+        signal_start_msc = int(signal_dt.timestamp() * 1000)
+        if (any(millis[i] - millis[i-1] != 5000 for i in range(1, len(millis))) or
+            signal_start_msc - millis[-1] != 5000):
             skipped_incomplete_scale += 1
             continue
+        expected_signal_end_msc = signal_start_msc + 5000
+        event_end = event.get("signal_window_end_msc")
+        if (isinstance(event_end, bool) or not isinstance(event_end, int) or
+            event_end != expected_signal_end_msc):
+            raise MultiPositionAdapterError(
+                "candidate signal_window_end_msc must match its indexed five-second UTC feature window"
+            )
         vol_values = [row.get("realized_volatility_bps") for row in prior]
         if any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(float(v)) or v < 0 for v in vol_values):
             skipped_incomplete_scale += 1
