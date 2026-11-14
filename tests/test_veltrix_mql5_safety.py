@@ -41,7 +41,8 @@ def test_veltrix_ea_uses_repository_relative_includes_and_timer():
     source = EA_SOURCE.read_text(encoding="utf-8")
     for include in ("MarketGuard.mqh", "RiskAllocator.mqh",
                     "PositionRegistry.mqh", "ExecutionGuard.mqh",
-                    "BrokerReconciler.mqh", "ExecutionCoordinator.mqh",\n                    "OverallAccountLossGuard.mqh"):
+                    "BrokerReconciler.mqh", "ExecutionCoordinator.mqh",
+                    "OverallAccountLossGuard.mqh"):
         assert f'#include "..\\\\Include\\\\Veltrix\\\\{include}"' in source
     assert "StrategyResearch.mqh" in source
     assert "FeaturePipeline.mqh" in source
