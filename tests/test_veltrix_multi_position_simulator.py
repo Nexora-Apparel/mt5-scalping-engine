@@ -377,3 +377,12 @@ def test_unresolved_gap_positions_keep_risk_reserved_and_block_excess_entries():
     assert result["trades"][2]["status"] == "REJECTED_AGGREGATE_RISK"
     assert result["summary"]["unresolved_positions_at_end"] == 2
     assert result["summary"]["max_open_stop_risk_money"] <= 50.0 + 1e-8
+
+
+def test_simulator_rejects_cross_utc_date_streams_without_daily_rebaseline():
+    ticks = [
+        PortfolioTick(86_399_900, 2000.00, 2000.02),
+        PortfolioTick(86_400_100, 2000.00, 2000.02),
+    ]
+    with pytest.raises(PortfolioSimulationError, match="exactly one UTC trading date"):
+        simulate_portfolio(ticks, [], BROKER, risk_config())
