@@ -70,7 +70,7 @@ void OnStart()
       FailRiskJournalTest("daily-lock event append/read | "+reason);
       return;
    }
-   if(journal.AppendDailyRearm(20261113,now_msc+5,9875.50,"","Too short","evidence-2026",reason))
+   if(journal.AppendDailyRearm(20261113,now_msc+5,9875.50,"   ","           ","       ",reason))
    {
       FailRiskJournalTest("daily rearm accepted missing operator attribution");
       return;
