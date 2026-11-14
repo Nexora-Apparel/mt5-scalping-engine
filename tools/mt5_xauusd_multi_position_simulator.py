@@ -43,6 +43,7 @@ def validate_portfolio_ticks(ticks: list[PortfolioTick]) -> None:
     if not isinstance(ticks, list) or not ticks:
         raise PortfolioSimulationError("tick stream must be non-empty")
     previous = 0
+    utc_session_day: int | None = None
     for index, tick in enumerate(ticks):
         if not isinstance(tick, PortfolioTick):
             raise PortfolioSimulationError(f"tick {index} must be PortfolioTick")
@@ -50,6 +51,13 @@ def validate_portfolio_ticks(ticks: list[PortfolioTick]) -> None:
             raise PortfolioSimulationError(f"tick {index} timestamp is invalid")
         if tick.time_msc < previous:
             raise PortfolioSimulationError("tick timestamps must be nondecreasing")
+        day = tick.time_msc // 86_400_000
+        if utc_session_day is None:
+            utc_session_day = day
+        elif day != utc_session_day:
+            raise PortfolioSimulationError(
+                "one simulator run must contain exactly one UTC trading date; split sessions before replay"
+            )
         if (isinstance(tick.bid, bool) or isinstance(tick.ask, bool) or
             not isinstance(tick.bid, (int, float)) or not isinstance(tick.ask, (int, float)) or
             not math.isfinite(tick.bid) or not math.isfinite(tick.ask)):
