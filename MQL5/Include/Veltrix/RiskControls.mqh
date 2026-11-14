@@ -288,15 +288,16 @@ public:
          m_daily_loss_locked=true;
          journal_state_changed=true;
       }
-      else if(m_server_day_key>0 && !m_journal.HasDailyLock(m_server_day_key) &&
-              m_journal.HasDailyRearm(m_server_day_key))
+      else if(m_daily_loss_locked && m_journal.ActiveDailyLockCount()==0 &&
+              m_journal.HasAnyDailyRearm())
       {
-         double rearmed_equity=m_journal.DailyRearmEquity(m_server_day_key);
+         double rearmed_equity=m_journal.LatestDailyRearmEquity();
          if(!MathIsValidNumber(rearmed_equity) || rearmed_equity<=0.0)
-         { reason="Daily-rearm journal baseline is invalid; refusing startup"; return false; }
+         { reason="Latest daily-rearm journal baseline is invalid; refusing startup"; return false; }
          m_day_start_equity=rearmed_equity;
          m_daily_loss_locked=false;
          m_consecutive_losses=0;
+         m_cooldown_until_msc=0;
          journal_state_changed=true;
       }
       if(journal_state_changed && !PersistRiskState())
@@ -405,7 +406,10 @@ public:
       if(!VerifyExactDemoAccount(reason)) return false;
       if(m_emergency_stop)
       { reason="Emergency stop remains independently latched; daily reactivation cannot clear it"; return false; }
-      if(!m_journal.AppendDailyRearm(m_server_day_key,now_msc,verified_current_equity,reason))
+      long locked_day=m_journal.ActiveDailyLockDay();
+      if(locked_day<=0)
+      { reason="No active daily-lock journal event exists for manual reactivation"; return false; }
+      if(!m_journal.AppendDailyRearm(locked_day,now_msc,verified_current_equity,reason))
          return false;
       m_day_start_equity=verified_current_equity;
       m_daily_loss_locked=false;
