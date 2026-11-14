@@ -219,7 +219,9 @@ public:
       m_records[index].state=VX_POSITION_CLOSED;
       m_records[index].last_reason=(reason=="" ?
          "Closing deal confirmed in broker history" : reason);
-      return true;
+      // The durable journal retains the history; remove the closed runtime
+      // record so an unlimited trade count does not grow the in-memory list.
+      return (PruneClosed()>0);
    }
 
    int PruneClosed(void)
