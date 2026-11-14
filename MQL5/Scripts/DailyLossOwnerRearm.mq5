@@ -32,6 +32,8 @@ void OnStart()
    { Print("VELTRIX DAILY REARM BLOCKED | owner must attest original-deposit evidence was reviewed"); return; }
    if(StringLen(InpReactivationEvidenceReference)<6)
    { Print("VELTRIX DAILY REARM BLOCKED | traceable evidence reference is required"); return; }
+   if(InpConfirmationPhrase!="VELTRIX OWNER CONFIRM DAILY REACTIVATION")
+   { Print("VELTRIX DAILY REARM BLOCKED | exact owner confirmation phrase is required"); return; }
 
    VxRiskControlConfig config;
    config.expected_demo_login=InpExpectedDemoLogin;
