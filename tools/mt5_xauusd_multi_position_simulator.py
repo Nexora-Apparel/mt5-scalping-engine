@@ -61,7 +61,7 @@ def _validate_spec(spec: dict[str, Any]) -> dict[str, float]:
     if not isinstance(spec, dict):
         raise PortfolioSimulationError("broker specification must be an object")
     required = (
-        "point_size", "tick_size", "tick_value_loss", "volume_min",
+        "point_size", "tick_size", "tick_value_loss", "tick_value_profit", "volume_min",
         "volume_max", "volume_step", "margin_per_lot",
     )
     values = {key: _finite_positive(spec.get(key), key) for key in required}
@@ -161,6 +161,9 @@ def simulate_portfolio(
     margin_reserve = float(risk_config.get("margin_reserve_money", 0.0))
     if not math.isfinite(margin_reserve) or margin_reserve < 0:
         raise PortfolioSimulationError("margin_reserve_money must be finite and nonnegative")
+    daily_loss_pct = float(risk_config.get("max_daily_loss_percent", 1.0))
+    if not math.isfinite(daily_loss_pct) or daily_loss_pct <= 0 or daily_loss_pct > 1.0:
+        raise PortfolioSimulationError("max_daily_loss_percent must be positive and no greater than the existing 1.00% hard ceiling")
     if risk_pct > 0.25 or portfolio_pct > 0.50:
         raise PortfolioSimulationError("risk configuration exceeds existing 0.25%/0.50% hard ceilings")
     if isinstance(slippage_points_per_side, bool) or not isinstance(slippage_points_per_side, int) or slippage_points_per_side < 0:
@@ -174,6 +177,8 @@ def simulate_portfolio(
     per_trade_budget = equity * risk_pct / 100.0
     active: list[dict[str, Any]] = []
     trades: list[dict[str, Any]] = []
+    daily_realized_pnl = 0.0
+    daily_loss_locked = False
     max_concurrent = 0
     max_open_risk = 0.0
     max_margin_used = 0.0
@@ -189,8 +194,31 @@ def simulate_portfolio(
         entry_time = entry_tick.time_msc
 
         # Release only positions whose simulated close has already occurred.
+        matured = [position for position in active
+                   if position["exit_time_msc"] is not None and position["exit_time_msc"] <= entry_time]
+        for position in matured:
+            if position["gross_pnl_money"] is not None:
+                daily_realized_pnl += position["gross_pnl_money"]
         active = [position for position in active
                   if position["exit_time_msc"] is None or position["exit_time_msc"] > entry_time]
+        current_tick = entry_tick
+        unrealized_pnl = 0.0
+        for position in active:
+            mark = current_tick.bid - slip if position["direction"] == "long" else current_tick.ask + slip
+            signed_delta = (mark - position["entry_price"]) if position["direction"] == "long" else (position["entry_price"] - mark)
+            tick_value = spec["tick_value_profit"] if signed_delta >= 0 else spec["tick_value_loss"]
+            unrealized_pnl += (signed_delta / spec["tick_size"]) * tick_value * position["volume"]
+        marked_equity = equity + daily_realized_pnl + unrealized_pnl
+        daily_drawdown_pct = max(0.0, (equity - marked_equity) / equity * 100.0)
+        if daily_drawdown_pct >= daily_loss_pct:
+            daily_loss_locked = True
+        if daily_loss_locked:
+            trades.append({
+                "signal_id": event["signal_id"], "status": "REJECTED_DAILY_LOSS_LOCK",
+                "daily_drawdown_percent": round(daily_drawdown_pct, 8),
+                "daily_loss_limit_percent": daily_loss_pct, "execution_sent": False,
+            })
+            continue
         current_open_risk = sum(position["risk_money"] for position in active)
         margin_used = sum(position["margin_money"] for position in active)
         max_open_risk = max(max_open_risk, current_open_risk)
@@ -250,7 +278,9 @@ def simulate_portfolio(
             pnl = None
         else:
             exit_price = raw_exit - slip if direction == "long" else raw_exit + slip
-            pnl = ((exit_price - entry_price) if direction == "long" else (entry_price - exit_price)) * volume
+            signed_delta = (exit_price - entry_price) if direction == "long" else (entry_price - exit_price)
+            tick_value = spec["tick_value_profit"] if signed_delta >= 0 else spec["tick_value_loss"]
+            pnl = (signed_delta / spec["tick_size"]) * tick_value * volume
 
         record = {
             "signal_id": event["signal_id"],
@@ -260,6 +290,7 @@ def simulate_portfolio(
             "entry_time_msc": entry_time,
             "exit_time_msc": exit_time,
             "holding_seconds": round((exit_time - entry_time) / 1000.0, 6) if exit_time else None,
+            "entry_price": entry_price,
             "entry_price_with_slippage": round(entry_price, 9),
             "exit_price_with_slippage": round(exit_price, 9) if exit_price is not None else None,
             "stop_price": round(stop_price, 9),
@@ -279,6 +310,10 @@ def simulate_portfolio(
             "risk_money": risk_money,
             "margin_money": margin_money,
             "exit_time_msc": exit_time,
+            "direction": direction,
+            "entry_price": entry_price,
+            "volume": volume,
+            "gross_pnl_money": pnl,
         }
         # Unknown exits remain in the active exposure set for the rest of the dataset.
         active.append(position)
@@ -286,6 +321,26 @@ def simulate_portfolio(
         max_open_risk = max(max_open_risk, sum(item["risk_money"] for item in active))
         max_margin_used = max(max_margin_used, sum(item["margin_money"] for item in active))
 
+    # Reconcile all exits observable by the end of the quote stream.
+    final_time = ticks[-1].time_msc
+    matured = [position for position in active
+               if position["exit_time_msc"] is not None and position["exit_time_msc"] <= final_time]
+    for position in matured:
+        if position["gross_pnl_money"] is not None:
+            daily_realized_pnl += position["gross_pnl_money"]
+    active = [position for position in active
+              if position["exit_time_msc"] is None or position["exit_time_msc"] > final_time]
+    final_tick = ticks[-1]
+    final_unrealized = 0.0
+    for position in active:
+        mark = final_tick.bid - slip if position["direction"] == "long" else final_tick.ask + slip
+        signed_delta = (mark - position["entry_price"]) if position["direction"] == "long" else (position["entry_price"] - mark)
+        tick_value = spec["tick_value_profit"] if signed_delta >= 0 else spec["tick_value_loss"]
+        final_unrealized += (signed_delta / spec["tick_size"]) * tick_value * position["volume"]
+    final_equity = equity + daily_realized_pnl + final_unrealized
+    final_daily_drawdown_pct = max(0.0, (equity - final_equity) / equity * 100.0)
+    if final_daily_drawdown_pct >= daily_loss_pct:
+        daily_loss_locked = True
     unresolved = [item for item in active if item["exit_time_msc"] is None]
     return {
         "status": "PASS",
@@ -301,6 +356,7 @@ def simulate_portfolio(
             "max_portfolio_risk_percent": portfolio_pct,
             "per_trade_budget_money": round(per_trade_budget, 8),
             "portfolio_limit_money": round(portfolio_limit, 8),
+            "max_daily_loss_percent": daily_loss_pct,
         },
         "summary": {
             "event_count": len(events),
@@ -310,6 +366,10 @@ def simulate_portfolio(
             "max_open_stop_risk_money": round(max_open_risk, 8),
             "max_open_margin_money": round(max_margin_used, 8),
             "unresolved_positions_at_end": len(unresolved),
+            "daily_realized_gross_pnl_money": round(daily_realized_pnl, 8),
+            "daily_unrealized_gross_pnl_money": round(final_unrealized, 8),
+            "daily_drawdown_percent_at_end": round(final_daily_drawdown_pct, 8),
+            "daily_loss_locked": daily_loss_locked,
         },
         "trades": trades,
         "limitations": [
