@@ -846,6 +846,9 @@ def test_overall_loss_guard_uses_immutable_verified_original_deposit_and_persist
         "StateChecksum", "GlobalVariablesFlush", "ACCOUNT_EQUITY",
         "m_loss_limit_percent=50.0", "Rearm",
         "immutable stored baseline", "Equity must recover above the 50% loss boundary",
+        "InitializeAudit", "AppendAudit", "REARM_INTENT", "REARM_COMMIT",
+        "VELTRIX OWNER CONFIRM REACTIVATION", "ACCOUNT_CURRENCY",
+        "USD-denominated DEMO account",
     )
     for token in required:
         assert token in source
@@ -867,6 +870,7 @@ def test_overall_loss_guard_fails_closed_on_unverified_or_tampered_baseline():
 
 OVERALL_GUARD_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "OverallAccountLossGuard.mqh"
 OVERALL_GUARD_RUNTIME = ROOT / "MQL5" / "Scripts" / "OverallAccountLossGuardRuntimeTest.mq5"
+OVERALL_OWNER_REARM = ROOT / "MQL5" / "Scripts" / "OverallLossOwnerRearm.mq5"
 MQL5_WORKFLOW = ROOT / ".github" / "workflows" / "mql5-compile.yml"
 
 
@@ -882,8 +886,9 @@ def test_overall_loss_guard_runtime_covers_threshold_restart_tamper_and_rearm():
         assert token in guard
     for token in (
         "EvaluateEquitySnapshotForTest(5000.0",
-        "RearmEquitySnapshotForTest(true,5000.0",
-        "RearmEquitySnapshotForTest(true,5001.0",
+        "RearmEquitySnapshotForTest(\"TEST_OWNER\"",
+        "VELTRIX OWNER CONFIRM REACTIVATION",
+        "audit_file",
         "conflicts with the immutable stored baseline",
         "checksum mismatch", "persistent state is partial",
         "restart replay", "GlobalVariableDel",
@@ -897,9 +902,30 @@ def test_overall_loss_guard_runtime_covers_threshold_restart_tamper_and_rearm():
     assert not [token for token in forbidden if token in lowered]
 
 
+def test_overall_loss_reactivation_is_manual_owner_attributed_and_audited():
+    script = OVERALL_OWNER_REARM.read_text(encoding="utf-8")
+    guard = OVERALL_GUARD_SOURCE.read_text(encoding="utf-8")
+    for token in (
+        "InpExpectedDemoLogin", "InpExpectedDemoServer",
+        "InpOriginalDepositEvidenceReviewed", "InpOwnerOperatorId",
+        "InpReactivationReason", "InpConfirmationPhrase",
+        "ACCOUNT_TRADE_MODE_DEMO", "ACCOUNT_CURRENCY",
+        "guard.Rearm", "No order APIs",
+    ):
+        assert token in script
+    assert "trusted_owner_confirmed" not in guard
+    assert "VELTRIX_OVERALL_AUDIT_" in guard
+    assert "Overall-loss audit checksum" in guard
+    lowered = script.lower()
+    assert "ordersend(" not in lowered
+    assert "order_send(" not in lowered
+
+
 def test_overall_loss_guard_runtime_is_wired_into_mql5_ci():
     workflow = MQL5_WORKFLOW.read_text(encoding="utf-8")
     assert "Compile overall account-loss guard runtime test script" in workflow
     assert "OverallAccountLossGuardRuntimeTest.ex5" in workflow
     assert 'Invoke-Mt5RuntimeScript "OverallAccountLossGuardRuntimeTest"' in workflow
     assert "veltrix_overall_loss_guard_runtime_test.result" in workflow
+    assert "Compile manual overall-loss owner reactivation script" in workflow
+    assert "OverallLossOwnerRearm.ex5" in workflow
