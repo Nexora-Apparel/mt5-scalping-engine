@@ -37,7 +37,10 @@
     "position_volume_rounding": "down_to_broker_volume_step",
     "unresolved_positions_reserve_risk_and_margin": true,
     "margin_reserve_required": true,
-    "stale_or_invalid_market_data": "reject_new_entry"
+    "stale_or_invalid_market_data": "reject_new_entry",
+    "cooldown_seconds": 0,
+    "max_consecutive_losses": 0,
+    "zero_values_disable_entry_pause": true
   },
   "evaluation": {
     "slippage_points_per_side": [
