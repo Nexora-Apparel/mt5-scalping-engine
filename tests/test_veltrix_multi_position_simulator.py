@@ -224,3 +224,47 @@ def test_simulator_rejects_mixed_candidate_strategies_within_same_grid():
     ]
     with pytest.raises(PortfolioSimulationError, match="multiple candidate strategies"):
         simulate_portfolio(ticks, events, BROKER, risk_config())
+
+
+def test_overall_loss_lock_latches_after_breach_even_if_equity_recovers():
+    ticks = [
+        PortfolioTick(1000, 2000.00, 2000.00),
+        PortfolioTick(1100, 2000.00, 2000.00),
+        PortfolioTick(1200, 1999.50, 1999.50),
+        PortfolioTick(1300, 2000.00, 2000.00),
+        PortfolioTick(1400, 2000.00, 2000.00),
+    ]
+    events = [
+        {
+            "signal_id": "breach-trigger",
+            "signal_window_end_msc": 1000,
+            "direction": "long",
+            "hold_seconds": 15,
+            "stop_distance_price": 0.5,
+            "take_profit_distance_price": 5.0,
+        },
+        {
+            "signal_id": "breach-detection",
+            "signal_window_end_msc": 1100,
+            "direction": "long",
+            "hold_seconds": 15,
+            "stop_distance_price": 0.5,
+            "take_profit_distance_price": 5.0,
+        },
+        {
+            "signal_id": "after-equity-recovery",
+            "signal_window_end_msc": 1300,
+            "direction": "long",
+            "hold_seconds": 15,
+            "stop_distance_price": 0.5,
+            "take_profit_distance_price": 5.0,
+        },
+    ]
+    result = simulate_portfolio(
+        ticks, events, BROKER,
+        risk_config(equity=5010.0, original_deposit=10000.0),
+    )
+    assert result["trades"][0]["status"] == "STOP_LOSS"
+    assert result["trades"][1]["status"] == "REJECTED_OVERALL_LOSS_LOCK"
+    assert result["trades"][2]["status"] == "REJECTED_OVERALL_LOSS_LOCK"
+    assert result["summary"]["overall_loss_locked"] is True
