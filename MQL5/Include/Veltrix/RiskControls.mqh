@@ -186,9 +186,9 @@ public:
          config.max_daily_loss_percent<=0.0 ||
          config.max_daily_loss_percent>1.00)
       { reason="Risk configuration exceeds hard policy ceilings"; return false; }
-      if(config.cooldown_seconds<30 || config.cooldown_seconds>3600 ||
-         config.max_consecutive_losses<1 || config.max_consecutive_losses>3)
-      { reason="Policy requires a 30-3600s cooldown and 1-3 consecutive-loss limit"; return false; }
+      if(config.cooldown_seconds<0 || config.cooldown_seconds>3600 ||
+         config.max_consecutive_losses<0 || config.max_consecutive_losses>3)
+      { reason="Cooldown must be 0-3600 seconds and consecutive-loss lock must be 0-3 (0 disables each)"; return false; }
       // There is deliberately no simultaneous-position count limit. Every
       // new intent must still fit the aggregate open-risk and margin budgets.
 
@@ -263,7 +263,8 @@ public:
          { reason="Persistent risk-state checksum mismatch; refusing initialization"; return false; }
       }
       bool journal_state_changed=false;
-      if(m_consecutive_losses>=m_config.max_consecutive_losses &&
+      if(m_config.max_consecutive_losses>0 &&
+         m_consecutive_losses>=m_config.max_consecutive_losses &&
          !m_daily_loss_locked)
       {
          m_daily_loss_locked=true;
@@ -404,9 +405,14 @@ public:
       }
       if(net_profit<0.0)
       {
-         m_consecutive_losses++;
-         m_cooldown_until_msc=close_time_msc+(long)m_config.cooldown_seconds*1000;
-         if(m_consecutive_losses>=m_config.max_consecutive_losses)
+         if(m_consecutive_losses<3)
+            m_consecutive_losses++;
+         if(m_config.cooldown_seconds>0)
+            m_cooldown_until_msc=close_time_msc+(long)m_config.cooldown_seconds*1000;
+         else
+            m_cooldown_until_msc=0;
+         if(m_config.max_consecutive_losses>0 &&
+            m_consecutive_losses>=m_config.max_consecutive_losses)
          {
             m_daily_loss_locked=true;
             reason="Consecutive-loss limit reached; daily lock latched";
@@ -499,7 +505,8 @@ public:
       if(!IsXauUsdContract(symbol))
       { reason="Only a verified XAUUSD contract is permitted"; return false; }
       // active_positions is retained for exposure reporting only; there is no count ceiling.
-      if(m_cooldown_until_msc>0 && now_msc<m_cooldown_until_msc)
+      if(m_config.cooldown_seconds>0 &&
+         m_cooldown_until_msc>0 && now_msc<m_cooldown_until_msc)
       { reason="Post-loss cooldown is active"; return false; }
       string request_key=RequestKey(request_id);
       if(request_key=="" || StringLen(request_key)>63)
