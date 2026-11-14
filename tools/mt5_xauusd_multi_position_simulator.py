@@ -50,8 +50,10 @@ def validate_portfolio_ticks(ticks: list[PortfolioTick]) -> None:
             raise PortfolioSimulationError(f"tick {index} timestamp is invalid")
         if tick.time_msc < previous:
             raise PortfolioSimulationError("tick timestamps must be nondecreasing")
-        if not math.isfinite(tick.bid) or not math.isfinite(tick.ask):
-            raise PortfolioSimulationError(f"tick {index} quote is non-finite")
+        if (isinstance(tick.bid, bool) or isinstance(tick.ask, bool) or
+            not isinstance(tick.bid, (int, float)) or not isinstance(tick.ask, (int, float)) or
+            not math.isfinite(tick.bid) or not math.isfinite(tick.ask)):
+            raise PortfolioSimulationError(f"tick {index} quote must contain finite numeric bid/ask values")
         if tick.bid <= 0 or tick.ask < tick.bid:
             raise PortfolioSimulationError(f"tick {index} bid/ask is invalid")
         previous = tick.time_msc
@@ -184,28 +186,41 @@ def simulate_portfolio(
     validate_portfolio_ticks(ticks)
     _validate_events(events)
     spec = _validate_spec(broker_spec)
+    if not isinstance(risk_config, dict):
+        raise PortfolioSimulationError("risk_config must be an object")
     equity = _finite_positive(risk_config.get("equity"), "equity")
     original_deposit = _finite_positive(risk_config.get("original_deposit"), "original_deposit")
     if risk_config.get("original_deposit_verified") is not True:
         raise PortfolioSimulationError("original_deposit must be explicitly owner-verified")
-    overall_loss_pct = float(risk_config.get("max_overall_account_loss_percent", 50.0))
+    overall_loss_raw = risk_config.get("max_overall_account_loss_percent", 50.0)
+    if isinstance(overall_loss_raw, bool) or not isinstance(overall_loss_raw, (int, float)):
+        raise PortfolioSimulationError("max_overall_account_loss_percent must be numeric")
+    overall_loss_pct = float(overall_loss_raw)
     if not math.isfinite(overall_loss_pct) or overall_loss_pct <= 0 or overall_loss_pct > 50.0:
         raise PortfolioSimulationError("max_overall_account_loss_percent must be positive and no greater than the 50.00% policy ceiling")
     risk_pct = _finite_positive(risk_config.get("risk_per_trade_percent"), "risk_per_trade_percent")
     portfolio_pct = _finite_positive(risk_config.get("max_portfolio_risk_percent"), "max_portfolio_risk_percent")
     free_margin = _finite_positive(risk_config.get("initial_free_margin"), "initial_free_margin")
-    margin_reserve = float(risk_config.get("margin_reserve_money", 0.0))
+    margin_reserve_raw = risk_config.get("margin_reserve_money", 0.0)
+    if isinstance(margin_reserve_raw, bool) or not isinstance(margin_reserve_raw, (int, float)):
+        raise PortfolioSimulationError("margin_reserve_money must be numeric")
+    margin_reserve = float(margin_reserve_raw)
     if not math.isfinite(margin_reserve) or margin_reserve < 0:
         raise PortfolioSimulationError("margin_reserve_money must be finite and nonnegative")
-    daily_loss_pct = float(risk_config.get("max_daily_loss_percent", 15.0))
+    daily_loss_raw = risk_config.get("max_daily_loss_percent", 15.0)
+    if isinstance(daily_loss_raw, bool) or not isinstance(daily_loss_raw, (int, float)):
+        raise PortfolioSimulationError("max_daily_loss_percent must be numeric")
+    daily_loss_pct = float(daily_loss_raw)
     if not math.isfinite(daily_loss_pct) or daily_loss_pct <= 0 or daily_loss_pct > 15.0:
         raise PortfolioSimulationError("max_daily_loss_percent must be positive and no greater than the 15.00% policy ceiling")
     if risk_pct > 0.25 or portfolio_pct > 0.50:
         raise PortfolioSimulationError("risk configuration exceeds existing 0.25%/0.50% hard ceilings")
     if isinstance(slippage_points_per_side, bool) or not isinstance(slippage_points_per_side, int) or slippage_points_per_side < 0:
         raise PortfolioSimulationError("slippage_points_per_side must be a nonnegative integer")
-    if min(entry_max_wait_ms, exit_tolerance_ms, max_tick_gap_ms) <= 0:
-        raise PortfolioSimulationError("timing tolerances must be positive")
+    timing_values = (entry_max_wait_ms, exit_tolerance_ms, max_tick_gap_ms)
+    if any(isinstance(value, bool) or not isinstance(value, int) or value <= 0
+           for value in timing_values):
+        raise PortfolioSimulationError("timing tolerances must be positive integers")
 
     stamps = [tick.time_msc for tick in ticks]
     slip = slippage_points_per_side * spec["point_size"]
