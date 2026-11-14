@@ -47,7 +47,7 @@
     "overall_account_loss_reactivation": "MANUAL_OWNER_CONFIRMATION_REQUIRED",
     "overall_account_loss_baseline": "owner_verified_original_deposit",
     "current_implementation_reactivation": "DAILY_REARM_JOURNAL_RUNTIME_PASS_2026_11_14; OVERALL_LOSS_AUDIT_CHAINED_MANUAL_DEMO_REARM_RUNTIME_PASS_2026_11_14",
-    "overall_loss_runtime_validation": "MQL5_RUNTIME_PASS_RUN_43543244612; PYTHON_CI_280_PASS_RUN_43543336244",
+    "overall_loss_runtime_validation": "MQL5_RUNTIME_PASS_RUN_43544258934_ALL_6_SENTINELS_PASS; PYTHON_CI_283_PASS_RUN_43544406802",
     "owner_reactivation": "MANUAL_DEMO_TERMINAL_SCRIPT_WITH_OPERATOR_ATTRIBUTION_AND_CHECKSUM_CHAINED_AUDIT; OPERATOR_ID_IS_SELF_ASSERTED_NOT_CRYPTOGRAPHIC_IDENTITY"
   },
   "evaluation": {
@@ -71,8 +71,8 @@
     "There is no fixed position-count cap. Aggregate stop risk, margin, broker volume rules, and safety controls are binding.",
     "The 15.00% daily loss value is a hard shutdown ceiling, never a loss target; the separate 50.00% overall account-loss ceiling is measured from the owner-verified original deposit and never resets.",
     "No daily profit target or profit cap exists. Floating PnL and verified trading costs count toward both loss limits.",
-    "Daily rearm remains journal-backed and requires a future trusted manual interface. Overall-loss reactivation now uses a dedicated manually launched DEMO-only terminal script, operator/reason/evidence-reference attribution, an exact confirmation phrase, equity recovery above the threshold, and a checksum-chained audit journal. Operator attribution is self-asserted, not cryptographic identity. The EA must be reinitialized after the separate script completes to reload the unlocked state. Latest MQL5 compile/runtime validation passed; the manual script has been compiled but has not been run against a real DEMO account. No broker execution is enabled.",
+    "Daily rearm remains journal-backed and requires a future trusted manual interface. Overall-loss reactivation now uses a dedicated manually launched DEMO-only terminal script, operator/reason/evidence-reference attribution, an exact confirmation phrase, equity recovery above the threshold, and a checksum-chained audit journal. Operator attribution is self-asserted, not cryptographic identity. The EA must be reinitialized after the separate script completes to reload the unlocked state. Latest MQL5 compile/runtime validation passed in run 43544258934; all six sentinels passed. The manual script has not been run against a real DEMO account. No broker execution is enabled.",
     "No broker execution is enabled.",
-    "The audit-chain/manual-script implementation passed the dedicated overall-loss terminal runtime test and all five companion runtime sentinels in run 43543244612. Python CI passed 280 tests in run 43543336244. The manual script itself has not been executed against a real DEMO account."
+    "The audit-chain/manual-script implementation (including the traceable evidence-reference input) passed the dedicated overall-loss terminal runtime test and all five companion runtime sentinels in run 43544258934. Python CI passed 283 tests in run 43544406802. The manual script itself has not been executed against a real DEMO account."
   ]
 }
