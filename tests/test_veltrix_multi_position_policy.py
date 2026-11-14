@@ -112,3 +112,10 @@ def test_manual_daily_loss_reactivation_requirement_is_explicit_and_not_misrepre
     assert policy["risk_controls"]["current_implementation_reactivation"] == "AUTO_NEXT_VERIFIED_SERVER_DAY_NOT_YET_ALIGNED"
     assert "m_daily_loss_locked=false" in controls
     assert "Owner requirement" in (ROOT / "docs/XAUUSD_MULTI_POSITION_SCALPING_V1.md").read_text(encoding="utf-8")
+
+
+
+def test_mql5_runtime_harness_initializes_with_unlimited_trade_frequency_policy():
+    source = (ROOT / "MQL5/Scripts/RiskControlsRuntimeTest.mq5").read_text(encoding="utf-8")
+    assert "config.cooldown_seconds=0" in source
+    assert "config.max_consecutive_losses=0" in source
