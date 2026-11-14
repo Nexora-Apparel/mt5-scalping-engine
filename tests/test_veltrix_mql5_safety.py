@@ -748,6 +748,7 @@ def test_phase7_manual_daily_reactivation_is_owner_confirmed_and_journaled():
     assert "DailyRearmReason" in journal
     assert "DailyRearmEvidenceReference" in journal
     assert "ParseDailyRearmKey" in journal
+    assert "StringTrimLeft" in journal and "StringTrimRight" in journal
     assert "ActiveDailyLockDay" in controls
     assert "LatestDailyRearmEquity" in controls
     assert "ActiveDailyLockCount" in journal
