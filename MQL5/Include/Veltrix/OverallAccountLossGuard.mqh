@@ -102,9 +102,17 @@ private:
             return false;
          }
          if(event_type=="LOCK")
-         { m_audit_locked=true; m_audit_pending=false; }
+         {
+            if(m_audit_locked || m_audit_pending)
+            { FileClose(handle); reason="Overall-loss audit contains a duplicate lock transition"; return false; }
+            m_audit_locked=true;
+         }
          else if(event_type=="REARM_INTENT")
-         { m_audit_locked=true; m_audit_pending=true; }
+         {
+            if(!m_audit_locked || m_audit_pending)
+            { FileClose(handle); reason="Overall-loss audit reactivation intent has no active lock"; return false; }
+            m_audit_pending=true;
+         }
          else if(event_type=="REARM_COMMIT")
          {
             if(!m_audit_pending)
@@ -112,7 +120,11 @@ private:
             m_audit_locked=false; m_audit_pending=false;
          }
          else if(event_type=="REARM_ABORT")
-         { m_audit_locked=true; m_audit_pending=false; }
+         {
+            if(!m_audit_pending)
+            { FileClose(handle); reason="Overall-loss audit has a reactivation abort without an intent"; return false; }
+            m_audit_locked=true; m_audit_pending=false;
+         }
          m_audit_sequence=(long)seq_number;
          m_audit_previous_hash=checksum;
       }
@@ -129,6 +141,10 @@ private:
       if(!SafeAuditText(operator_id,1,64) || !SafeAuditText(detail,1,240) ||
          !MathIsValidNumber(equity) || equity<=0.0 || timestamp_msc<=0)
       { reason="Overall-loss audit event fields are invalid"; return false; }
+      if((event_type=="LOCK" && (m_audit_locked || m_audit_pending)) ||
+         (event_type=="REARM_INTENT" && (!m_audit_locked || m_audit_pending)) ||
+         ((event_type=="REARM_COMMIT" || event_type=="REARM_ABORT") && !m_audit_pending))
+      { reason="Overall-loss audit event violates the lock/reactivation transition sequence"; return false; }
       int handle=FileOpen(m_audit_filename,FILE_READ|FILE_WRITE|FILE_CSV|FILE_ANSI|FILE_COMMON,';');
       if(handle==INVALID_HANDLE)
       { reason="Could not append overall-loss audit event"; return false; }
@@ -340,7 +356,16 @@ public:
       double minimum_equity=m_original_deposit*(1.0-m_loss_limit_percent/100.0);
       if(!MathIsValidNumber(equity) || equity<=minimum_equity)
       { reason="Equity must recover above the 50% loss boundary before manual reactivation"; return false; }
+      if(!m_audit_locked)
+      { reason="Audit history does not confirm an active overall-loss lock; reactivation is blocked"; return false; }
       long now_msc=(long)TimeLocal()*1000;
+      if(m_audit_pending)
+      {
+         if(!AppendAudit("REARM_ABORT",operator_id,"RECOVERED_INTERRUPTED_REARM",
+                         equity,now_msc,reason))
+            return false;
+         now_msc=(long)TimeLocal()*1000;
+      }
       if(!AppendAudit("REARM_INTENT",operator_id,owner_reason,equity,now_msc,reason))
          return false;
       m_locked=false;
@@ -378,8 +403,6 @@ public:
       return EvaluateEquityValue(AccountInfoDouble(ACCOUNT_EQUITY),reason);
    }
 
-   // This boolean is an explicit call-site assertion, NOT authentication.
-   // Production wiring must expose this only through a trusted owner-only UI.
    // Called only by the manually launched owner-rearm script. Operator ID and
    // reason are audit attribution supplied by the operator, not cryptographic identity.
    bool Rearm(const string operator_id,const string owner_reason,
