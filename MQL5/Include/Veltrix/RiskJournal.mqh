@@ -339,6 +339,22 @@ public:
       return 0.0;
    }
 
+   int ActiveDailyLockCount(void) const { return ArraySize(m_daily_lock_keys); }
+
+   long ActiveDailyLockDay(void) const
+   {
+      if(ArraySize(m_daily_lock_keys)<=0) return 0;
+      return (long)StringToInteger(m_daily_lock_keys[ArraySize(m_daily_lock_keys)-1]);
+   }
+
+   bool HasAnyDailyRearm(void) const { return (ArraySize(m_daily_rearm_days)>0); }
+
+   double LatestDailyRearmEquity(void) const
+   {
+      int size=ArraySize(m_daily_rearm_equity);
+      return (size>0 ? m_daily_rearm_equity[size-1] : 0.0);
+   }
+
    bool AppendEmergencyStop(const long timestamp_msc,string &reason)
    {
       if(m_emergency_stop)
