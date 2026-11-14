@@ -259,6 +259,22 @@ jobs:
           }
           if (!(Test-Path (Join-Path (Split-Path $source) "RiskControlsRestartVerify.ex5"))) { throw "Restart-verification EX5 artifact missing." }
 
+      - name: Compile manual overall-loss owner reactivation script
+        shell: pwsh
+        run: |
+          $source = (Resolve-Path "MQL5\\Scripts\\OverallLossOwnerRearm.mq5").Path
+          $log = Join-Path (Split-Path $source) "OverallLossOwnerRearm.log"
+          if (Test-Path $log) { Remove-Item $log -Force }
+          Start-Process -FilePath $env:METAEDITOR -ArgumentList @('/compile:"' + $source + '"', '/log') -Wait | Out-Null
+          Start-Sleep -Seconds 2
+          if (!(Test-Path $log)) { throw "MetaEditor did not produce the owner-reactivation compilation log." }
+          $logText = Get-Content $log -Raw
+          Get-Content $log
+          if ($logText -match "(?i)\\b[1-9]\\d* errors?\\b" -or $logText -notmatch "(?i)0 errors?" -or $logText -match "(?i)\\b[1-9]\\d* warnings?\\b") {
+            throw "Owner-reactivation script did not compile with zero errors and warnings."
+          }
+          if (!(Test-Path (Join-Path (Split-Path $source) "OverallLossOwnerRearm.ex5"))) { throw "Owner-reactivation script EX5 artifact missing." }
+
       - name: Compile risk journal storage-failure runtime test
         shell: pwsh
         run: |
