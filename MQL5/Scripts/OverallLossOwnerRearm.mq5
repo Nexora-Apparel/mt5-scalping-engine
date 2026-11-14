@@ -14,6 +14,7 @@ input double InpVerifiedOriginalDeposit=0.0;
 input bool   InpOriginalDepositEvidenceReviewed=false;
 input string InpOwnerOperatorId="";
 input string InpReactivationReason="";
+input string InpReactivationEvidenceReference="";
 input string InpConfirmationPhrase="";
 
 void OnStart()
@@ -27,6 +28,11 @@ void OnStart()
    { Print("VELTRIX REARM BLOCKED | connected account does not match owner-entered DEMO identity"); return; }
    if(!InpOriginalDepositEvidenceReviewed)
    { Print("VELTRIX REARM BLOCKED | owner must attest that original-deposit evidence was reviewed"); return; }
+   if(StringLen(InpReactivationEvidenceReference)<6)
+   { Print("VELTRIX REARM BLOCKED | a traceable evidence reference (statement ID/date or secure record reference) is required"); return; }
+   string audited_reason=InpReactivationReason+" | evidence_ref="+InpReactivationEvidenceReference;
+   if(StringLen(audited_reason)>240)
+   { Print("VELTRIX REARM BLOCKED | reason and evidence reference exceed audit field limit"); return; }
 
    CVxOverallAccountLossGuard guard;
    string reason="";
@@ -36,11 +42,12 @@ void OnStart()
    if(!guard.IsLocked())
    { Print("VELTRIX REARM BLOCKED | no active overall-loss lock exists"); return; }
 
-   if(!guard.Rearm(InpOwnerOperatorId,InpReactivationReason,
+   if(!guard.Rearm(InpOwnerOperatorId,audited_reason,
                    InpConfirmationPhrase,reason))
    { Print("VELTRIX REARM FAILED | ",reason); return; }
 
    Print("VELTRIX OVERALL-LOSS REARM SUCCESS | operator=",InpOwnerOperatorId,
          " | reason=",InpReactivationReason,
+         " | evidence_ref=",InpReactivationEvidenceReference,
          " | immutable original-deposit baseline retained");
 }
