@@ -8,6 +8,7 @@
 
 #include "RiskAllocator.mqh"
 #include "RiskJournal.mqh"
+#include "PortfolioExposureLedger.mqh"
 
 struct VxRiskControlConfig
 {
@@ -471,6 +472,15 @@ public:
       request.max_portfolio_risk_percent=m_config.max_portfolio_risk_percent;
       request.open_positions=active_positions;
       return VxCalculateRiskVolume(request,decision);
+   }
+
+   bool CalculateVolume(const VxRiskRequest &source,
+                        const CVxPortfolioExposureLedger &exposures,
+                        VxRiskDecision &decision)
+   {
+      VxRiskRequest request=source;
+      request.current_open_risk_money=exposures.AggregateOpenRiskMoney();
+      return CalculateVolume(request,exposures.ActiveCount(),decision);
    }
 
    bool RegisterApprovedIntent(const string request_id,const string symbol,
