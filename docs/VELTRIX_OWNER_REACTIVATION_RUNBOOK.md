@@ -42,7 +42,7 @@ Required inputs:
 - Expected DEMO login and exact server name.
 - Original-deposit amount matching the immutable verified baseline and InpOriginalDepositEvidenceReviewed=true.
 - Operator ID, reason, and traceable evidence reference.
-- Exact confirmation phrase required by the script.
+- Exact confirmation phrase: VELTRIX OWNER CONFIRM REACTIVATION.
 - Account equity strictly above the 50% loss boundary. At or below the boundary, reactivation must fail.
 
 Expected behavior:
@@ -64,4 +64,4 @@ After success, reinitialize/restart the EA and verify the persisted overall-loss
 
 ## Release boundary
 
-Both reactivation scripts are compile/runtime-tested in CI. They remain manual-only and local. No remote reactivation endpoint, live trading, DEMO order execution, deployment, or scheduled workflow is authorized by this runbook.
+Both reactivation scripts compile in CI. Companion terminal runtime tests exercise the underlying guard, journal, persistence, and audit paths; they do not execute either script's OnStart against the user's terminal. The scripts remain manual-only and local. No remote reactivation endpoint, live trading, DEMO order execution, deployment, or scheduled workflow is authorized by this runbook.
