@@ -45,8 +45,8 @@ bool BuildConfig(const long login,const string server,VxRiskControlConfig &confi
    config.risk_per_trade_percent=0.10;
    config.max_portfolio_risk_percent=0.25;
    config.max_daily_loss_percent=1.00;
-   config.cooldown_seconds=30;
-   config.max_consecutive_losses=3;
+   config.cooldown_seconds=0; // No trade-frequency pause in the multi-position policy.
+   config.max_consecutive_losses=0; // No consecutive-loss daily lock.
    return true;
 }
 
