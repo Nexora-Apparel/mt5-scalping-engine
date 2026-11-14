@@ -50,7 +50,7 @@ The frozen Phase 8 evaluation plan explicitly requires one open position per can
 ## Current implementation state
 
 - The MQL5 risk allocator no longer rejects an intent solely because a position-count ceiling has been reached.
-- `PortfolioExposureLedger.mqh` aggregates per-position stop risk and margin across a dynamic list with no count ceiling; close-pending, unknown, and protection-failure records continue reserving exposure until broker close confirmation. It rejects duplicate position identifiers/tickets, permits broker-refreshed margin estimates, and never permits stop-risk widening.
+- `PortfolioExposureLedger.mqh` aggregates per-position stop risk and margin across a dynamic list with no count ceiling. `RiskControls.mqh` now has an overload that reads aggregate open risk and active count directly from this ledger before invoking dynamic lot sizing; close-pending, unknown, and protection-failure records continue reserving exposure until broker close confirmation. It rejects duplicate position identifiers/tickets, permits broker-refreshed margin estimates, and never permits stop-risk widening.
 - The risk-control configuration no longer requires exactly one simultaneous position.
 - Aggregate open risk and broker margin remain the binding portfolio constraints.
 - The position registry already maintains independent per-position lifecycle and 10-60 second close deadlines.
