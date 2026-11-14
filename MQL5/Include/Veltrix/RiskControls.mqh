@@ -611,11 +611,14 @@ public:
 
    bool IsOverallAccountLossLocked(void) const { return m_overall_guard.IsLocked(); }
 
-   bool RearmOverallAccountLossLock(const bool trusted_owner_confirmed,string &reason)
+   // Reactivation is intentionally routed through the manually launched
+   // OverallLossOwnerRearm script; this wrapper is not exposed to automation.
+   bool RearmOverallAccountLossLock(const string operator_id,const string owner_reason,
+                                    const string confirmation_phrase,string &reason)
    {
       if(!m_initialized)
       { reason="Risk controls are not initialized"; return false; }
-      return m_overall_guard.Rearm(trusted_owner_confirmed,reason);
+      return m_overall_guard.Rearm(operator_id,owner_reason,confirmation_phrase,reason);
    }
 
    bool IsEmergencyStopped(void) const { return m_emergency_stop; }
