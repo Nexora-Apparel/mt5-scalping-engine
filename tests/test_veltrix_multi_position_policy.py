@@ -101,3 +101,14 @@ def test_multi_position_policy_keeps_analysis_running_without_cooldown_or_loss_s
     assert "config.cooldown_seconds<0" in controls
     assert "m_config.cooldown_seconds>0" in controls
     assert "m_config.max_consecutive_losses>0" in controls
+
+
+
+def test_manual_daily_loss_reactivation_requirement_is_explicit_and_not_misrepresented():
+    import json
+    policy = json.loads((ROOT / "research/xauusd_multi_position_policy_v1.json").read_text(encoding="utf-8"))
+    controls = CONTROLS.read_text(encoding="utf-8")
+    assert policy["risk_controls"]["daily_loss_reactivation"] == "MANUAL_OWNER_CONFIRMATION_REQUIRED"
+    assert policy["risk_controls"]["current_implementation_reactivation"] == "AUTO_NEXT_VERIFIED_SERVER_DAY_NOT_YET_ALIGNED"
+    assert "m_daily_loss_locked=false" in controls
+    assert "Owner requirement" in (ROOT / "docs/XAUUSD_MULTI_POSITION_SCALPING_V1.md").read_text(encoding="utf-8")
