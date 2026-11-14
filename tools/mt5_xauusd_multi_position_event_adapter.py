@@ -134,7 +134,10 @@ def build_multi_position_events(features: dict[str, Any], candidates: dict[str, 
                 max(base_volatility_price * float(stop_multiple), spec["minimum_stop_distance"]),
                 spec["tick_size"],
             )
-            target_distance = _tick_ceil(stop_distance * float(reward_r), spec["tick_size"])
+            target_distance = _tick_ceil(
+                max(stop_distance * float(reward_r), spec["minimum_stop_distance"]),
+                spec["tick_size"],
+            )
             config_id = f"sl{float(stop_multiple):g}_rr{float(reward_r):g}_h{horizon}"
             output.append({
                 "signal_id": f"{event['signal_id']}:{config_id}",
@@ -148,6 +151,7 @@ def build_multi_position_events(features: dict[str, Any], candidates: dict[str, 
                 "volatility_scale_bps": round(scale_bps, 8),
                 "stop_volatility_multiple": float(stop_multiple),
                 "take_profit_reward_r_multiple": float(reward_r),
+                "effective_reward_r_multiple": round(target_distance / stop_distance, 8),
                 "event_origin": "ADAPTED_RESEARCH_SIGNAL_NOT_TRADE",
                 "execution_authorized": False,
             })
