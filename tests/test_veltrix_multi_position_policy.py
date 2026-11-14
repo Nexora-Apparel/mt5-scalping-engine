@@ -126,3 +126,26 @@ def test_mql5_runtime_harness_initializes_with_unlimited_trade_frequency_policy(
     source = (ROOT / "MQL5/Scripts/RiskControlsRuntimeTest.mq5").read_text(encoding="utf-8")
     assert "config.cooldown_seconds=0" in source
     assert "config.max_consecutive_losses=0" in source
+
+
+def test_overall_loss_guard_is_mandatory_in_risk_intent_approval_path():
+    controls = CONTROLS.read_text(encoding="utf-8")
+    guard = (ROOT / "MQL5/Include/Veltrix/OverallAccountLossGuard.mqh").read_text(encoding="utf-8")
+    assert '#include "OverallAccountLossGuard.mqh"' in controls
+    assert "original_deposit_verified" in controls
+    assert "m_overall_guard.Init" in controls
+    assert "m_overall_guard.Evaluate" in controls
+    assert "RearmOverallAccountLossLock" in controls
+    assert "m_overall_guard.IsLocked()" in controls
+    assert "ACCOUNT_EQUITY" in guard
+    assert "m_original_deposit" in guard
+    assert "m_loss_limit_percent=50.0" in guard
+
+
+def test_risk_control_runtime_and_process_restart_fixtures_pin_verified_deposit():
+    runtime = (ROOT / "MQL5/Scripts/RiskControlsRuntimeTest.mq5").read_text(encoding="utf-8")
+    seed = (ROOT / "MQL5/Scripts/RiskControlsRestartSeed.mq5").read_text(encoding="utf-8")
+    verify = (ROOT / "MQL5/Scripts/RiskControlsRestartVerify.mq5").read_text(encoding="utf-8")
+    for source in (runtime, seed, verify):
+        assert "verified_original_deposit=10000.0" in source
+        assert "original_deposit_verified=true" in source
