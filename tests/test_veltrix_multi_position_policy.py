@@ -112,7 +112,7 @@ def test_manual_daily_loss_reactivation_requirement_is_explicit_and_not_misrepre
     policy = json.loads((ROOT / "research/xauusd_multi_position_policy_v1.json").read_text(encoding="utf-8"))
     controls = CONTROLS.read_text(encoding="utf-8")
     assert policy["risk_controls"]["daily_loss_reactivation"] == "MANUAL_OWNER_CONFIRMATION_REQUIRED"
-    assert policy["risk_controls"]["current_implementation_reactivation"] == "DAILY_REARM_JOURNAL_IMPLEMENTED_PENDING_LATEST_RUNTIME_VALIDATION; OVERALL_LOSS_GUARD_STANDALONE_NOT_INTEGRATED_OR_RUNTIME_VALIDATED"
+    assert policy["risk_controls"]["current_implementation_reactivation"] == "DAILY_REARM_JOURNAL_PENDING_LATEST_RUNTIME_VALIDATION; OVERALL_LOSS_GUARD_INTEGRATED_IN_CVX_RISK_CONTROLS_PENDING_LATEST_COMPILE_RUNTIME_AND_TRUSTED_OWNER_INTERFACE"
     day_reset = controls.split("bool BeginServerDay", 1)[1].split("bool EvaluateDailyLoss", 1)[0]
     assert "m_daily_loss_locked=false" not in day_reset
     assert "owner-rearmed" in day_reset
