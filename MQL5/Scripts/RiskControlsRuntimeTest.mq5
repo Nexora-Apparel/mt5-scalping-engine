@@ -1,3 +1,4 @@
+#define VELTRIX_RISK_TEST
 #include "../Include/Veltrix/RiskControls.mqh"
 #include "../Include/Veltrix/PortfolioExposureLedger.mqh"
 
@@ -104,6 +105,144 @@ bool ExpectInitFailure(const long login,const string server,
 }
 
 
+bool RunDailyRearmControlTests(string &reason)
+{
+   long login=900000000+(long)(GetTickCount64()%900000000);
+   string server="VELTRIX_DAILY_REARM_RUNTIME_TEST";
+   string suffix=TestSuffix(login,server);
+   string emergency_key="VX_ESTOP_"+suffix;
+   string day_key_name="VX_DAY_"+suffix;
+   string equity_key="VX_EQ_"+suffix;
+   string daily_lock_key="VX_LOCK_"+suffix;
+   string loss_key="VX_LS_"+suffix;
+   string cooldown_key="VX_CD_"+suffix;
+   string checksum_key="VX_CSUM_"+suffix;
+   string transaction_lock_key="VX_LOCKTX_"+suffix;
+   string original_deposit_key="VX_ORIGDEP_"+suffix;
+   string overall_lock_key="VX_OVERALL_LOCK_"+suffix;
+   string overall_checksum_key="VX_OVERALL_SUM_"+suffix;
+   string journal_file=StringFormat("VELTRIX_XAUUSD_RISK_%I64d_%I64u.csv",
+                                    login,TestHash64(server));
+   long now_msc=(long)TimeLocal()*1000;
+   long day_key=20261114;
+   double initial_equity=10000.0;
+   double rearmed_equity=9875.50;
+   VxRiskControlConfig config;
+   BuildConfig(login,server,config);
+   bool ok=true;
+   string local_reason="";
+
+   CVxRiskJournal seed;
+   if(!seed.Init(login,server,local_reason) ||
+      !seed.AppendDailyLock(day_key,now_msc+1,15.0,local_reason))
+   {
+      reason="could not seed audited daily lock: "+local_reason;
+      ok=false;
+   }
+   seed.Close();
+
+   string serialized=StringFormat("0|%I64d|%.17g|1|0|0",day_key,initial_equity);
+   double checksum=(double)(TestHash64(serialized)%9007199254740991);
+   if(ok &&
+      (GlobalVariableSet(day_key_name,(double)day_key)==0 ||
+       GlobalVariableSet(equity_key,initial_equity)==0 ||
+       GlobalVariableSet(daily_lock_key,1.0)==0 ||
+       GlobalVariableSet(loss_key,0.0)==0 ||
+       GlobalVariableSet(cooldown_key,0.0)==0 ||
+       GlobalVariableSet(emergency_key,0.0)==0 ||
+       GlobalVariableSet(checksum_key,checksum)==0 ||
+       GlobalVariableSet(transaction_lock_key,0.0)==0))
+   {
+      reason="could not seed checksum-valid daily-lock state";
+      ok=false;
+   }
+
+   if(ok)
+   {
+      CVxRiskControls controls;
+      if(!controls.Init(config,local_reason) || !controls.IsDailyLossLocked() ||
+         controls.IsEmergencyStopped())
+      {
+         reason="daily-lock control initialization failed: "+local_reason;
+         ok=false;
+      }
+      else
+      {
+         if(controls.RearmDailyLossLockForTest(
+               rearmed_equity,now_msc+10,"owner-01",
+               "Manual recovery after equity and statement review",
+               "statement-2026-11-14","INVALID CONFIRMATION",local_reason))
+         {
+            reason="daily reactivation accepted an invalid owner confirmation";
+            ok=false;
+         }
+         if(ok && controls.RearmDailyLossLockForTest(
+               rearmed_equity,now_msc+11,"","Manual recovery after equity and statement review",
+               "statement-2026-11-14","VELTRIX OWNER CONFIRM DAILY REACTIVATION",local_reason))
+         {
+            reason="daily reactivation accepted missing operator attribution";
+            ok=false;
+         }
+         if(ok && !controls.RearmDailyLossLockForTest(
+               rearmed_equity,now_msc+12,"owner-01",
+               "Manual recovery after equity and statement review",
+               "statement-2026-11-14","VELTRIX OWNER CONFIRM DAILY REACTIVATION",local_reason))
+         {
+            reason="audited daily reactivation core failed: "+local_reason;
+            ok=false;
+         }
+         if(ok && (controls.IsDailyLossLocked() || controls.IsEmergencyStopped() ||
+                   MathAbs(GlobalVariableGet(equity_key)-rearmed_equity)>1e-8 ||
+                   GlobalVariableGet(daily_lock_key)!=0.0))
+         {
+            reason="daily reactivation did not persist unlocked state and replacement equity baseline";
+            ok=false;
+         }
+      }
+   }
+
+   if(ok)
+   {
+      CVxRiskJournal verify;
+      if(!verify.Init(login,server,local_reason) ||
+         verify.HasDailyLock(day_key) || !verify.HasDailyRearm(day_key) ||
+         verify.DailyRearmOperatorId(day_key)!="owner-01" ||
+         verify.DailyRearmReason(day_key)!="Manual recovery after equity and statement review" ||
+         verify.DailyRearmEvidenceReference(day_key)!="statement-2026-11-14")
+      {
+         reason="daily rearm audit metadata/replay verification failed: "+local_reason;
+         ok=false;
+      }
+      verify.Close();
+   }
+
+   if(ok)
+   {
+      CVxRiskControls restored;
+      if(!restored.Init(config,local_reason) || restored.IsDailyLossLocked() ||
+         restored.IsEmergencyStopped() ||
+         MathAbs(GlobalVariableGet(equity_key)-rearmed_equity)>1e-8)
+      {
+         reason="daily rearm state did not survive risk-control restart: "+local_reason;
+         ok=false;
+      }
+   }
+
+   FileDelete(journal_file,FILE_COMMON);
+   string keys[8];
+   keys[0]=emergency_key; keys[1]=day_key_name;
+   keys[2]=equity_key; keys[3]=daily_lock_key;
+   keys[4]=loss_key; keys[5]=cooldown_key;
+   keys[6]=checksum_key; keys[7]=transaction_lock_key;
+   for(int i=0;i<8;i++) GlobalVariableDel(keys[i]);
+   GlobalVariableDel(original_deposit_key);
+   GlobalVariableDel(overall_lock_key);
+   GlobalVariableDel(overall_checksum_key);
+   if(!ok) return false;
+   reason="";
+   return true;
+}
+
 bool RunPortfolioLedgerTests(string &reason)
 {
    CVxPortfolioExposureLedger ledger;
@@ -173,6 +312,13 @@ bool RunPortfolioLedgerTests(string &reason)
 
 void OnStart()
 {
+   string daily_rearm_reason="";
+   if(!RunDailyRearmControlTests(daily_rearm_reason))
+   {
+      FailControlsTest("audited daily reactivation control path | "+daily_rearm_reason);
+      return;
+   }
+
    string portfolio_reason="";
    if(!RunPortfolioLedgerTests(portfolio_reason))
    {
@@ -277,6 +423,6 @@ void OnStart()
    GlobalVariableDel(overall_lock_key);
    GlobalVariableDel(overall_checksum_key);
 
-   PrintFormat("RISK CONTROLS RUNTIME TEST PASS | synthetic_identity=true emergency_stop_restore=true daily_lock_restore=true abandoned_lock_blocked=true checksum_mismatch_blocked=true cleanup=true portfolio_exposure_ledger=true uncapped_positions=true unresolved_risk_retained=true");
-   WriteControlsResult("PASS | emergency-stop restore, daily-lock restore, abandoned transaction-lock rejection, checksum mismatch rejection, cleanup, multi-position exposure ledger");
+   PrintFormat("RISK CONTROLS RUNTIME TEST PASS | synthetic_identity=true emergency_stop_restore=true daily_lock_restore=true audited_daily_rearm=true daily_rearm_restart=true abandoned_lock_blocked=true checksum_mismatch_blocked=true cleanup=true portfolio_exposure_ledger=true uncapped_positions=true unresolved_risk_retained=true");
+   WriteControlsResult("PASS | emergency-stop/daily-lock restore, audited daily rearm core, owner metadata replay, rearm restart recovery, abandoned transaction-lock rejection, checksum mismatch rejection, multi-position exposure ledger");
 }
