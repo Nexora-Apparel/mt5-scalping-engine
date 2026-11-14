@@ -193,3 +193,34 @@ def test_simulator_rejects_mixed_portfolio_configurations():
     ]
     with pytest.raises(PortfolioSimulationError, match="simulated separately"):
         simulate_portfolio(ticks, events, BROKER, risk_config())
+
+
+def test_simulator_rejects_mixed_candidate_strategies_within_same_grid():
+    ticks = [
+        PortfolioTick(1000, 2000.0, 2000.02),
+        PortfolioTick(1100, 2000.0, 2000.02),
+    ]
+    events = [
+        {
+            "signal_id": "candidate-a",
+            "candidate_id": "breakout",
+            "portfolio_config_id": "sl1_rr1_h15",
+            "signal_window_end_msc": 1000,
+            "direction": "long",
+            "hold_seconds": 15,
+            "stop_distance_price": 0.5,
+            "take_profit_distance_price": 0.5,
+        },
+        {
+            "signal_id": "candidate-b",
+            "candidate_id": "mean-reversion",
+            "portfolio_config_id": "sl1_rr1_h15",
+            "signal_window_end_msc": 1000,
+            "direction": "short",
+            "hold_seconds": 15,
+            "stop_distance_price": 0.5,
+            "take_profit_distance_price": 0.5,
+        },
+    ]
+    with pytest.raises(PortfolioSimulationError, match="multiple candidate strategies"):
+        simulate_portfolio(ticks, events, BROKER, risk_config())
