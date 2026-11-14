@@ -65,7 +65,7 @@ void OnStart()
       return;
    }
    if(!journal.AppendDailyLock(20261113,now_msc+4,1.0,reason) ||
-      !journal.HasDailyLock(20261113))
+      !journal.HasDailyLock(20261113) || journal.ActiveDailyLockDay()!=20261113)
    {
       FailRiskJournalTest("daily-lock event append/read | "+reason);
       return;
