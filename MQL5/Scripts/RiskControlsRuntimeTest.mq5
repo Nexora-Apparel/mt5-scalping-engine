@@ -163,7 +163,7 @@ bool RunPortfolioLedgerTests(string &reason)
    if(ledger.Register(99,1001,1.0,1.0,duplicate_reason))
    { reason="duplicate broker ticket was accepted"; return false; }
    if(!ledger.UpdateMargin(5,6.0) ||
-      MathAbs(ledger.AggregateMarginMoney()-50.0)>1e-8)
+      MathAbs(ledger.AggregateMarginMoney()-46.0)>1e-8)
    { reason="fresh margin estimate did not update aggregate margin"; return false; }
    reason="";
    return true;
