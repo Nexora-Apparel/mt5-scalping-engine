@@ -93,3 +93,8 @@ The 240-point spread corresponds to 0.240 in XAUUSD price units on the manifest'
 ## Daily-loss owner reactivation
 
 `MQL5/Scripts/DailyLossOwnerRearm.mq5` provides a separate manual control for the 15.00% daily lock. It requires the exact Exness DEMO login/server, USD account currency, owner attestation that the immutable original-deposit evidence was reviewed, operator ID, a specific reason, a traceable evidence reference, and the exact phrase `VELTRIX OWNER CONFIRM DAILY REACTIVATION`. The journal records the metadata and verified equity baseline in a single checksum-chained `DAILY_REARM` event. Operator, reason, and evidence fields reject empty, whitespace-only, delimiter-injected, or overlength values. This script cannot clear the overall-loss lock or emergency stop. The owner must restart/reinitialize the EA after successful reactivation. The script is compiled by CI but must never be remotely exposed; operator ID remains self-asserted attribution, not cryptographic authentication.
+
+
+## Additional portfolio robustness checks
+
+The simulator now permits demonstrated concurrency above two positions when per-position risk is lower, while enforcing the same 0.50% aggregate open-stop-risk ceiling. A synthetic five-position overlap test confirms that no fixed count ceiling is applied. A separate gap stress test confirms that two unresolved positions retain their risk reservation and prevent a third entry from overbooking the aggregate budget. Replay input is restricted to one UTC trading date per invocation; cross-date streams are rejected rather than silently applying one daily-equity baseline across multiple days. These are deterministic mechanics tests only. The 288-test Python CI run `43547866604` passed.
