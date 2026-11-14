@@ -52,8 +52,10 @@ def test_multi_position_policy_preserves_phase8_and_daily_loss_safety_boundary()
     assert "Phase 8" in source
     assert "one open position per candidate configuration" in source
     assert "0.50% of equity" in source
-    assert "1.00% daily equity loss" in source
-    assert "50-60%" in source
+    assert "15.00% daily equity drawdown ceiling" in source
+    assert "50.00% of the owner-verified original deposit" in source
+    assert "no daily profit target or profit cap" in source.lower()
+    assert "Floating PnL" in source
     assert "No daily minimum trade count" in source
     assert "No fixed simultaneous-position count ceiling" in source
 
@@ -110,9 +112,11 @@ def test_manual_daily_loss_reactivation_requirement_is_explicit_and_not_misrepre
     policy = json.loads((ROOT / "research/xauusd_multi_position_policy_v1.json").read_text(encoding="utf-8"))
     controls = CONTROLS.read_text(encoding="utf-8")
     assert policy["risk_controls"]["daily_loss_reactivation"] == "MANUAL_OWNER_CONFIRMATION_REQUIRED"
-    assert policy["risk_controls"]["current_implementation_reactivation"] == "AUTO_NEXT_VERIFIED_SERVER_DAY_NOT_YET_ALIGNED"
-    assert "m_daily_loss_locked=false" in controls
-    assert "Owner requirement" in (ROOT / "docs/XAUUSD_MULTI_POSITION_SCALPING_V1.md").read_text(encoding="utf-8")
+    assert policy["risk_controls"]["current_implementation_reactivation"] == "LOCK_REMAINS_LATCHED_ACROSS_DAY_BOUNDARY_PENDING_AUDITED_MANUAL_REARM"
+    day_reset = controls.split("bool BeginServerDay", 1)[1].split("bool EvaluateDailyLoss", 1)[0]
+    assert "m_daily_loss_locked=false" not in day_reset
+    assert "owner-rearmed" in day_reset
+    assert "owner-controlled manual reactivation" in (ROOT / "docs/XAUUSD_MULTI_POSITION_SCALPING_V1.md").read_text(encoding="utf-8")
 
 
 
