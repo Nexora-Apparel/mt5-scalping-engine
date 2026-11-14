@@ -330,7 +330,7 @@ public:
       m_day_start_equity=starting_equity;
       // A daily loss lock is owner-rearmed; a new server day alone must not clear it.
       m_consecutive_losses=0;
-      // A cooldown and emergency stop deliberately survive a day boundary.
+      // A daily-loss lock, cooldown, and emergency stop deliberately survive a day boundary.
       if(!PersistRiskState())
       {
          string latch_reason="";
