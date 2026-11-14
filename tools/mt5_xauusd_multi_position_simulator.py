@@ -73,6 +73,23 @@ def _validate_spec(spec: dict[str, Any]) -> dict[str, float]:
 def _validate_events(events: list[dict[str, Any]]) -> None:
     if not isinstance(events, list):
         raise PortfolioSimulationError("events must be a list")
+    # Each replay represents one preregistered portfolio configuration.
+    # Mixing stop/target/horizon configurations would let mutually exclusive
+    # research hypotheses consume one another's risk budget and corrupt the
+    # comparison. Run each config independently against the same tick stream.
+    config_values = [event.get("portfolio_config_id") for event in events
+                     if isinstance(event, dict) and "portfolio_config_id" in event]
+    if config_values:
+        if len(config_values) != len(events) or any(
+            not isinstance(value, str) or not value.strip() for value in config_values
+        ):
+            raise PortfolioSimulationError(
+                "portfolio_config_id must be present and non-empty on every event when used"
+            )
+        if len(set(config_values)) != 1:
+            raise PortfolioSimulationError(
+                "events from multiple portfolio configurations must be simulated separately"
+            )
     seen: set[str] = set()
     for index, event in enumerate(events):
         if not isinstance(event, dict):
