@@ -184,8 +184,8 @@ public:
          config.max_portfolio_risk_percent<=0.0 ||
          config.max_portfolio_risk_percent>0.50 ||
          config.max_daily_loss_percent<=0.0 ||
-         config.max_daily_loss_percent>1.00)
-      { reason="Risk configuration exceeds hard policy ceilings"; return false; }
+         config.max_daily_loss_percent>15.00)
+      { reason="Risk configuration exceeds hard policy ceilings (0.25% per-trade, 0.50% aggregate, 15.00% daily)"; return false; }
       if(config.cooldown_seconds<0 || config.cooldown_seconds>3600 ||
          config.max_consecutive_losses<0 || config.max_consecutive_losses>3)
       { reason="Cooldown must be 0-3600 seconds and consecutive-loss lock must be 0-3 (0 disables each)"; return false; }
@@ -328,7 +328,7 @@ public:
       }
       m_server_day_key=day_key;
       m_day_start_equity=starting_equity;
-      m_daily_loss_locked=false;
+      // A daily loss lock is owner-rearmed; a new server day alone must not clear it.
       m_consecutive_losses=0;
       // A cooldown and emergency stop deliberately survive a day boundary.
       if(!PersistRiskState())
@@ -350,7 +350,7 @@ public:
       if(!VerifyExactDemoAccount(reason))
          return false;
       if(m_daily_loss_locked)
-      { reason="Daily loss lock is latched until the next verified server day"; return false; }
+      { reason="Daily loss lock remains latched until audited owner reactivation"; return false; }
       double loss_percent=(m_day_start_equity-current_equity)/m_day_start_equity*100.0;
       if(!MathIsValidNumber(loss_percent))
       { reason="Daily loss calculation is non-finite"; return false; }
@@ -374,7 +374,7 @@ public:
             reason="Daily loss reached and risk-state persistence failed; emergency stop latched";
             return false;
          }
-         reason="Maximum daily equity loss reached; new intents locked until next server day";
+         reason="Maximum daily equity loss reached; new intents locked pending audited owner reactivation";
          return false;
       }
       return true;
