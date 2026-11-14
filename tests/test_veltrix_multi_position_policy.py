@@ -141,6 +141,8 @@ def test_overall_loss_guard_is_mandatory_in_risk_intent_approval_path():
     rearm_script = (ROOT / "MQL5/Scripts/OverallLossOwnerRearm.mq5").read_text(encoding="utf-8")
     assert "guard.Rearm" in rearm_script
     assert "InpOriginalDepositEvidenceReviewed" in rearm_script
+    assert "InpReactivationEvidenceReference" in rearm_script
+    assert "evidence_ref=" in rearm_script
     assert "ACCOUNT_EQUITY" in guard
     assert "m_original_deposit" in guard
     assert "m_loss_limit_percent=50.0" in guard
