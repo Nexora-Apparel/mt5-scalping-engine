@@ -112,11 +112,13 @@ def test_manual_daily_loss_reactivation_requirement_is_explicit_and_not_misrepre
     policy = json.loads((ROOT / "research/xauusd_multi_position_policy_v1.json").read_text(encoding="utf-8"))
     controls = CONTROLS.read_text(encoding="utf-8")
     assert policy["risk_controls"]["daily_loss_reactivation"] == "MANUAL_OWNER_CONFIRMATION_REQUIRED"
-    assert policy["risk_controls"]["current_implementation_reactivation"] == "LOCK_REMAINS_LATCHED_ACROSS_DAY_BOUNDARY_PENDING_AUDITED_MANUAL_REARM"
+    assert policy["risk_controls"]["current_implementation_reactivation"] == "DAILY_REARM_API_AND_JOURNAL_EVENT_ADDED_PENDING_RUNTIME_VALIDATION_AND_TRUSTED_OWNER_INTERFACE"
     day_reset = controls.split("bool BeginServerDay", 1)[1].split("bool EvaluateDailyLoss", 1)[0]
     assert "m_daily_loss_locked=false" not in day_reset
     assert "owner-rearmed" in day_reset
     assert "owner-controlled manual reactivation" in (ROOT / "docs/XAUUSD_MULTI_POSITION_SCALPING_V1.md").read_text(encoding="utf-8")
+    assert "RearmDailyLossLock" in controls
+    assert "DAILY_REARM" in (ROOT / "MQL5/Include/Veltrix/RiskJournal.mqh").read_text(encoding="utf-8")
 
 
 
