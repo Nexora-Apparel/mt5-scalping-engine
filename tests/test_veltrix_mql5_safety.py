@@ -736,18 +736,22 @@ def test_phase7_manual_daily_reactivation_is_owner_confirmed_and_journaled():
     controls = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
     journal = (ROOT / "MQL5" / "Include" / "Veltrix" / "RiskJournal.mqh").read_text(encoding="utf-8")
     assert "RearmDailyLossLock" in controls
-    assert "owner_confirmed" in controls
-    assert "Explicit owner confirmation is required" in controls
+    assert "operator_id" in controls
+    assert "VELTRIX OWNER CONFIRM DAILY REACTIVATION" in controls
     assert "m_journal.AppendDailyRearm" in controls
     assert "DailyRearmEquity" in controls
     assert "Emergency stop remains independently latched" in controls
     assert 'event_type=="DAILY_REARM"' in journal
     assert "AppendDailyRearm" in journal
     assert "HasDailyRearm" in journal
+    assert "DailyRearmOperatorId" in journal
+    assert "DailyRearmReason" in journal
+    assert "DailyRearmEvidenceReference" in journal
+    assert "ParseDailyRearmKey" in journal
     assert "ActiveDailyLockDay" in controls
     assert "LatestDailyRearmEquity" in controls
     assert "ActiveDailyLockCount" in journal
-    assert "RemoveValue(m_daily_lock_keys,key)" in journal
+    assert "RemoveValue(m_daily_lock_keys,day_key)" in journal
 
 
 def test_phase7_risk_controls_restore_journal_locks_and_persist_loss_locks():
@@ -871,6 +875,7 @@ def test_overall_loss_guard_fails_closed_on_unverified_or_tampered_baseline():
 OVERALL_GUARD_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "OverallAccountLossGuard.mqh"
 OVERALL_GUARD_RUNTIME = ROOT / "MQL5" / "Scripts" / "OverallAccountLossGuardRuntimeTest.mq5"
 OVERALL_OWNER_REARM = ROOT / "MQL5" / "Scripts" / "OverallLossOwnerRearm.mq5"
+DAILY_OWNER_REARM = ROOT / "MQL5" / "Scripts" / "DailyLossOwnerRearm.mq5"
 MQL5_WORKFLOW = ROOT / ".github" / "workflows" / "mql5-compile.yml"
 
 
@@ -921,6 +926,26 @@ def test_overall_loss_reactivation_is_manual_owner_attributed_and_audited():
     assert "order_send(" not in lowered
 
 
+def test_daily_loss_reactivation_is_owner_attributed_and_manual_demo_only():
+    script = DAILY_OWNER_REARM.read_text(encoding="utf-8")
+    controls = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    for token in (
+        "InpExpectedDemoLogin", "InpExpectedDemoServer",
+        "InpOriginalDepositEvidenceReviewed", "InpOwnerOperatorId",
+        "InpReactivationReason", "InpReactivationEvidenceReference",
+        "InpConfirmationPhrase", "ACCOUNT_TRADE_MODE_DEMO",
+        "ACCOUNT_CURRENCY", "controls.RearmDailyLossLock",
+        "VELTRIX OWNER CONFIRM DAILY REACTIVATION",
+    ):
+        assert token in script
+    assert "m_journal.AppendDailyRearm" in controls
+    assert "DailyRearmEvidenceReference" in (ROOT / "MQL5" / "Include" / "Veltrix" / "RiskJournal.mqh").read_text(encoding="utf-8")
+    lowered = script.lower()
+    forbidden = ("ordersend(", "ordersendasync(", "ordercheck(", "ctrade",
+                 "trade_action_deal", "positionclose(", "positionmodify(")
+    assert not [token for token in forbidden if token in lowered]
+
+
 def test_overall_loss_guard_runtime_is_wired_into_mql5_ci():
     workflow = MQL5_WORKFLOW.read_text(encoding="utf-8")
     assert "Compile overall account-loss guard runtime test script" in workflow
@@ -929,3 +954,5 @@ def test_overall_loss_guard_runtime_is_wired_into_mql5_ci():
     assert "veltrix_overall_loss_guard_runtime_test.result" in workflow
     assert "Compile manual overall-loss owner reactivation script" in workflow
     assert "OverallLossOwnerRearm.ex5" in workflow
+    assert "Compile manual daily-loss owner reactivation script" in workflow
+    assert "DailyLossOwnerRearm.ex5" in workflow
