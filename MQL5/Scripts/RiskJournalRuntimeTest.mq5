@@ -70,15 +70,12 @@ void OnStart()
       FailRiskJournalTest("daily-lock event append/read | "+reason);
       return;
    }
-   if(journal.AppendDailyRearm(20261113,now_msc+5,9875.50,
-                                "","Too short","evidence-2026",reason))
+   if(journal.AppendDailyRearm(20261113,now_msc+5,9875.50,"","Too short","evidence-2026",reason))
    {
       FailRiskJournalTest("daily rearm accepted missing operator attribution");
       return;
    }
-   if(!journal.AppendDailyRearm(20261113,now_msc+5,9875.50,
-                                "owner-01","Manual recovery after equity and statement review",
-                                "statement-2026-11-14",reason) ||
+   if(!journal.AppendDailyRearm(20261113,now_msc+5,9875.50,"owner-01","Manual recovery after equity and statement review","statement-2026-11-14",reason) ||
       journal.HasDailyLock(20261113) || !journal.HasDailyRearm(20261113) ||
       MathAbs(journal.DailyRearmEquity(20261113)-9875.50)>1e-8 ||
       journal.DailyRearmOperatorId(20261113)!="owner-01" ||
