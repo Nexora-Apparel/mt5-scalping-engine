@@ -940,6 +940,12 @@ def test_daily_loss_reactivation_is_owner_attributed_and_manual_demo_only():
     ):
         assert token in script
     assert "m_journal.AppendDailyRearm" in controls
+    assert "RearmDailyLossLockForTest" in controls
+    controls_runtime = (ROOT / "MQL5" / "Scripts" / "RiskControlsRuntimeTest.mq5").read_text(encoding="utf-8")
+    assert "#define VELTRIX_RISK_TEST" in controls_runtime
+    assert "RunDailyRearmControlTests" in controls_runtime
+    assert "RearmDailyLossLockForTest" in controls_runtime
+    assert "daily rearm state did not survive risk-control restart" in controls_runtime
     assert "DailyRearmEvidenceReference" in (ROOT / "MQL5" / "Include" / "Veltrix" / "RiskJournal.mqh").read_text(encoding="utf-8")
     lowered = script.lower()
     forbidden = ("ordersend(", "ordersendasync(", "ordercheck(", "ctrade",
