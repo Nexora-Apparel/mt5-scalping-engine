@@ -88,3 +88,15 @@ def test_closed_position_registry_has_explicit_memory_compaction():
     assert "broker_close_deal_confirmed" in registry
     assert "ArrayResize(m_records,size-1)" in registry
     assert "ArrayResize(m_items,size-1)" in ledger
+
+
+
+def test_multi_position_policy_keeps_analysis_running_without_cooldown_or_loss_streak_pause():
+    import json
+    policy = json.loads((ROOT / "research/xauusd_multi_position_policy_v1.json").read_text(encoding="utf-8"))
+    controls = CONTROLS.read_text(encoding="utf-8")
+    assert policy["risk_controls"]["cooldown_seconds"] == 0
+    assert policy["risk_controls"]["max_consecutive_losses"] == 0
+    assert "config.cooldown_seconds<0" in controls
+    assert "m_config.cooldown_seconds>0" in controls
+    assert "m_config.max_consecutive_losses>0" in controls
