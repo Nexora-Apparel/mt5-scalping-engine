@@ -9,6 +9,7 @@
 #include "RiskAllocator.mqh"
 #include "RiskJournal.mqh"
 #include "PortfolioExposureLedger.mqh"
+#include "OverallAccountLossGuard.mqh"
 
 struct VxRiskControlConfig
 {
@@ -17,6 +18,8 @@ struct VxRiskControlConfig
    double risk_per_trade_percent;
    double max_portfolio_risk_percent;
    double max_daily_loss_percent;
+   double verified_original_deposit;
+   bool   original_deposit_verified;
    int    cooldown_seconds;
    int    max_consecutive_losses;
 };
@@ -26,6 +29,7 @@ class CVxRiskControls
 private:
    VxRiskControlConfig m_config;
    CVxRiskJournal m_journal;
+   CVxOverallAccountLossGuard m_overall_guard;
    bool m_initialized;
    bool m_emergency_stop;
    bool m_daily_loss_locked;
@@ -176,7 +180,8 @@ public:
       { reason="Exact expected DEMO login and server are mandatory"; return false; }
       if(!MathIsValidNumber(config.risk_per_trade_percent) ||
          !MathIsValidNumber(config.max_portfolio_risk_percent) ||
-         !MathIsValidNumber(config.max_daily_loss_percent))
+         !MathIsValidNumber(config.max_daily_loss_percent) ||
+         !MathIsValidNumber(config.verified_original_deposit))
       { reason="Risk percentages must be finite"; return false; }
       // Conservative hard ceilings are policy limits, not suggested targets.
       if(config.risk_per_trade_percent<=0.0 ||
@@ -186,6 +191,8 @@ public:
          config.max_daily_loss_percent<=0.0 ||
          config.max_daily_loss_percent>15.00)
       { reason="Risk configuration exceeds hard policy ceilings (0.25% per-trade, 0.50% aggregate, 15.00% daily)"; return false; }
+      if(!config.original_deposit_verified || config.verified_original_deposit<=0.0)
+      { reason="Owner-verified original DEMO deposit is mandatory for the 50% overall-loss guard"; return false; }
       if(config.cooldown_seconds<0 || config.cooldown_seconds>3600 ||
          config.max_consecutive_losses<0 || config.max_consecutive_losses>3)
       { reason="Cooldown must be 0-3600 seconds and consecutive-loss lock must be 0-3 (0 disables each)"; return false; }
@@ -195,6 +202,10 @@ public:
       m_config=config;
       if(!m_journal.Init(config.expected_demo_login,config.expected_demo_server,reason))
       { reason="Risk journal initialization failed: "+reason; return false; }
+      if(!m_overall_guard.Init(config.expected_demo_login,config.expected_demo_server,
+                               config.verified_original_deposit,
+                               config.original_deposit_verified,reason))
+      { reason="Overall account-loss guard initialization failed: "+reason; return false; }
       string suffix=StringFormat("%I64d_%I64u",
                                  config.expected_demo_login,
                                  ServerHash(config.expected_demo_server));
@@ -516,6 +527,8 @@ public:
       string guard_reason;
       if(!VerifyExactDemoAccount(guard_reason))
       { decision.reason=guard_reason; return false; }
+      if(!m_overall_guard.Evaluate(guard_reason))
+      { decision.reason=guard_reason; return false; }
       if(!EvaluateDailyLoss(source.equity,guard_reason))
       { decision.reason=guard_reason; return false; }
       VxRiskRequest request=source;
@@ -542,6 +555,8 @@ public:
       if(!m_initialized || m_emergency_stop || m_daily_loss_locked)
       { reason="Risk controls are uninitialized or locked"; return false; }
       if(!VerifyExactDemoAccount(reason))
+         return false;
+      if(!m_overall_guard.Evaluate(reason))
          return false;
       if(!EvaluateDailyLoss(current_equity,reason))
          return false;
@@ -591,7 +606,16 @@ public:
 
    bool IsLocked(void) const
    {
-      return (!m_initialized || m_emergency_stop || m_daily_loss_locked);
+      return (!m_initialized || m_emergency_stop || m_daily_loss_locked || m_overall_guard.IsLocked());
+   }
+
+   bool IsOverallAccountLossLocked(void) const { return m_overall_guard.IsLocked(); }
+
+   bool RearmOverallAccountLossLock(const bool trusted_owner_confirmed,string &reason)
+   {
+      if(!m_initialized)
+      { reason="Risk controls are not initialized"; return false; }
+      return m_overall_guard.Rearm(trusted_owner_confirmed,reason);
    }
 
    bool IsEmergencyStopped(void) const { return m_emergency_stop; }
