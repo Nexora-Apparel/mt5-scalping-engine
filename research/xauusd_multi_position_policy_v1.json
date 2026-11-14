@@ -1,0 +1,62 @@
+{
+  "policy_schema": "VELTRIX_XAUUSD_MULTI_POSITION_POLICY_V1",
+  "version": 1,
+  "status": "PREREGISTERED_RESEARCH_ONLY",
+  "canonical_symbol": "XAUUSD",
+  "broker": "Exness",
+  "account_mode": "DEMO",
+  "execution_enabled": false,
+  "live_trading_enabled": false,
+  "daily_trade_count_minimum": null,
+  "daily_trade_count_maximum": null,
+  "profit_target_money": null,
+  "profit_cap_money": null,
+  "simultaneous_position_count_cap": null,
+  "holding_seconds": [
+    15,
+    30,
+    60
+  ],
+  "stop_distance_method": "max(past_only_volatility_scale_price * stop_volatility_multiple, broker_minimum_stop_distance), rounded upward to broker tick size",
+  "take_profit_method": "stop_distance * take_profit_reward_r_multiple, rounded upward to broker tick size",
+  "volatility_scale_method": "sqrt(sum(realized_volatility_bps^2)) across the event's registered lookback windows strictly preceding the signal window",
+  "stop_volatility_multipliers": [
+    1,
+    1.5,
+    2
+  ],
+  "take_profit_reward_r_multiples": [
+    0.5,
+    1,
+    1.5
+  ],
+  "risk_controls": {
+    "per_trade_risk_percent_hard_max": 0.25,
+    "aggregate_open_stop_risk_percent_hard_max": 0.5,
+    "daily_loss_percent_hard_max": 1,
+    "position_volume_rounding": "down_to_broker_volume_step",
+    "unresolved_positions_reserve_risk_and_margin": true,
+    "margin_reserve_required": true,
+    "stale_or_invalid_market_data": "reject_new_entry"
+  },
+  "evaluation": {
+    "slippage_points_per_side": [
+      0,
+      1,
+      2,
+      5
+    ],
+    "commission_status": "UNVERIFIED_REQUIRED_INPUT",
+    "net_performance_allowed": false,
+    "phase8_isolation": true,
+    "no_holdout_tuning": true
+  },
+  "notes": [
+    "This is a separate multi-position research policy; it does not alter the frozen Phase 8 registry.",
+    "The five-second holding horizon from the legacy candidate registry is excluded from this policy because the user's minimum intended holding window is 10 seconds.",
+    "The stop and target grids are research hypotheses, not selected or profitable settings.",
+    "There is no fixed position-count cap. Aggregate stop risk, margin, broker volume rules, and safety controls are binding.",
+    "The existing 1.00% daily loss hard ceiling is retained; the requested 50-60% daily loss allowance is not adopted.",
+    "No broker execution is enabled."
+  ]
+}
