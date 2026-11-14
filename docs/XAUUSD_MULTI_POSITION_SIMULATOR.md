@@ -4,6 +4,21 @@
 
 `tools/mt5_xauusd_multi_position_simulator.py` is an offline research simulator. It accepts a verified quote stream, event proposals from a separately validated signal source, broker symbol economics, and explicit risk settings. It does not create or send orders. It is isolated from the preregistered Phase 8 evaluator.
 
+## Signal-to-event adaptation
+
+The candidate engine produces research signals, not trade instructions. Use `tools/mt5_xauusd_multi_position_event_adapter.py` to convert those events into the simulator's SL/TP event schema. It reads the separate `research/xauusd_multi_position_policy_v1.json` grid, uses volatility from strictly preceding completed windows, enforces broker minimum stop distance, rounds distances upward to tick size, and excludes the legacy five-second horizon. The separate grid explores stop volatility multiples of 1.0/1.5/2.0 and take-profit reward multiples of 0.5R/1.0R/1.5R; these are hypotheses only and are not selected or certified. The adapter verifies that feature and candidate source hashes match.
+
+Run the adapter first:
+
+```bash
+python -m tools.mt5_xauusd_multi_position_event_adapter \\
+  --features path/to/features.json \\
+  --candidate-events path/to/candidate_events.json \\
+  --broker-spec path/to/verified_demo_snapshot.json \\
+  --policy research/xauusd_multi_position_policy_v1.json \\
+  --output path/to/multi_position_events.json
+```
+
 ## Event contract
 
 The input JSON object contains an `events` array. Each event requires:
