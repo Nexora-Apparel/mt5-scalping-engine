@@ -73,6 +73,6 @@
     "No daily profit target or profit cap exists. Floating PnL and verified trading costs count toward both loss limits.",
     "Daily rearm remains journal-backed and requires a future trusted manual interface. Overall-loss reactivation now uses a dedicated manually launched DEMO-only terminal script, operator/reason/evidence-reference attribution, an exact confirmation phrase, equity recovery above the threshold, and a checksum-chained audit journal. Operator attribution is self-asserted, not cryptographic identity. The EA must be reinitialized after the separate script completes to reload the unlocked state. Latest MQL5 compile/runtime validation passed in run 43545106284; all six sentinels passed. The manual script has not been run against a real DEMO account. No broker execution is enabled.",
     "No broker execution is enabled.",
-    "The audit-chain/manual-script implementation (including the traceable evidence-reference input) passed the dedicated overall-loss terminal runtime test and all five companion runtime sentinels in run 43545106284. Python CI passed 283 tests in run 43544406802. The manual script itself has not been executed against a real DEMO account."
+    "The audit-chain/manual-script implementation (including the traceable evidence-reference input) passed the dedicated overall-loss terminal runtime test and all five companion runtime sentinels in run 43545106284. Python CI passed 284 tests in run 43545106280. The manual script itself has not been executed against a real DEMO account."
   ]
 }
