@@ -298,3 +298,82 @@ def test_simulator_rejects_boolean_risk_and_timing_values():
     ]
     with pytest.raises(PortfolioSimulationError, match="finite numeric"):
         simulate_portfolio(bad_ticks, event, BROKER, risk_config())
+
+
+def test_position_concurrency_is_risk_limited_not_count_limited():
+    ticks = [
+        PortfolioTick(1000, 2000.00, 2000.00),
+        PortfolioTick(1100, 2000.00, 2000.00),
+        PortfolioTick(2000, 2000.00, 2000.00),
+        PortfolioTick(3000, 2000.00, 2000.00),
+        PortfolioTick(4000, 2000.00, 2000.00),
+        PortfolioTick(5000, 2000.00, 2000.00),
+        PortfolioTick(10000, 2000.00, 2000.00),
+        PortfolioTick(15000, 2000.00, 2000.00),
+        PortfolioTick(16100, 2000.00, 2000.00),
+        PortfolioTick(20000, 2000.00, 2000.00),
+    ]
+    events = [
+        {
+            "signal_id": f"low-risk-overlap-{index}",
+            "signal_window_end_msc": signal_end,
+            "direction": "long",
+            "hold_seconds": 15,
+            "stop_distance_price": 0.5,
+            "take_profit_distance_price": 5.0,
+        }
+        for index, signal_end in enumerate((1000, 1900, 2900, 3900, 4900))
+    ]
+    config = {
+        **risk_config(),
+        "risk_per_trade_percent": 0.10,
+    }
+    result = simulate_portfolio(ticks, events, BROKER, config)
+    assert result["summary"]["max_concurrent_positions"] == 5
+    assert result["summary"]["max_open_stop_risk_money"] <= 50.0 + 1e-8
+    assert result["summary"]["accepted_positions"] == 5
+    assert all(trade["risk_money"] <= 10.0 + 1e-8 for trade in result["trades"])
+
+
+def test_unresolved_gap_positions_keep_risk_reserved_and_block_excess_entries():
+    ticks = [
+        PortfolioTick(1000, 2000.00, 2000.00),
+        PortfolioTick(1100, 2000.00, 2000.00),
+        PortfolioTick(7000, 2000.00, 2000.00),
+        PortfolioTick(7100, 2000.00, 2000.00),
+        PortfolioTick(7200, 2000.00, 2000.00),
+        PortfolioTick(7300, 2000.00, 2000.00),
+        PortfolioTick(13000, 2000.00, 2000.00),
+    ]
+    events = [
+        {
+            "signal_id": "unresolved-one",
+            "signal_window_end_msc": 1000,
+            "direction": "long",
+            "hold_seconds": 15,
+            "stop_distance_price": 0.5,
+            "take_profit_distance_price": 5.0,
+        },
+        {
+            "signal_id": "unresolved-two",
+            "signal_window_end_msc": 7000,
+            "direction": "long",
+            "hold_seconds": 15,
+            "stop_distance_price": 0.5,
+            "take_profit_distance_price": 5.0,
+        },
+        {
+            "signal_id": "must-not-overbook",
+            "signal_window_end_msc": 7200,
+            "direction": "long",
+            "hold_seconds": 15,
+            "stop_distance_price": 0.5,
+            "take_profit_distance_price": 5.0,
+        },
+    ]
+    result = simulate_portfolio(ticks, events, BROKER, risk_config())
+    assert result["trades"][0]["status"] == "DATA_GAP_UNRESOLVED"
+    assert result["trades"][1]["status"] == "DATA_GAP_UNRESOLVED"
+    assert result["trades"][2]["status"] == "REJECTED_AGGREGATE_RISK"
+    assert result["summary"]["unresolved_positions_at_end"] == 2
+    assert result["summary"]["max_open_stop_risk_money"] <= 50.0 + 1e-8
