@@ -50,6 +50,19 @@ def run_robustness_sweep(
         raise RobustnessEvaluationError("final holdout and unclassified data roles are not accepted")
     if not isinstance(broker_snapshot, dict) or broker_snapshot.get("account_mode") != "DEMO" or broker_snapshot.get("trading_enabled") is not False:
         raise RobustnessEvaluationError("broker snapshot must prove DEMO and trading-disabled")
+    identity = broker_snapshot.get("account_identity")
+    if not isinstance(identity, dict):
+        raise RobustnessEvaluationError("broker snapshot must include verified Exness DEMO account_identity")
+    company = identity.get("company")
+    server = identity.get("server")
+    currency = identity.get("account_currency")
+    login_hash = identity.get("login_sha256")
+    if (identity.get("broker") != "Exness" or identity.get("account_mode") != "DEMO" or
+        not isinstance(company, str) or "exness" not in company.casefold() or
+        not isinstance(server, str) or "exness" not in server.casefold() or
+        currency != "USD" or not isinstance(login_hash, str) or len(login_hash) != 64 or
+        any(ch not in "0123456789abcdef" for ch in login_hash.lower())):
+        raise RobustnessEvaluationError("broker account identity must prove Exness company/server, DEMO mode, USD currency, and SHA-256 login fingerprint")
     spec = broker_snapshot.get("instrument_specs", {}).get("XAUUSD")
     if not isinstance(spec, dict):
         raise RobustnessEvaluationError("broker snapshot must contain XAUUSD instrument economics")
