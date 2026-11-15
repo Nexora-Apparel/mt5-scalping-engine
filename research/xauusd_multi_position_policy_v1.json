@@ -75,7 +75,7 @@
       "isolation": "one candidate and one portfolio configuration per replay",
       "net_pnl_allowed": false,
       "final_holdout_eligible": false,
-      "validation": "PYTHON_CI_327_PASS_RUN_43703146396"
+      "validation": "PYTHON_CI_332_PASS_RUN_43703345325"
     },
     "broker_identity_contract": {
       "required_fields": [
@@ -119,7 +119,7 @@
         "direct_simulator_cli"
       ],
       "login_fingerprint": "HMAC-SHA-256 keyed with configured account password; raw login and password are never persisted",
-      "validation": "PYTHON_CI_327_PASS_RUN_43703146396",
+      "validation": "PYTHON_CI_332_PASS_RUN_43703345325",
       "limitation": "Terminal-reported metadata and a keyed login fingerprint are consistency evidence, not a cryptographically signed broker attestation"
     }
   },
