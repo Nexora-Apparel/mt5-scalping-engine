@@ -125,8 +125,8 @@ def test_robustness_sweep_rejects_non_demo_or_execution_enabled_snapshots():
     {"server": "Demo-Server"},
     {"account_mode": "REAL"},
     {"account_currency": "EUR"},
-    {"login_sha256": "not-a-sha256"},
-    {"login_sha256": "d" * 63},
+    {"login_hmac_sha256": "not-a-sha256"},
+    {"login_hmac_sha256": "d" * 63},
 ])
 def test_robustness_sweep_rejects_incomplete_or_mismatched_account_identity(patch):
     invalid = {**BROKER, "account_identity": {**BROKER["account_identity"], **patch}}
