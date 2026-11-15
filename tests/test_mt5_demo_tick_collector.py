@@ -70,7 +70,7 @@ def test_full_collector_records_only_gold_and_passes_integrity(tmp_path,monkeypa
  assert m["account_identity"]=={
   "broker":"Exness","company":"Exness Technologies Ltd","server":"Exness-MT5Trial",
   "account_mode":"DEMO","account_currency":"USD",
-  "login_sha256":collector.hashlib.sha256(b"12345678").hexdigest()
+  "login_hmac_sha256":collector.hmac.new(b"fake",b"12345678",collector.hashlib.sha256).hexdigest()
  }
  assert m["session_id"]=="validation_01"
  assert m["instrument_specs"]["XAUUSD"]["currency_base"]=="XAU"
