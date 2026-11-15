@@ -230,3 +230,9 @@ def test_transient_intraday_floating_breach_latches_before_equity_recovers(
     assert result["summary"][summary_key] is True
     assert result["summary"]["daily_drawdown_percent_at_end"] < 0.01
     assert result["summary"]["overall_drawdown_percent_at_end"] < 0.01
+    if limit_key == "max_daily_loss_percent":
+        assert result["summary"]["daily_loss_lock_time_msc"] == 2000
+        assert result["summary"]["max_daily_drawdown_percent_observed"] >= 0.01
+    else:
+        assert result["summary"]["overall_loss_lock_time_msc"] == 2000
+        assert result["summary"]["max_overall_drawdown_percent_observed"] >= 0.01
