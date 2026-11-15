@@ -63,6 +63,8 @@ def run_robustness_sweep(
         currency != "USD" or not isinstance(login_hash, str) or len(login_hash) != 64 or
         any(ch not in "0123456789abcdef" for ch in login_hash.lower())):
         raise RobustnessEvaluationError("broker account identity must prove Exness company/server, DEMO mode, USD currency, and SHA-256 login fingerprint")
+    if event_payload.get("broker_account_identity") != identity:
+        raise RobustnessEvaluationError("event payload account identity does not match the broker snapshot")
     spec = broker_snapshot.get("instrument_specs", {}).get("XAUUSD")
     if not isinstance(spec, dict):
         raise RobustnessEvaluationError("broker snapshot must contain XAUUSD instrument economics")
