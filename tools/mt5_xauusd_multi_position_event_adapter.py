@@ -58,7 +58,7 @@ def _validate_payload(features: dict[str, Any], candidates: dict[str, Any],
         identity.get("account_currency") != "USD" or
         not isinstance(login_hash, str) or len(login_hash) != 64 or
         any(ch not in "0123456789abcdef" for ch in login_hash.lower())):
-        raise MultiPositionAdapterError("account_identity must prove Exness company/server, DEMO mode, USD currency, and SHA-256 login fingerprint")
+        raise MultiPositionAdapterError("account_identity must prove Exness company/server, DEMO mode, USD currency, and HMAC-SHA-256 login fingerprint")
     if policy.get("status") != "PREREGISTERED_RESEARCH_ONLY" or policy.get("execution_enabled") is not False:
         raise MultiPositionAdapterError("multi-position policy must be preregistered and research-only")
     instrument_specs = broker.get("instrument_specs")
