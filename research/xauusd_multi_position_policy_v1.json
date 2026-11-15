@@ -75,7 +75,7 @@
       "isolation": "one candidate and one portfolio configuration per replay",
       "net_pnl_allowed": false,
       "final_holdout_eligible": false,
-      "validation": "PENDING_FINAL_CI_AFTER_DIRECT_SIMULATOR_GATE"
+      "validation": "PENDING_IDENTITY_CONTRACT_CI"
     },
     "broker_identity_contract": {
       "required_fields": [
@@ -120,6 +120,17 @@
       ],
       "login_fingerprint": "HMAC-SHA-256 keyed with the configured account password; raw login and password are never persisted",
       "validation": "PENDING_CI_AFTER_KEYED_FINGERPRINT"
+    },
+    "broker_snapshot_identity_contract": {
+      "required": true,
+      "broker": "Exness",
+      "account_mode": "DEMO",
+      "account_currency": "USD",
+      "company_and_server_must_each_identify_exness": true,
+      "login_identifier": "HMAC-SHA256 keyed with the terminal password; raw login and password are never written to the manifest",
+      "event_adapter_must_copy_identity_exactly": true,
+      "robustness_harness_must_match_event_identity_to_snapshot": true,
+      "limitation": "Broker identity fields are terminal-reported metadata, not a cryptographically signed broker attestation"
     }
   },
   "notes": [
@@ -136,6 +147,7 @@
     "Same-quote concurrency regression verifies multiple signals sharing one executable quote are sized against one live marked-equity and aggregate-risk state; a third signal is rejected when broker volume-step rounding leaves insufficient capacity. Latest Python CI passed 299 tests in run 43697512870.",
     "Broker identity evidence is now required at collection, event adaptation, and robustness replay. The collector records an Exness company/server assertion, DEMO mode, USD account currency, and SHA-256 login fingerprint without persisting the raw login. The adapter binds that identity into event output and the robustness harness requires an exact identity match. This is a consistency gate, not cryptographic broker attestation; independent terminal/account evidence and instrument economics still require owner review.",
     "The collector, adapter, and robustness harness now fail closed on malformed instrument_specs, non-XAU base currency, non-USD profit currency, or missing/nonpositive contract size. Broker-provided contract size and tick size are recorded without substituting generic market assumptions.",
-    "The collector derives the stable account-login fingerprint as HMAC-SHA-256 keyed with the configured account password, preventing offline login-number enumeration from the manifest. Neither the raw login nor password is persisted."
+    "The collector derives the stable account-login fingerprint as HMAC-SHA-256 keyed with the configured account password, preventing offline login-number enumeration from the manifest. Neither the raw login nor password is persisted.",
+    "The multi-position collector, event adapter, and robustness harness now require an explicit Exness DEMO USD account identity. The collector stores company/server/currency and a password-keyed HMAC-SHA-256 login fingerprint without storing the raw login or password. The adapter carries the identity into the event payload and the robustness harness requires an exact identity match. These terminal-reported fields are not a cryptographically signed broker attestation; provenance review remains required."
   ]
 }
