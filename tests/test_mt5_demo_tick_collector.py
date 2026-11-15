@@ -19,11 +19,12 @@ class FakeMT5:
  def __init__(self,c): self.clock=c;self.shutdown_called=False
  def initialize(self,*a,**k): return True
  def terminal_info(self): return SimpleNamespace(connected=True,trade_allowed=False,dlls_allowed=False)
- def account_info(self): return SimpleNamespace(login=12345678,server="Exness-MT5Trial",trade_mode=0,company="Exness")
+ def account_info(self): return SimpleNamespace(login=12345678,server="Exness-MT5Trial",trade_mode=0,company="Exness Technologies Ltd",currency="USD")
  def symbols_get(self): return [SimpleNamespace(name="XAUUSDm",currency_base="XAU",currency_profit="USD"),
                                 SimpleNamespace(name="XAGUSDm",currency_base="XAG",currency_profit="USD")]
  def symbol_select(self,s,e): return e and s=="XAUUSDm"
- def symbol_info(self,s): return SimpleNamespace(point=0.01,digits=2)
+ def symbol_info(self,s): return SimpleNamespace(point=0.01,digits=2,currency_base="XAU",
+  currency_profit="USD",trade_tick_size=0.01,trade_contract_size=100.0)
  def symbol_info_tick(self,s): return SimpleNamespace(bid=3000.0,ask=3000.2,time_msc=int(self.clock.now().timestamp()*1000))
  def copy_ticks_from(self,s,d,n,f): return [SimpleNamespace(time_msc=int(self.clock.now().timestamp()*1000),bid=3000.0,ask=3000.2,last=3000.1,volume=1,volume_real=1.0,flags=f)]
  def last_error(self): return (1,"fake")
@@ -66,10 +67,20 @@ def test_full_collector_records_only_gold_and_passes_integrity(tmp_path,monkeypa
  m=collector.collect(api,30,tmp_path,monotonic=c.monotonic,sleep=c.sleep,now=c.now)
  assert api.shutdown_called and m["duration_seconds"]==1802.0 and m["status"]=="PASS"
  assert m["account_mode"]=="DEMO" and m["trading_enabled"] is False and m["dll_imports_enabled"] is False
+ assert m["account_identity"]=={
+  "broker":"Exness","company":"Exness Technologies Ltd","server":"Exness-MT5Trial",
+  "account_mode":"DEMO","account_currency":"USD",
+  "login_hmac_sha256":collector.hmac.new(b"fake",b"12345678",collector.hashlib.sha256).hexdigest()
+ }
  assert m["session_id"]=="validation_01"
+ assert m["instrument_specs"]["XAUUSD"]["currency_base"]=="XAU"
+ assert m["instrument_specs"]["XAUUSD"]["currency_profit"]=="USD"
+ assert m["instrument_specs"]["XAUUSD"]["contract_size"]==100.0
  assert set(m["symbols"])=={"XAUUSD"} and set(m["streams"])=={"XAUUSD"}
  assert m["streams"]["XAUUSD"]["records"]==1802
  assert (tmp_path/"manifest.json").is_file() and (tmp_path/"veltrix_exness_demo_ticks.csv").is_file()
+ manifest_text=(tmp_path/"manifest.json").read_text(encoding="utf-8")
+ assert "12345678" not in manifest_text and "fake" not in manifest_text
 
 def test_collector_rejects_unregistered_validation_session_before_mt5_initialize(monkeypatch):
  monkeypatch.setenv("VELTRIX_SESSION_ID","holdout_01")
@@ -98,3 +109,37 @@ def test_warmup_fails_closed_when_gold_quote_stays_stale():
  with pytest.raises(collector.DiagnosticFailure,match="fresh quote warm-up failed"):
   collector.wait_for_fresh_quotes(api,{"XAUUSD":"XAUUSDm"},12345678,"Exness-MT5Trial",
    timeout_seconds=3,stable_samples_required=2,monotonic=c.monotonic,sleep=c.sleep,now=c.now)
+
+def test_collector_rejects_non_usd_account_before_collection(tmp_path,monkeypatch):
+ c=Clock();api=FakeMT5(c)
+ api.account_info=lambda: SimpleNamespace(login=12345678,server="Exness-MT5Trial",trade_mode=0,
+  company="Exness Technologies Ltd",currency="EUR")
+ for k,v in {"MT5_LOGIN":"12345678","MT5_PASSWORD":"fake","MT5_SERVER":"Exness-MT5Trial",
+  "MT5_TERMINAL":r"C:\\MT5\\terminal64.exe","VELTRIX_SESSION_ID":"validation_01"}.items():
+  monkeypatch.setenv(k,v)
+ with pytest.raises(collector.DiagnosticFailure,match="account currency must be USD"):
+  collector.collect(api,30,tmp_path,monotonic=c.monotonic,sleep=c.sleep,now=c.now)
+ assert api.shutdown_called
+
+
+def test_collector_rejects_non_exness_company_even_on_demo_server(tmp_path,monkeypatch):
+ c=Clock();api=FakeMT5(c)
+ api.account_info=lambda: SimpleNamespace(login=12345678,server="Exness-MT5Trial",trade_mode=0,
+  company="Unrelated Broker",currency="USD")
+ for k,v in {"MT5_LOGIN":"12345678","MT5_PASSWORD":"fake","MT5_SERVER":"Exness-MT5Trial",
+  "MT5_TERMINAL":r"C:\\MT5\\terminal64.exe","VELTRIX_SESSION_ID":"validation_01"}.items():
+  monkeypatch.setenv(k,v)
+ with pytest.raises(collector.DiagnosticFailure,match="identify Exness"):
+  collector.collect(api,30,tmp_path,monotonic=c.monotonic,sleep=c.sleep,now=c.now)
+ assert api.shutdown_called
+
+def test_collector_rejects_incomplete_xauusd_contract_spec(tmp_path,monkeypatch):
+ c=Clock();api=FakeMT5(c)
+ api.symbol_info=lambda s: SimpleNamespace(point=0.01,digits=2,currency_base="XAU",
+  currency_profit="EUR",trade_tick_size=0.01,trade_contract_size=100.0)
+ for k,v in {"MT5_LOGIN":"12345678","MT5_PASSWORD":"fake","MT5_SERVER":"Exness-MT5Trial",
+  "MT5_TERMINAL":r"C:\\MT5\\terminal64.exe","VELTRIX_SESSION_ID":"validation_01"}.items():
+  monkeypatch.setenv(k,v)
+ with pytest.raises(collector.DiagnosticFailure,match="USD profit"):
+  collector.collect(api,30,tmp_path,monotonic=c.monotonic,sleep=c.sleep,now=c.now)
+ assert api.shutdown_called

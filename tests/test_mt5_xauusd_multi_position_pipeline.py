@@ -29,7 +29,13 @@ def test_candidate_to_multi_position_portfolio_pipeline_end_to_end():
     }
     broker = {
         "account_mode": "DEMO", "trading_enabled": False,
+        "account_identity": {
+            "broker": "Exness", "company": "Exness Technologies Ltd",
+            "server": "Exness-MT5Trial", "account_mode": "DEMO",
+            "account_currency": "USD", "login_hmac_sha256": "d" * 64,
+        },
         "instrument_specs": {"XAUUSD": {
+            "currency_base": "XAU", "currency_profit": "USD", "contract_size": 100.0,
             "point_size": 0.01, "tick_size": 0.01,
             "stops_level_points": 10, "tick_value_loss": 1.0,
             "tick_value_profit": 1.0, "volume_min": 0.01,

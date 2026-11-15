@@ -45,11 +45,33 @@ def _validate_payload(features: dict[str, Any], candidates: dict[str, Any],
         raise MultiPositionAdapterError("only canonical XAUUSD inputs are accepted")
     if features.get("source_sha256") != candidates.get("source_sha256"):
         raise MultiPositionAdapterError("feature and candidate source hashes do not match")
-    if broker.get("account_mode", "DEMO") != "DEMO" or broker.get("trading_enabled", False) is not False:
+    if broker.get("account_mode") != "DEMO" or broker.get("trading_enabled") is not False:
         raise MultiPositionAdapterError("broker snapshot must prove DEMO and trading-disabled")
+    identity = broker.get("account_identity")
+    if not isinstance(identity, dict):
+        raise MultiPositionAdapterError("broker snapshot must include verified Exness DEMO account_identity")
+    company, server = identity.get("company"), identity.get("server")
+    login_hash = identity.get("login_hmac_sha256")
+    if (identity.get("broker") != "Exness" or identity.get("account_mode") != "DEMO" or
+        not isinstance(company, str) or "exness" not in company.casefold() or
+        not isinstance(server, str) or "exness" not in server.casefold() or
+        identity.get("account_currency") != "USD" or
+        not isinstance(login_hash, str) or len(login_hash) != 64 or
+        any(ch not in "0123456789abcdef" for ch in login_hash.lower())):
+        raise MultiPositionAdapterError("account_identity must prove Exness company/server, DEMO mode, USD currency, and HMAC-SHA-256 login fingerprint")
     if policy.get("status") != "PREREGISTERED_RESEARCH_ONLY" or policy.get("execution_enabled") is not False:
         raise MultiPositionAdapterError("multi-position policy must be preregistered and research-only")
-    spec = broker.get("instrument_specs", {}).get("XAUUSD", broker)
+    instrument_specs = broker.get("instrument_specs")
+    if instrument_specs is not None and not isinstance(instrument_specs, dict):
+        raise MultiPositionAdapterError("instrument_specs must be an object")
+    spec = instrument_specs.get("XAUUSD") if instrument_specs is not None else broker
+    if not isinstance(spec, dict):
+        raise MultiPositionAdapterError("broker snapshot must contain XAUUSD instrument economics")
+    if (str(spec.get("currency_base", "")).upper() != "XAU" or
+        str(spec.get("currency_profit", "")).upper() != "USD"):
+        raise MultiPositionAdapterError("XAUUSD contract must explicitly prove XAU base and USD profit currencies")
+    if _positive(spec.get("contract_size"), "contract_size") <= 0:
+        raise MultiPositionAdapterError("contract_size must be finite and positive")
     values = {
         "point_size": _positive(spec.get("point_size", spec.get("point")), "point_size"),
         "tick_size": _positive(spec.get("tick_size"), "tick_size"),
@@ -178,6 +200,7 @@ def build_multi_position_events(features: dict[str, Any], candidates: dict[str, 
         "schema": "VELTRIX_XAUUSD_MULTI_POSITION_EVENTS_V1",
         "source_sha256": features["source_sha256"],
         "policy_sha256": policy_hash,
+        "broker_account_identity": dict(broker["account_identity"]),
         "data_role": candidates.get("data_role", "UNCLASSIFIED_NOT_HOLDOUT"),
         "final_holdout_eligible": False,
         "event_count": len(output),

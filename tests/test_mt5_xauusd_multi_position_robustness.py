@@ -16,6 +16,9 @@ SPEC = {
     "volume_max": 100.0,
     "volume_step": 0.01,
     "margin_per_lot": 100.0,
+    "currency_base": "XAU",
+    "currency_profit": "USD",
+    "contract_size": 100.0,
 }
 RISK = {
     "equity": 10000.0,
@@ -38,6 +41,11 @@ TICKS = [
 BROKER = {
     "account_mode": "DEMO",
     "trading_enabled": False,
+    "account_identity": {
+        "broker": "Exness", "company": "Exness Technologies Ltd",
+        "server": "Exness-MT5Trial", "account_mode": "DEMO",
+        "account_currency": "USD", "login_hmac_sha256": "c" * 64,
+    },
     "instrument_specs": {"XAUUSD": SPEC},
 }
 
@@ -49,6 +57,7 @@ def payload():
         "schema": "VELTRIX_XAUUSD_MULTI_POSITION_EVENTS_V1",
         "source_sha256": "a" * 64,
         "policy_sha256": "b" * 64,
+        "broker_account_identity": dict(BROKER["account_identity"]),
         "data_role": "DEVELOPMENT_ONLY",
         "final_holdout_eligible": False,
         "events": [
@@ -110,6 +119,47 @@ def test_robustness_sweep_rejects_non_demo_or_execution_enabled_snapshots():
         run_robustness_sweep(TICKS, payload(), invalid, RISK)
 
 
+@pytest.mark.parametrize("patch", [
+    {"broker": "OtherBroker"},
+    {"company": "Unrelated Markets"},
+    {"server": "Demo-Server"},
+    {"account_mode": "REAL"},
+    {"account_currency": "EUR"},
+    {"login_hmac_sha256": "not-a-sha256"},
+    {"login_hmac_sha256": "d" * 63},
+])
+def test_robustness_sweep_rejects_incomplete_or_mismatched_account_identity(patch):
+    invalid = {**BROKER, "account_identity": {**BROKER["account_identity"], **patch}}
+    with pytest.raises(RobustnessEvaluationError, match="account identity"):
+        run_robustness_sweep(TICKS, payload(), invalid, RISK)
+
+
+def test_robustness_sweep_rejects_missing_account_identity():
+    invalid = {key: value for key, value in BROKER.items() if key != "account_identity"}
+    with pytest.raises(RobustnessEvaluationError, match="account_identity"):
+        run_robustness_sweep(TICKS, payload(), invalid, RISK)
+
+
+@pytest.mark.parametrize("instrument_specs", [None, [], "invalid"])
+def test_robustness_sweep_rejects_malformed_instrument_specs(instrument_specs):
+    invalid = {**BROKER, "instrument_specs": instrument_specs}
+    with pytest.raises(RobustnessEvaluationError, match="instrument_specs"):
+        run_robustness_sweep(TICKS, payload(), invalid, RISK)
+
+
+def test_robustness_sweep_rejects_missing_xauusd_instrument_spec():
+    invalid = {**BROKER, "instrument_specs": {}}
+    with pytest.raises(RobustnessEvaluationError, match="XAUUSD instrument economics"):
+        run_robustness_sweep(TICKS, payload(), invalid, RISK)
+
+
+def test_robustness_sweep_rejects_event_snapshot_identity_mismatch():
+    events = payload()
+    events["broker_account_identity"]["server"] = "Exness-DifferentServer"
+    with pytest.raises(RobustnessEvaluationError, match="does not match"):
+        run_robustness_sweep(TICKS, events, BROKER, RISK)
+
+
 def test_robustness_sweep_rejects_missing_candidate_config_or_execution_flag():
     invalid = payload()
     invalid["events"][0]["portfolio_config_id"] = ""
@@ -127,3 +177,15 @@ def test_robustness_sweep_rejects_duplicate_or_invalid_slippage_grid():
         run_robustness_sweep(TICKS, payload(), BROKER, RISK, slippage_grid=(0, 0))
     with pytest.raises(RobustnessEvaluationError, match="nonnegative"):
         run_robustness_sweep(TICKS, payload(), BROKER, RISK, slippage_grid=(0, -1))
+
+@pytest.mark.parametrize("patch", [
+    {"currency_base": "EUR"},
+    {"currency_profit": "EUR"},
+    {"contract_size": 0},
+    {"contract_size": "invalid"},
+    {"contract_size": True},
+])
+def test_robustness_sweep_rejects_invalid_xauusd_contract_economics(patch):
+    invalid = {**BROKER, "instrument_specs": {"XAUUSD": {**SPEC, **patch}}}
+    with pytest.raises(RobustnessEvaluationError, match="contract|currency"):
+        run_robustness_sweep(TICKS, payload(), invalid, RISK)

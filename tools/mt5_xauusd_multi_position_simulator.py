@@ -67,6 +67,32 @@ def validate_portfolio_ticks(ticks: list[PortfolioTick]) -> None:
         previous = tick.time_msc
 
 
+def validate_broker_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Validate the account and XAUUSD identity envelope before CLI replay."""
+    if not isinstance(snapshot, dict) or snapshot.get("account_mode") != "DEMO" or snapshot.get("trading_enabled") is not False:
+        raise PortfolioSimulationError("broker snapshot must explicitly prove DEMO mode and trading-disabled")
+    identity = snapshot.get("account_identity")
+    if not isinstance(identity, dict):
+        raise PortfolioSimulationError("broker snapshot must include Exness DEMO account_identity")
+    company, server, login_hash = identity.get("company"), identity.get("server"), identity.get("login_hmac_sha256")
+    if (identity.get("broker") != "Exness" or identity.get("account_mode") != "DEMO" or
+        not isinstance(company, str) or "exness" not in company.casefold() or
+        not isinstance(server, str) or "exness" not in server.casefold() or
+        identity.get("account_currency") != "USD" or
+        not isinstance(login_hash, str) or len(login_hash) != 64 or
+        any(ch not in "0123456789abcdef" for ch in login_hash.lower())):
+        raise PortfolioSimulationError("account_identity must prove Exness company/server, DEMO mode, USD currency, and HMAC-SHA-256 login fingerprint")
+    specs = snapshot.get("instrument_specs")
+    if not isinstance(specs, dict) or not isinstance(specs.get("XAUUSD"), dict):
+        raise PortfolioSimulationError("broker snapshot must contain XAUUSD instrument economics")
+    spec = specs["XAUUSD"]
+    if (str(spec.get("currency_base", "")).upper() != "XAU" or
+        str(spec.get("currency_profit", "")).upper() != "USD"):
+        raise PortfolioSimulationError("XAUUSD contract must explicitly prove XAU base and USD profit currencies")
+    _finite_positive(spec.get("contract_size"), "contract_size")
+    return spec
+
+
 def _validate_spec(spec: dict[str, Any]) -> dict[str, float]:
     if not isinstance(spec, dict):
         raise PortfolioSimulationError("broker specification must be an object")
@@ -509,9 +535,7 @@ def main() -> int:
         spec_payload = json.loads(args.broker_spec.read_text(encoding="utf-8"))
         risk_payload = json.loads(args.risk_config.read_text(encoding="utf-8"))
         ticks = [PortfolioTick(**item) for item in raw_ticks]
-        spec = spec_payload.get("instrument_specs", {}).get("XAUUSD", spec_payload)
-        if spec_payload.get("account_mode", "DEMO") != "DEMO" or spec_payload.get("trading_enabled", False) is not False:
-            raise PortfolioSimulationError("broker snapshot must be DEMO and trading-disabled")
+        spec = validate_broker_snapshot(spec_payload)
         result = simulate_portfolio(
             ticks, events_payload.get("events"), spec, risk_payload,
             slippage_points_per_side=args.slippage_points_per_side,

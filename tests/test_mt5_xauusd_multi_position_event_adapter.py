@@ -37,7 +37,13 @@ def fixture_payloads():
     }
     broker = {
         "account_mode": "DEMO", "trading_enabled": False,
-        "instrument_specs": {"XAUUSD": {"point_size": 0.01, "tick_size": 0.01, "stops_level_points": 10}},
+        "account_identity": {
+            "broker": "Exness", "company": "Exness Technologies Ltd",
+            "server": "Exness-MT5Trial", "account_mode": "DEMO",
+            "account_currency": "USD", "login_hmac_sha256": "c" * 64,
+        },
+        "instrument_specs": {"XAUUSD": {"point_size": 0.01, "tick_size": 0.01, "stops_level_points": 10,
+            "currency_base": "XAU", "currency_profit": "USD", "contract_size": 100.0}},
     }
     policy = {
         "status": "PREREGISTERED_RESEARCH_ONLY", "execution_enabled": False,
@@ -57,6 +63,7 @@ def test_adapter_creates_only_10_to_60_second_adaptive_sl_tp_events():
     assert all(event["stop_distance_price"] > 0 for event in result["events"])
     assert all(event["take_profit_distance_price"] > 0 for event in result["events"])
     assert all(event["execution_authorized"] is False for event in result["events"])
+    assert result["broker_account_identity"] == broker["account_identity"]
 
 
 def test_stop_and_target_distances_are_tick_aligned_and_stop_respects_broker_minimum():
@@ -81,6 +88,28 @@ def test_adapter_rejects_non_demo_or_enabled_trading():
     features, candidates, broker, policy = fixture_payloads()
     broker["trading_enabled"] = True
     with pytest.raises(MultiPositionAdapterError, match="DEMO"):
+        build_multi_position_events(features, candidates, broker, policy)
+
+
+@pytest.mark.parametrize("patch", [
+    {"broker": "OtherBroker"},
+    {"company": "Unrelated Markets"},
+    {"server": "Demo-Server"},
+    {"account_mode": "REAL"},
+    {"account_currency": "EUR"},
+    {"login_hmac_sha256": "bad"},
+])
+def test_adapter_rejects_mismatched_account_identity(patch):
+    features, candidates, broker, policy = fixture_payloads()
+    broker["account_identity"].update(patch)
+    with pytest.raises(MultiPositionAdapterError, match="account_identity"):
+        build_multi_position_events(features, candidates, broker, policy)
+
+
+def test_adapter_rejects_missing_account_identity():
+    features, candidates, broker, policy = fixture_payloads()
+    del broker["account_identity"]
+    with pytest.raises(MultiPositionAdapterError, match="account_identity"):
         build_multi_position_events(features, candidates, broker, policy)
 
 
@@ -119,3 +148,25 @@ def test_adapter_skips_volatility_window_with_gap_into_signal_window():
     result = build_multi_position_events(features, candidates, broker, policy)
     assert result["event_count"] == 0
     assert result["skipped_incomplete_volatility_events"] == 1
+
+@pytest.mark.parametrize("patch", [
+    {"currency_base": "EUR"},
+    {"currency_profit": "EUR"},
+    {"contract_size": 0},
+])
+def test_adapter_rejects_invalid_xauusd_contract_economics(patch):
+    features, candidates, broker, policy = fixture_payloads()
+    broker["instrument_specs"]["XAUUSD"].update(patch)
+    with pytest.raises(MultiPositionAdapterError, match="contract|currency"):
+        build_multi_position_events(features, candidates, broker, policy)
+
+def test_adapter_rejects_missing_or_malformed_instrument_spec():
+    features, candidates, broker, policy = fixture_payloads()
+    broker["instrument_specs"] = []
+    with pytest.raises(MultiPositionAdapterError, match="instrument_specs"):
+        build_multi_position_events(features, candidates, broker, policy)
+
+    features, candidates, broker, policy = fixture_payloads()
+    broker["instrument_specs"] = {}
+    with pytest.raises(MultiPositionAdapterError, match="XAUUSD instrument economics"):
+        build_multi_position_events(features, candidates, broker, policy)

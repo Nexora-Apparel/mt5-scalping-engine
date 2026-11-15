@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -50,9 +51,39 @@ def run_robustness_sweep(
         raise RobustnessEvaluationError("final holdout and unclassified data roles are not accepted")
     if not isinstance(broker_snapshot, dict) or broker_snapshot.get("account_mode") != "DEMO" or broker_snapshot.get("trading_enabled") is not False:
         raise RobustnessEvaluationError("broker snapshot must prove DEMO and trading-disabled")
-    spec = broker_snapshot.get("instrument_specs", {}).get("XAUUSD")
+    identity = broker_snapshot.get("account_identity")
+    if not isinstance(identity, dict):
+        raise RobustnessEvaluationError("broker snapshot must include verified Exness DEMO account_identity")
+    company = identity.get("company")
+    server = identity.get("server")
+    currency = identity.get("account_currency")
+    login_hash = identity.get("login_hmac_sha256")
+    if (identity.get("broker") != "Exness" or identity.get("account_mode") != "DEMO" or
+        not isinstance(company, str) or "exness" not in company.casefold() or
+        not isinstance(server, str) or "exness" not in server.casefold() or
+        currency != "USD" or not isinstance(login_hash, str) or len(login_hash) != 64 or
+        any(ch not in "0123456789abcdef" for ch in login_hash.lower())):
+        raise RobustnessEvaluationError("broker account identity must prove Exness company/server, DEMO mode, USD currency, and HMAC-SHA-256 login fingerprint")
+    if event_payload.get("broker_account_identity") != identity:
+        raise RobustnessEvaluationError("event payload account identity does not match the broker snapshot")
+    instrument_specs = broker_snapshot.get("instrument_specs")
+    if not isinstance(instrument_specs, dict):
+        raise RobustnessEvaluationError("broker snapshot instrument_specs must be an object")
+    spec = instrument_specs.get("XAUUSD")
     if not isinstance(spec, dict):
         raise RobustnessEvaluationError("broker snapshot must contain XAUUSD instrument economics")
+    if (str(spec.get("currency_base", "")).upper() != "XAU" or
+        str(spec.get("currency_profit", "")).upper() != "USD"):
+        raise RobustnessEvaluationError("XAUUSD contract must explicitly prove XAU base and USD profit currencies")
+    raw_contract_size = spec.get("contract_size")
+    if isinstance(raw_contract_size, bool):
+        raise RobustnessEvaluationError("XAUUSD contract_size must be a finite positive number, not a boolean")
+    try:
+        contract_size = float(raw_contract_size)
+        if not math.isfinite(contract_size) or contract_size <= 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        raise RobustnessEvaluationError("XAUUSD contract_size must be finite and positive")
     if not isinstance(risk_config, dict) or risk_config.get("original_deposit_verified") is not True:
         raise RobustnessEvaluationError("owner-verified original-deposit risk configuration is required")
     if not slippage_grid or any(isinstance(v, bool) or not isinstance(v, int) or v < 0 for v in slippage_grid):
