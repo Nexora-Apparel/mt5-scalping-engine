@@ -159,3 +159,14 @@ def test_adapter_rejects_invalid_xauusd_contract_economics(patch):
     broker["instrument_specs"]["XAUUSD"].update(patch)
     with pytest.raises(MultiPositionAdapterError, match="contract|currency"):
         build_multi_position_events(features, candidates, broker, policy)
+
+def test_adapter_rejects_missing_or_malformed_instrument_spec():
+    features, candidates, broker, policy = fixture_payloads()
+    broker["instrument_specs"] = []
+    with pytest.raises(MultiPositionAdapterError, match="instrument_specs"):
+        build_multi_position_events(features, candidates, broker, policy)
+
+    features, candidates, broker, policy = fixture_payloads()
+    broker["instrument_specs"] = {}
+    with pytest.raises(MultiPositionAdapterError, match="XAUUSD instrument economics"):
+        build_multi_position_events(features, candidates, broker, policy)
