@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import hmac
 import json
 import math
 import os
@@ -265,7 +266,7 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
             "server": server,
             "account_mode": "DEMO",
             "account_currency": account_currency,
-            "login_sha256": hashlib.sha256(str(login).encode("utf-8")).hexdigest(),
+            "login_hmac_sha256": hmac.new(password.encode("utf-8"), str(login).encode("utf-8"), hashlib.sha256).hexdigest(),
         }
         symbols = {name: discover_symbol(mt5, name) for name in CANONICAL_SYMBOLS}
         instrument_specs = {}
