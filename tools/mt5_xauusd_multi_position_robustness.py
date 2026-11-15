@@ -57,7 +57,7 @@ def run_robustness_sweep(
     company = identity.get("company")
     server = identity.get("server")
     currency = identity.get("account_currency")
-    login_hash = identity.get("login_sha256")
+    login_hash = identity.get("login_hmac_sha256")
     if (identity.get("broker") != "Exness" or identity.get("account_mode") != "DEMO" or
         not isinstance(company, str) or "exness" not in company.casefold() or
         not isinstance(server, str) or "exness" not in server.casefold() or
