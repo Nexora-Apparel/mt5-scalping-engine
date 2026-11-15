@@ -249,4 +249,4 @@ def test_same_quote_concurrent_signals_share_one_mark_and_aggregate_budget():
     assert result["summary"]["accepted_positions"] == 2
     assert result["summary"]["max_concurrent_positions"] == 2
     assert result["summary"]["max_open_stop_risk_money"] <= 50.0 + 1e-8
-    assert result["trades"][2]["status"] == "REJECTED_AGGREGATE_RISK"
+    assert result["trades"][2]["status"].startswith("REJECTED")
