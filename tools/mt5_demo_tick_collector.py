@@ -251,8 +251,22 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
 
     try:
         identity = validate_account(mt5, login, server)
+        account = mt5.account_info()
+        account_currency = str(getattr(account, "currency", "") or "").upper()
         if identity["trade_mode"] != DEMO_TRADE_MODE:
             raise DiagnosticFailure("account is not DEMO")
+        if "exness" not in identity["company"].casefold() or "exness" not in server.casefold():
+            raise DiagnosticFailure("account company and server must independently identify Exness")
+        if account_currency != "USD":
+            raise DiagnosticFailure(f"account currency must be USD (observed={account_currency or 'missing'})")
+        account_identity = {
+            "broker": "Exness",
+            "company": identity["company"],
+            "server": server,
+            "account_mode": "DEMO",
+            "account_currency": account_currency,
+            "login_sha256": hashlib.sha256(str(login).encode("utf-8")).hexdigest(),
+        }
         symbols = {name: discover_symbol(mt5, name) for name in CANONICAL_SYMBOLS}
         instrument_specs = {}
         for canonical, broker_symbol in symbols.items():
@@ -323,6 +337,7 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
             "requested_duration_minutes": minutes,
             "quote_validation_cycles": quote_samples,
             "account_mode": "DEMO",
+            "account_identity": account_identity,
             "server": server,
             "symbols": symbols,
             "instrument_specs": instrument_specs,
