@@ -45,8 +45,20 @@ def _validate_payload(features: dict[str, Any], candidates: dict[str, Any],
         raise MultiPositionAdapterError("only canonical XAUUSD inputs are accepted")
     if features.get("source_sha256") != candidates.get("source_sha256"):
         raise MultiPositionAdapterError("feature and candidate source hashes do not match")
-    if broker.get("account_mode", "DEMO") != "DEMO" or broker.get("trading_enabled", False) is not False:
+    if broker.get("account_mode") != "DEMO" or broker.get("trading_enabled") is not False:
         raise MultiPositionAdapterError("broker snapshot must prove DEMO and trading-disabled")
+    identity = broker.get("account_identity")
+    if not isinstance(identity, dict):
+        raise MultiPositionAdapterError("broker snapshot must include verified Exness DEMO account_identity")
+    company, server = identity.get("company"), identity.get("server")
+    login_hash = identity.get("login_sha256")
+    if (identity.get("broker") != "Exness" or identity.get("account_mode") != "DEMO" or
+        not isinstance(company, str) or "exness" not in company.casefold() or
+        not isinstance(server, str) or "exness" not in server.casefold() or
+        identity.get("account_currency") != "USD" or
+        not isinstance(login_hash, str) or len(login_hash) != 64 or
+        any(ch not in "0123456789abcdef" for ch in login_hash.lower())):
+        raise MultiPositionAdapterError("account_identity must prove Exness company/server, DEMO mode, USD currency, and SHA-256 login fingerprint")
     if policy.get("status") != "PREREGISTERED_RESEARCH_ONLY" or policy.get("execution_enabled") is not False:
         raise MultiPositionAdapterError("multi-position policy must be preregistered and research-only")
     spec = broker.get("instrument_specs", {}).get("XAUUSD", broker)
