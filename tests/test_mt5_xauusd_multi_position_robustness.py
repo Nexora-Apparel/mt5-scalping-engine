@@ -44,7 +44,7 @@ BROKER = {
     "account_identity": {
         "broker": "Exness", "company": "Exness Technologies Ltd",
         "server": "Exness-MT5Trial", "account_mode": "DEMO",
-        "account_currency": "USD", "login_sha256": "c" * 64,
+        "account_currency": "USD", "login_hmac_sha256": "c" * 64,
     },
     "instrument_specs": {"XAUUSD": SPEC},
 }
