@@ -75,7 +75,31 @@
       "isolation": "one candidate and one portfolio configuration per replay",
       "net_pnl_allowed": false,
       "final_holdout_eligible": false,
-      "validation": "PYTHON_CI_299_PASS_RUN_43697512870"
+      "validation": "PENDING_CI_AFTER_EXNESS_DEMO_USD_IDENTITY_GATE"
+    },
+    "broker_identity_contract": {
+      "required_fields": [
+        "broker",
+        "company",
+        "server",
+        "account_mode",
+        "account_currency",
+        "login_sha256"
+      ],
+      "required_values": {
+        "broker": "Exness",
+        "account_mode": "DEMO",
+        "account_currency": "USD"
+      },
+      "collector_checks": [
+        "company identifies Exness",
+        "server identifies Exness",
+        "account currency is USD",
+        "configured login and server match connected account"
+      ],
+      "event_binding": "event payload account identity must exactly match robustness broker snapshot",
+      "raw_login_persisted": false,
+      "cryptographic_broker_attestation": false
     }
   },
   "notes": [
@@ -89,6 +113,7 @@
     "No broker execution is enabled.",
     "The audit-chain/manual-script implementation (including the traceable evidence-reference input) passed the dedicated overall-loss terminal runtime test and all five companion runtime sentinels in run 43545106284. Python CI passed 285 tests in run 43549639320. The manual script itself has not been executed against a real DEMO account.",
     "The multi-position robustness harness partitions each candidate/configuration independently and runs identical UTC-session quotes at 0/1/2/5 points of assumed slippage per side. It reports gross-only diagnostics, unresolved status, drawdown peaks and first lock timestamps; commission remains unverified, net PnL is null, and no configuration is selected. The quote-by-quote simulator latches daily/overall locks at the first observed breach even if equity later recovers. Python CI passed 298 tests in run 43697363506.",
-    "Same-quote concurrency regression verifies multiple signals sharing one executable quote are sized against one live marked-equity and aggregate-risk state; a third signal is rejected when broker volume-step rounding leaves insufficient capacity. Latest Python CI passed 299 tests in run 43697512870."
+    "Same-quote concurrency regression verifies multiple signals sharing one executable quote are sized against one live marked-equity and aggregate-risk state; a third signal is rejected when broker volume-step rounding leaves insufficient capacity. Latest Python CI passed 299 tests in run 43697512870.",
+    "Broker identity evidence is now required at collection, event adaptation, and robustness replay. The collector records an Exness company/server assertion, DEMO mode, USD account currency, and SHA-256 login fingerprint without persisting the raw login. The adapter binds that identity into event output and the robustness harness requires an exact identity match. This is a consistency gate, not cryptographic broker attestation; independent terminal/account evidence and instrument economics still require owner review."
   ]
 }
