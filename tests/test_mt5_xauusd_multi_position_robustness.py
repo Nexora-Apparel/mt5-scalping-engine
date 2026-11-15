@@ -79,13 +79,13 @@ def payload():
 
 
 def test_robustness_sweep_isolates_configs_and_runs_all_slippage_cases():
-    result = run_robustness_sweep(TICKS, payload(), BROKER, RISK, slippage_grid=(0, 2))
+    result = run_robustness_sweep(TICKS, payload(), BROKER, RISK)
     assert result["candidate_configuration_count"] == 2
-    assert result["scenario_count"] == 4
+    assert result["scenario_count"] == 8
     assert {row["portfolio_config_id"] for row in result["scenarios"]} == {
         "sl1_rr1_h15", "sl2_rr1_h15"
     }
-    assert {row["slippage_points_per_side"] for row in result["scenarios"]} == {0, 2}
+    assert {row["slippage_points_per_side"] for row in result["scenarios"]} == {0, 1, 2, 5}
     assert all(row["execution_sent"] is False for row in result["scenarios"])
     assert all(row["net_pnl_money"] is None for row in result["scenarios"])
     assert result["net_performance_allowed"] is False
