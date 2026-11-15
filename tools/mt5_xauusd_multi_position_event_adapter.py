@@ -62,6 +62,11 @@ def _validate_payload(features: dict[str, Any], candidates: dict[str, Any],
     if policy.get("status") != "PREREGISTERED_RESEARCH_ONLY" or policy.get("execution_enabled") is not False:
         raise MultiPositionAdapterError("multi-position policy must be preregistered and research-only")
     spec = broker.get("instrument_specs", {}).get("XAUUSD", broker)
+    if (str(spec.get("currency_base", "")).upper() != "XAU" or
+        str(spec.get("currency_profit", "")).upper() != "USD"):
+        raise MultiPositionAdapterError("XAUUSD contract must explicitly prove XAU base and USD profit currencies")
+    if _positive(spec.get("contract_size"), "contract_size") <= 0:
+        raise MultiPositionAdapterError("contract_size must be finite and positive")
     values = {
         "point_size": _positive(spec.get("point_size", spec.get("point")), "point_size"),
         "tick_size": _positive(spec.get("tick_size"), "tick_size"),
