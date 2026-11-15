@@ -183,6 +183,7 @@ def test_robustness_sweep_rejects_duplicate_or_invalid_slippage_grid():
     {"currency_profit": "EUR"},
     {"contract_size": 0},
     {"contract_size": "invalid"},
+    {"contract_size": True},
 ])
 def test_robustness_sweep_rejects_invalid_xauusd_contract_economics(patch):
     invalid = {**BROKER, "instrument_specs": {"XAUUSD": {**SPEC, **patch}}}
