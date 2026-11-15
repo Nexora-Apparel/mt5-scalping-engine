@@ -70,7 +70,7 @@ There is no fixed maximum number of simultaneous positions. The portfolio risk b
 - A quote gap beyond the freshness limit or a missing deadline quote leaves the position unresolved and reserves exposure.
 - Observed bid/ask crossing includes spread once. Slippage is an explicit sensitivity assumption, not measured execution quality.
 - Commission remains unverified; net PnL is always null and net-performance claims remain disabled. Gross money PnL uses broker tick-value profit/loss economics, not raw price change multiplied by lots. The daily drawdown latch is evaluated using realized gross PnL plus marked-to-market open PnL; commission is excluded because it is not verified.
-- The overall-loss latch independently compares marked equity with the owner-verified original-deposit baseline and blocks new entries at or above the configured limit (hard-capped at 50.00%). It is not reset by daily accounting.
+- Daily and overall loss latches are evaluated on every recorded quote, not only when a new signal arrives. A threshold breach latches the lock immediately and it remains active even if equity recovers before the next signal. The report records peak observed daily/overall drawdown and the first quote timestamp that triggered each lock. The overall-loss latch compares marked equity with the owner-verified original-deposit baseline and is not reset by daily accounting.
 
 A stop can be crossed between recorded ticks. This tick-only simulator cannot reconstruct intratick paths or guarantee stop fill price. Gaps can therefore produce worse real fills than the theoretical result.
 
@@ -99,3 +99,8 @@ The ticks JSON is an array of objects with `time_msc`, `bid`, and `ask`. The eve
 
 Each replay must contain one `portfolio_config_id` and one `candidate_id` only. If either ID is present, it must be non-empty and present on every event. Candidate strategies and their stop/target/horizon configurations must be replayed independently against the same tick stream; mixing them would make distinct hypotheses compete for one portfolio risk budget and invalidate cross-candidate comparisons.
 
+
+
+## Drawdown path robustness
+
+The simulator advances the portfolio mark across every quote between signal decisions. Realized exits are booked at their simulated exit timestamp; remaining positions are marked on the executable bid/ask side with configured slippage. The 15% daily and 50% overall locks latch on the first observed quote at or beyond their thresholds and cannot clear through a subsequent equity recovery. Output includes peak observed drawdown and first lock-trigger timestamps. This is quote-sampled, not intratick risk measurement: gaps and unobserved price paths remain limitations.
