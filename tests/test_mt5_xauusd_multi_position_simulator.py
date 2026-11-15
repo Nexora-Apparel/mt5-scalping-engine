@@ -259,7 +259,7 @@ def test_direct_simulator_snapshot_gate_requires_exness_demo_usd_and_gold_contra
         "account_identity": {
             "broker": "Exness", "company": "Exness Technologies Ltd",
             "server": "Exness-MT5Trial", "account_mode": "DEMO",
-            "account_currency": "USD", "login_sha256": "e" * 64,
+            "account_currency": "USD", "login_hmac_sha256": "e" * 64,
         },
         "instrument_specs": {"XAUUSD": {
             "currency_base": "XAU", "currency_profit": "USD", "contract_size": 100.0,
