@@ -14,6 +14,9 @@ def test_artifact_intake_accepts_only_preregistered_development_and_validation_i
         {"session_id": "session8", "run_id": 43333365050},
         {"session_id": "session9", "run_id": 43338046880},
         {"session_id": "validation_01", "run_id": 43390000001},
+        {"session_id": "validation_03", "run_id": 43390000003},
+        {"session_id": "validation_04", "run_id": 43390000004},
+        {"session_id": "validation_05", "run_id": 43390000005},
     ]}
     result = validate_session_map(mapping, PLAN, stage="validation")
     assert result == mapping["sessions"]
@@ -30,6 +33,16 @@ def test_artifact_intake_rejects_unregistered_sessions_and_invalid_run_ids(item)
     with pytest.raises(ArtifactIntakeError):
         validate_session_map({"sessions": [item]}, PLAN, stage="validation")
 
+
+
+def test_artifact_intake_rejects_incomplete_validation_session_set():
+    mapping = {"sessions": [
+        {"session_id": "validation_01", "run_id": 43390000001},
+        {"session_id": "validation_03", "run_id": 43390000003},
+        {"session_id": "validation_04", "run_id": 43390000004},
+    ]}
+    with pytest.raises(ArtifactIntakeError, match="every eligible validation session together"):
+        validate_session_map(mapping, PLAN, stage="validation")
 
 def test_artifact_intake_rejects_explicitly_ineligible_validation_02():
     with pytest.raises(ArtifactIntakeError, match="explicitly ineligible"):
