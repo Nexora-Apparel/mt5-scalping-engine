@@ -140,6 +140,19 @@ def test_robustness_sweep_rejects_missing_account_identity():
         run_robustness_sweep(TICKS, payload(), invalid, RISK)
 
 
+@pytest.mark.parametrize("instrument_specs", [None, [], "invalid"])
+def test_robustness_sweep_rejects_malformed_instrument_specs(instrument_specs):
+    invalid = {**BROKER, "instrument_specs": instrument_specs}
+    with pytest.raises(RobustnessEvaluationError, match="instrument_specs"):
+        run_robustness_sweep(TICKS, payload(), invalid, RISK)
+
+
+def test_robustness_sweep_rejects_missing_xauusd_instrument_spec():
+    invalid = {**BROKER, "instrument_specs": {}}
+    with pytest.raises(RobustnessEvaluationError, match="XAUUSD instrument economics"):
+        run_robustness_sweep(TICKS, payload(), invalid, RISK)
+
+
 def test_robustness_sweep_rejects_event_snapshot_identity_mismatch():
     events = payload()
     events["broker_account_identity"]["server"] = "Exness-DifferentServer"
