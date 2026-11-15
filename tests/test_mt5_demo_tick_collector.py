@@ -80,7 +80,7 @@ def test_full_collector_records_only_gold_and_passes_integrity(tmp_path,monkeypa
  assert m["streams"]["XAUUSD"]["records"]==1802
  assert (tmp_path/"manifest.json").is_file() and (tmp_path/"veltrix_exness_demo_ticks.csv").is_file()
  manifest_text=(tmp_path/"manifest.json").read_text(encoding="utf-8")
- assert "12345678" not in manifest_text and "\\"fake\\" " not in manifest_text
+ assert "12345678" not in manifest_text and "fake" not in manifest_text
 
 def test_collector_rejects_unregistered_validation_session_before_mt5_initialize(monkeypatch):
  monkeypatch.setenv("VELTRIX_SESSION_ID","holdout_01")
