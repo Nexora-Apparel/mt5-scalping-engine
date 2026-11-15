@@ -16,6 +16,9 @@ SPEC = {
     "volume_max": 100.0,
     "volume_step": 0.01,
     "margin_per_lot": 100.0,
+    "currency_base": "XAU",
+    "currency_profit": "USD",
+    "contract_size": 100.0,
 }
 RISK = {
     "equity": 10000.0,
@@ -161,3 +164,14 @@ def test_robustness_sweep_rejects_duplicate_or_invalid_slippage_grid():
         run_robustness_sweep(TICKS, payload(), BROKER, RISK, slippage_grid=(0, 0))
     with pytest.raises(RobustnessEvaluationError, match="nonnegative"):
         run_robustness_sweep(TICKS, payload(), BROKER, RISK, slippage_grid=(0, -1))
+
+@pytest.mark.parametrize("patch", [
+    {"currency_base": "EUR"},
+    {"currency_profit": "EUR"},
+    {"contract_size": 0},
+    {"contract_size": "invalid"},
+])
+def test_robustness_sweep_rejects_invalid_xauusd_contract_economics(patch):
+    invalid = {**BROKER, "instrument_specs": {"XAUUSD": {**SPEC, **patch}}}
+    with pytest.raises(RobustnessEvaluationError, match="contract|currency"):
+        run_robustness_sweep(TICKS, payload(), invalid, RISK)
