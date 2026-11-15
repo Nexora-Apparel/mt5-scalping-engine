@@ -38,6 +38,11 @@ TICKS = [
 BROKER = {
     "account_mode": "DEMO",
     "trading_enabled": False,
+    "account_identity": {
+        "broker": "Exness", "company": "Exness Technologies Ltd",
+        "server": "Exness-MT5Trial", "account_mode": "DEMO",
+        "account_currency": "USD", "login_sha256": "c" * 64,
+    },
     "instrument_specs": {"XAUUSD": SPEC},
 }
 
@@ -107,6 +112,27 @@ def test_robustness_sweep_rejects_unverified_or_holdout_event_payloads():
 def test_robustness_sweep_rejects_non_demo_or_execution_enabled_snapshots():
     invalid = {**BROKER, "trading_enabled": True}
     with pytest.raises(RobustnessEvaluationError, match="DEMO"):
+        run_robustness_sweep(TICKS, payload(), invalid, RISK)
+
+
+@pytest.mark.parametrize("patch", [
+    {"broker": "OtherBroker"},
+    {"company": "Unrelated Markets"},
+    {"server": "Demo-Server"},
+    {"account_mode": "REAL"},
+    {"account_currency": "EUR"},
+    {"login_sha256": "not-a-sha256"},
+    {"login_sha256": "d" * 63},
+])
+def test_robustness_sweep_rejects_incomplete_or_mismatched_account_identity(patch):
+    invalid = {**BROKER, "account_identity": {**BROKER["account_identity"], **patch}}
+    with pytest.raises(RobustnessEvaluationError, match="account identity"):
+        run_robustness_sweep(TICKS, payload(), invalid, RISK)
+
+
+def test_robustness_sweep_rejects_missing_account_identity():
+    invalid = {key: value for key, value in BROKER.items() if key != "account_identity"}
+    with pytest.raises(RobustnessEvaluationError, match="account_identity"):
         run_robustness_sweep(TICKS, payload(), invalid, RISK)
 
 
