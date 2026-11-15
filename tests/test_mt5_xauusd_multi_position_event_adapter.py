@@ -62,6 +62,7 @@ def test_adapter_creates_only_10_to_60_second_adaptive_sl_tp_events():
     assert all(event["stop_distance_price"] > 0 for event in result["events"])
     assert all(event["take_profit_distance_price"] > 0 for event in result["events"])
     assert all(event["execution_authorized"] is False for event in result["events"])
+    assert result["broker_account_identity"] == broker["account_identity"]
 
 
 def test_stop_and_target_distances_are_tick_aligned_and_stop_respects_broker_minimum():
