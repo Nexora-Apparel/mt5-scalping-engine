@@ -43,7 +43,7 @@ The broker snapshot must provide:
 
 Do not infer contract size, tick economics, or margin from generic XAUUSD assumptions. The simulator requires explicit values. A static `margin_per_lot` snapshot is an approximation; live preflight must independently call the broker's current margin calculator for every proposed volume. The simulator also requires a separately owner-verified original-deposit baseline and enforces the 50.00% overall-loss ceiling against that immutable baseline.
 
-The CLI accepts a wrapper with `account_mode: DEMO`, `trading_enabled: false`, and `instrument_specs.XAUUSD`. The symbol/account metadata must come from a provenance-verified Exness DEMO snapshot before research reports can be treated as broker-specific.
+The CLI accepts a wrapper with `account_mode: DEMO`, `trading_enabled: false`, `account_identity`, and `instrument_specs.XAUUSD`. The account identity object must contain `broker: "Exness"`, an Exness company name and server, `account_mode: "DEMO"`, `account_currency: "USD"`, and a 64-character SHA-256 fingerprint of the login (the raw login is deliberately not written to the manifest). The read-only collector now checks both company and server identity plus USD account currency, and writes this object into its manifest. The event adapter carries the same identity into its output; the robustness harness rejects missing, malformed, mismatched, non-Exness, non-DEMO, or non-USD identity evidence. This is a consistency and metadata gate, not a cryptographic attestation of broker origin: the manifest still requires independent review against the live terminal/account record and instrument economics before broker-specific claims are made. Do not fabricate or manually substitute identity fields.
 
 ## Risk configuration
 
