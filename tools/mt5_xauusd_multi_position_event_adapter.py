@@ -61,7 +61,12 @@ def _validate_payload(features: dict[str, Any], candidates: dict[str, Any],
         raise MultiPositionAdapterError("account_identity must prove Exness company/server, DEMO mode, USD currency, and SHA-256 login fingerprint")
     if policy.get("status") != "PREREGISTERED_RESEARCH_ONLY" or policy.get("execution_enabled") is not False:
         raise MultiPositionAdapterError("multi-position policy must be preregistered and research-only")
-    spec = broker.get("instrument_specs", {}).get("XAUUSD", broker)
+    instrument_specs = broker.get("instrument_specs")
+    if instrument_specs is not None and not isinstance(instrument_specs, dict):
+        raise MultiPositionAdapterError("instrument_specs must be an object")
+    spec = instrument_specs.get("XAUUSD") if instrument_specs is not None else broker
+    if not isinstance(spec, dict):
+        raise MultiPositionAdapterError("broker snapshot must contain XAUUSD instrument economics")
     if (str(spec.get("currency_base", "")).upper() != "XAU" or
         str(spec.get("currency_profit", "")).upper() != "USD"):
         raise MultiPositionAdapterError("XAUUSD contract must explicitly prove XAU base and USD profit currencies")
