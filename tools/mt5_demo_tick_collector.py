@@ -273,14 +273,28 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
             info = mt5.symbol_info(broker_symbol)
             if info is None or float(getattr(info, "point", 0.0)) <= 0:
                 raise DiagnosticFailure(f"{canonical}: broker instrument specification unavailable")
+            currency_base = str(getattr(info, "currency_base", "") or "").upper()
+            currency_profit = str(getattr(info, "currency_profit", "") or "").upper()
+            contract_size = float(getattr(info, "trade_contract_size", 0.0) or 0.0)
+            tick_size = float(getattr(info, "trade_tick_size", 0.0) or 0.0)
+            if canonical == "XAUUSD" and (currency_base != "XAU" or currency_profit != "USD" or
+                                           not math.isfinite(contract_size) or contract_size <= 0 or
+                                           not math.isfinite(tick_size) or tick_size <= 0):
+                raise DiagnosticFailure(
+                    f"{canonical}: broker contract must explicitly prove XAU base, USD profit, "
+                    "positive contract size, and positive tick size"
+                )
             instrument_specs[canonical] = {
                 "broker_symbol": broker_symbol,
                 "point": float(info.point),
+                "point_size": float(info.point),
                 "digits": int(getattr(info, "digits", 0)),
-                "currency_base": str(getattr(info, "currency_base", "") or ""),
-                "currency_profit": str(getattr(info, "currency_profit", "") or ""),
-                "trade_tick_size": float(getattr(info, "trade_tick_size", 0.0) or 0.0),
-                "trade_contract_size": float(getattr(info, "trade_contract_size", 0.0) or 0.0),
+                "currency_base": currency_base,
+                "currency_profit": currency_profit,
+                "trade_tick_size": tick_size,
+                "tick_size": tick_size,
+                "trade_contract_size": contract_size,
+                "contract_size": contract_size,
             }
         spread_samples = {name: [] for name in CANONICAL_SYMBOLS}
         source_id = "exness-demo-" + re.sub(r"[^A-Za-z0-9_-]", "-", server)[:70]
