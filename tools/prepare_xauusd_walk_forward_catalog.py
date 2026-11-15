@@ -69,6 +69,12 @@ def validate_session_map(
             raise ArtifactIntakeError(f"{sid}: run_id differs from the preregistered development workflow run")
         seen.add(sid)
         normalized.append({"session_id": sid, "run_id": run_id})
+    missing_validation = sorted(validation - seen)
+    if missing_validation:
+        raise ArtifactIntakeError(
+            "validation intake requires every eligible validation session together; missing: "
+            + ", ".join(missing_validation)
+        )
     return normalized
 
 
