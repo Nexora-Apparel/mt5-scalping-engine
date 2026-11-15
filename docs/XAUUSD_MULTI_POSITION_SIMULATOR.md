@@ -101,6 +101,21 @@ Each replay must contain one `portfolio_config_id` and one `candidate_id` only. 
 
 
 
+## Parameter-grid robustness sweep
+
+After generating adapted events, run the isolated sweep against one certified UTC session:
+
+```bash
+python -m tools.mt5_xauusd_multi_position_robustness \
+  --ticks path/to/session_ticks.json \
+  --events path/to/multi_position_events.json \
+  --broker-snapshot path/to/verified_demo_snapshot.json \
+  --risk-config path/to/risk_config.json \
+  --output path/to/robustness_report.json
+```
+
+The harness partitions every candidate/configuration pair and runs it independently at 0, 1, 2, and 5 points of assumed slippage per side. It records accepted/rejected positions, concurrency, exposure, gross PnL completeness, loss-lock state, peak drawdown, and lock timestamps. It includes a zero-PnL no-trade reference. It does not rank or select a configuration, infer commission, or make net-performance claims. Every session must be replayed separately because the simulator intentionally rejects multi-UTC-date input; development, prospective validation, and holdout roles must never be mixed.
+
 ## Drawdown path robustness
 
 The simulator advances the portfolio mark across every quote between signal decisions. Realized exits are booked at their simulated exit timestamp; remaining positions are marked on the executable bid/ask side with configured slippage. The 15% daily and 50% overall locks latch on the first observed quote at or beyond their thresholds and cannot clear through a subsequent equity recovery. Output includes peak observed drawdown and first lock-trigger timestamps. This is quote-sampled, not intratick risk measurement: gaps and unobserved price paths remain limitations.
