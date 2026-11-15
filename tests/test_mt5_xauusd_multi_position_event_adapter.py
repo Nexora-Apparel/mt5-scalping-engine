@@ -42,7 +42,8 @@ def fixture_payloads():
             "server": "Exness-MT5Trial", "account_mode": "DEMO",
             "account_currency": "USD", "login_sha256": "c" * 64,
         },
-        "instrument_specs": {"XAUUSD": {"point_size": 0.01, "tick_size": 0.01, "stops_level_points": 10}},
+        "instrument_specs": {"XAUUSD": {"point_size": 0.01, "tick_size": 0.01, "stops_level_points": 10,
+            "currency_base": "XAU", "currency_profit": "USD", "contract_size": 100.0}},
     }
     policy = {
         "status": "PREREGISTERED_RESEARCH_ONLY", "execution_enabled": False,
@@ -147,3 +148,14 @@ def test_adapter_skips_volatility_window_with_gap_into_signal_window():
     result = build_multi_position_events(features, candidates, broker, policy)
     assert result["event_count"] == 0
     assert result["skipped_incomplete_volatility_events"] == 1
+
+@pytest.mark.parametrize("patch", [
+    {"currency_base": "EUR"},
+    {"currency_profit": "EUR"},
+    {"contract_size": 0},
+])
+def test_adapter_rejects_invalid_xauusd_contract_economics(patch):
+    features, candidates, broker, policy = fixture_payloads()
+    broker["instrument_specs"]["XAUUSD"].update(patch)
+    with pytest.raises(MultiPositionAdapterError, match="contract|currency"):
+        build_multi_position_events(features, candidates, broker, policy)
