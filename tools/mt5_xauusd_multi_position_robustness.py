@@ -75,8 +75,11 @@ def run_robustness_sweep(
     if (str(spec.get("currency_base", "")).upper() != "XAU" or
         str(spec.get("currency_profit", "")).upper() != "USD"):
         raise RobustnessEvaluationError("XAUUSD contract must explicitly prove XAU base and USD profit currencies")
+    raw_contract_size = spec.get("contract_size")
+    if isinstance(raw_contract_size, bool):
+        raise RobustnessEvaluationError("XAUUSD contract_size must be a finite positive number, not a boolean")
     try:
-        contract_size = float(spec.get("contract_size", 0))
+        contract_size = float(raw_contract_size)
         if not math.isfinite(contract_size) or contract_size <= 0:
             raise ValueError
     except (TypeError, ValueError):
