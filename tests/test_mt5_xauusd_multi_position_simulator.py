@@ -236,3 +236,17 @@ def test_transient_intraday_floating_breach_latches_before_equity_recovers(
     else:
         assert result["summary"]["overall_loss_lock_time_msc"] == 2000
         assert result["summary"]["max_overall_drawdown_percent_observed"] >= 0.01
+
+
+def test_same_quote_concurrent_signals_share_one_mark_and_aggregate_budget():
+    risk = {**RISK, "risk_per_trade_percent": 0.25, "max_portfolio_risk_percent": 0.50}
+    result = simulate_portfolio(
+        ticks(),
+        [ev("same-a", 1000), ev("same-b", 1000), ev("same-c", 1000)],
+        SPEC,
+        risk,
+    )
+    assert result["summary"]["accepted_positions"] == 2
+    assert result["summary"]["max_concurrent_positions"] == 2
+    assert result["summary"]["max_open_stop_risk_money"] <= 50.0 + 1e-8
+    assert result["trades"][2]["status"] == "REJECTED_AGGREGATE_RISK"
