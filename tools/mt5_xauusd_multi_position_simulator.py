@@ -243,6 +243,44 @@ def simulate_portfolio(
     max_open_risk = 0.0
     max_margin_used = 0.0
 
+    last_processed_tick_index = -1
+
+    def advance_portfolio(to_index: int) -> tuple[float, float]:
+        """Advance marked equity and loss latches over every observed quote."""
+        nonlocal active, daily_realized_pnl, daily_loss_locked, overall_loss_locked
+        for tick_index in range(last_processed_tick_index + 1, to_index + 1):
+            tick = ticks[tick_index]
+            matured = [position for position in active
+                       if position["exit_time_msc"] is not None and position["exit_time_msc"] <= tick.time_msc]
+            for position in matured:
+                if position["gross_pnl_money"] is not None:
+                    daily_realized_pnl += position["gross_pnl_money"]
+            active = [position for position in active
+                      if position["exit_time_msc"] is None or position["exit_time_msc"] > tick.time_msc]
+            unrealized = 0.0
+            for position in active:
+                mark = tick.bid - slip if position["direction"] == "long" else tick.ask + slip
+                signed_delta = ((mark - position["entry_price"]) if position["direction"] == "long"
+                                else (position["entry_price"] - mark))
+                tick_value = spec["tick_value_profit"] if signed_delta >= 0 else spec["tick_value_loss"]
+                unrealized += (signed_delta / spec["tick_size"]) * tick_value * position["volume"]
+            marked = equity + daily_realized_pnl + unrealized
+            if max(0.0, (equity - marked) / equity * 100.0) >= daily_loss_pct:
+                daily_loss_locked = True
+            if max(0.0, (original_deposit - marked) / original_deposit * 100.0) >= overall_loss_pct:
+                overall_loss_locked = True
+
+        # Recompute at the requested quote even when multiple signals share it.
+        tick = ticks[to_index]
+        unrealized = 0.0
+        for position in active:
+            mark = tick.bid - slip if position["direction"] == "long" else tick.ask + slip
+            signed_delta = ((mark - position["entry_price"]) if position["direction"] == "long"
+                            else (position["entry_price"] - mark))
+            tick_value = spec["tick_value_profit"] if signed_delta >= 0 else spec["tick_value_loss"]
+            unrealized += (signed_delta / spec["tick_size"]) * tick_value * position["volume"]
+        return equity + daily_realized_pnl + unrealized, unrealized
+
     ordered = sorted(events, key=lambda item: (item["signal_window_end_msc"], item["signal_id"]))
     for event in ordered:
         signal_end = event["signal_window_end_msc"]
@@ -252,27 +290,10 @@ def simulate_portfolio(
             continue
         entry_tick = ticks[entry_index]
         entry_time = entry_tick.time_msc
-
-        # Release only positions whose simulated close has already occurred.
-        matured = [position for position in active
-                   if position["exit_time_msc"] is not None and position["exit_time_msc"] <= entry_time]
-        for position in matured:
-            if position["gross_pnl_money"] is not None:
-                daily_realized_pnl += position["gross_pnl_money"]
-        active = [position for position in active
-                  if position["exit_time_msc"] is None or position["exit_time_msc"] > entry_time]
-        current_tick = entry_tick
-        unrealized_pnl = 0.0
-        for position in active:
-            mark = current_tick.bid - slip if position["direction"] == "long" else current_tick.ask + slip
-            signed_delta = (mark - position["entry_price"]) if position["direction"] == "long" else (position["entry_price"] - mark)
-            tick_value = spec["tick_value_profit"] if signed_delta >= 0 else spec["tick_value_loss"]
-            unrealized_pnl += (signed_delta / spec["tick_size"]) * tick_value * position["volume"]
-        marked_equity = equity + daily_realized_pnl + unrealized_pnl
+        marked_equity, unrealized_pnl = advance_portfolio(entry_index)
+        last_processed_tick_index = entry_index
         daily_drawdown_pct = max(0.0, (equity - marked_equity) / equity * 100.0)
         overall_drawdown_pct = max(0.0, (original_deposit - marked_equity) / original_deposit * 100.0)
-        if overall_drawdown_pct >= overall_loss_pct:
-            overall_loss_locked = True
         if overall_loss_locked:
             trades.append({
                 "signal_id": event["signal_id"], "status": "REJECTED_OVERALL_LOSS_LOCK",
@@ -399,29 +420,11 @@ def simulate_portfolio(
         max_open_risk = max(max_open_risk, sum(item["risk_money"] for item in active))
         max_margin_used = max(max_margin_used, sum(item["margin_money"] for item in active))
 
-    # Reconcile all exits observable by the end of the quote stream.
-    final_time = ticks[-1].time_msc
-    matured = [position for position in active
-               if position["exit_time_msc"] is not None and position["exit_time_msc"] <= final_time]
-    for position in matured:
-        if position["gross_pnl_money"] is not None:
-            daily_realized_pnl += position["gross_pnl_money"]
-    active = [position for position in active
-              if position["exit_time_msc"] is None or position["exit_time_msc"] > final_time]
-    final_tick = ticks[-1]
-    final_unrealized = 0.0
-    for position in active:
-        mark = final_tick.bid - slip if position["direction"] == "long" else final_tick.ask + slip
-        signed_delta = (mark - position["entry_price"]) if position["direction"] == "long" else (position["entry_price"] - mark)
-        tick_value = spec["tick_value_profit"] if signed_delta >= 0 else spec["tick_value_loss"]
-        final_unrealized += (signed_delta / spec["tick_size"]) * tick_value * position["volume"]
-    final_equity = equity + daily_realized_pnl + final_unrealized
+    # Advance through every remaining quote so transient floating breaches latch.
+    final_equity, final_unrealized = advance_portfolio(len(ticks) - 1)
+    last_processed_tick_index = len(ticks) - 1
     final_daily_drawdown_pct = max(0.0, (equity - final_equity) / equity * 100.0)
     final_overall_drawdown_pct = max(0.0, (original_deposit - final_equity) / original_deposit * 100.0)
-    if final_daily_drawdown_pct >= daily_loss_pct:
-        daily_loss_locked = True
-    if final_overall_drawdown_pct >= overall_loss_pct:
-        overall_loss_locked = True
     unresolved = [item for item in active if item["exit_time_msc"] is None]
     return {
         "status": "PASS",
