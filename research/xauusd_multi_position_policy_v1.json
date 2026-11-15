@@ -75,7 +75,7 @@
       "isolation": "one candidate and one portfolio configuration per replay",
       "net_pnl_allowed": false,
       "final_holdout_eligible": false,
-      "validation": "PENDING_CI_AFTER_ACCOUNT_AND_CONTRACT_ECONOMICS_GATES"
+      "validation": "PENDING_FINAL_CI_AFTER_DIRECT_SIMULATOR_GATE"
     },
     "broker_identity_contract": {
       "required_fields": [
@@ -111,7 +111,13 @@
       "required_instrument_values": {
         "currency_base": "XAU",
         "currency_profit": "USD"
-      }
+      },
+      "enforcement_stages": [
+        "read_only_collector",
+        "event_adapter",
+        "robustness_harness",
+        "direct_simulator_cli"
+      ]
     }
   },
   "notes": [
