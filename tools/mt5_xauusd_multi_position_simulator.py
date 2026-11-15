@@ -74,7 +74,7 @@ def validate_broker_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     identity = snapshot.get("account_identity")
     if not isinstance(identity, dict):
         raise PortfolioSimulationError("broker snapshot must include Exness DEMO account_identity")
-    company, server, login_hash = identity.get("company"), identity.get("server"), identity.get("login_sha256")
+    company, server, login_hash = identity.get("company"), identity.get("server"), identity.get("login_hmac_sha256")
     if (identity.get("broker") != "Exness" or identity.get("account_mode") != "DEMO" or
         not isinstance(company, str) or "exness" not in company.casefold() or
         not isinstance(server, str) or "exness" not in server.casefold() or
