@@ -81,7 +81,7 @@ def validate_broker_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         identity.get("account_currency") != "USD" or
         not isinstance(login_hash, str) or len(login_hash) != 64 or
         any(ch not in "0123456789abcdef" for ch in login_hash.lower())):
-        raise PortfolioSimulationError("account_identity must prove Exness company/server, DEMO mode, USD currency, and SHA-256 login fingerprint")
+        raise PortfolioSimulationError("account_identity must prove Exness company/server, DEMO mode, USD currency, and HMAC-SHA-256 login fingerprint")
     specs = snapshot.get("instrument_specs")
     if not isinstance(specs, dict) or not isinstance(specs.get("XAUUSD"), dict):
         raise PortfolioSimulationError("broker snapshot must contain XAUUSD instrument economics")
