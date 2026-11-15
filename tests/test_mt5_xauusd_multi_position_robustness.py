@@ -54,6 +54,7 @@ def payload():
         "schema": "VELTRIX_XAUUSD_MULTI_POSITION_EVENTS_V1",
         "source_sha256": "a" * 64,
         "policy_sha256": "b" * 64,
+        "broker_account_identity": dict(BROKER["account_identity"]),
         "data_role": "DEVELOPMENT_ONLY",
         "final_holdout_eligible": False,
         "events": [
@@ -134,6 +135,13 @@ def test_robustness_sweep_rejects_missing_account_identity():
     invalid = {key: value for key, value in BROKER.items() if key != "account_identity"}
     with pytest.raises(RobustnessEvaluationError, match="account_identity"):
         run_robustness_sweep(TICKS, payload(), invalid, RISK)
+
+
+def test_robustness_sweep_rejects_event_snapshot_identity_mismatch():
+    events = payload()
+    events["broker_account_identity"]["server"] = "Exness-DifferentServer"
+    with pytest.raises(RobustnessEvaluationError, match="does not match"):
+        run_robustness_sweep(TICKS, events, BROKER, RISK)
 
 
 def test_robustness_sweep_rejects_missing_candidate_config_or_execution_flag():
