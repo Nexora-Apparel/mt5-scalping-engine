@@ -51,7 +51,7 @@ def _validate_payload(features: dict[str, Any], candidates: dict[str, Any],
     if not isinstance(identity, dict):
         raise MultiPositionAdapterError("broker snapshot must include verified Exness DEMO account_identity")
     company, server = identity.get("company"), identity.get("server")
-    login_hash = identity.get("login_sha256")
+    login_hash = identity.get("login_hmac_sha256")
     if (identity.get("broker") != "Exness" or identity.get("account_mode") != "DEMO" or
         not isinstance(company, str) or "exness" not in company.casefold() or
         not isinstance(server, str) or "exness" not in server.casefold() or
