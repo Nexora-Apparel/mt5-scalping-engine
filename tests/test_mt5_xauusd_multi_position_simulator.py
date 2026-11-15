@@ -4,6 +4,7 @@ from tools.mt5_xauusd_multi_position_simulator import (
     PortfolioSimulationError,
     PortfolioTick,
     simulate_portfolio,
+    validate_broker_snapshot,
 )
 
 
@@ -250,3 +251,33 @@ def test_same_quote_concurrent_signals_share_one_mark_and_aggregate_budget():
     assert result["summary"]["max_concurrent_positions"] == 2
     assert result["summary"]["max_open_stop_risk_money"] <= 50.0 + 1e-8
     assert result["trades"][2]["status"].startswith("REJECTED")
+
+def test_direct_simulator_snapshot_gate_requires_exness_demo_usd_and_gold_contract():
+    snapshot = {
+        "account_mode": "DEMO",
+        "trading_enabled": False,
+        "account_identity": {
+            "broker": "Exness", "company": "Exness Technologies Ltd",
+            "server": "Exness-MT5Trial", "account_mode": "DEMO",
+            "account_currency": "USD", "login_sha256": "e" * 64,
+        },
+        "instrument_specs": {"XAUUSD": {
+            "currency_base": "XAU", "currency_profit": "USD", "contract_size": 100.0,
+        }},
+    }
+    assert validate_broker_snapshot(snapshot) == snapshot["instrument_specs"]["XAUUSD"]
+
+    for mutate in (
+        lambda x: x.pop("account_identity"),
+        lambda x: x["account_identity"].update(account_currency="EUR"),
+        lambda x: x["account_identity"].update(company="Other Broker"),
+        lambda x: x["instrument_specs"]["XAUUSD"].update(currency_profit="EUR"),
+        lambda x: x["instrument_specs"]["XAUUSD"].update(contract_size=0),
+        lambda x: x.update(trading_enabled=True),
+        lambda x: x.update(account_mode="REAL"),
+    ):
+        import copy
+        invalid = copy.deepcopy(snapshot)
+        mutate(invalid)
+        with pytest.raises(PortfolioSimulationError):
+            validate_broker_snapshot(invalid)
