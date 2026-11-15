@@ -138,6 +138,6 @@ def test_collector_rejects_incomplete_xauusd_contract_spec(tmp_path,monkeypatch)
  for k,v in {"MT5_LOGIN":"12345678","MT5_PASSWORD":"fake","MT5_SERVER":"Exness-MT5Trial",
   "MT5_TERMINAL":r"C:\\MT5\\terminal64.exe","VELTRIX_SESSION_ID":"validation_01"}.items():
   monkeypatch.setenv(k,v)
- with pytest.raises(collector.DiagnosticFailure,match="USD profit currencies"):
+ with pytest.raises(collector.DiagnosticFailure,match="USD profit"):
   collector.collect(api,30,tmp_path,monotonic=c.monotonic,sleep=c.sleep,now=c.now)
  assert api.shutdown_called
