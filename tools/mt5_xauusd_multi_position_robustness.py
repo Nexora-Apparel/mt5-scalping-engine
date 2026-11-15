@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -68,6 +69,15 @@ def run_robustness_sweep(
     spec = broker_snapshot.get("instrument_specs", {}).get("XAUUSD")
     if not isinstance(spec, dict):
         raise RobustnessEvaluationError("broker snapshot must contain XAUUSD instrument economics")
+    if (str(spec.get("currency_base", "")).upper() != "XAU" or
+        str(spec.get("currency_profit", "")).upper() != "USD"):
+        raise RobustnessEvaluationError("XAUUSD contract must explicitly prove XAU base and USD profit currencies")
+    try:
+        contract_size = float(spec.get("contract_size", 0))
+        if not math.isfinite(contract_size) or contract_size <= 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        raise RobustnessEvaluationError("XAUUSD contract_size must be finite and positive")
     if not isinstance(risk_config, dict) or risk_config.get("original_deposit_verified") is not True:
         raise RobustnessEvaluationError("owner-verified original-deposit risk configuration is required")
     if not slippage_grid or any(isinstance(v, bool) or not isinstance(v, int) or v < 0 for v in slippage_grid):
