@@ -32,7 +32,7 @@ def test_candidate_to_multi_position_portfolio_pipeline_end_to_end():
         "account_identity": {
             "broker": "Exness", "company": "Exness Technologies Ltd",
             "server": "Exness-MT5Trial", "account_mode": "DEMO",
-            "account_currency": "USD", "login_sha256": "d" * 64,
+            "account_currency": "USD", "login_hmac_sha256": "d" * 64,
         },
         "instrument_specs": {"XAUUSD": {
             "currency_base": "XAU", "currency_profit": "USD", "contract_size": 100.0,
