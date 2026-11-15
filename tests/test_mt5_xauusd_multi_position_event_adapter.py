@@ -97,7 +97,7 @@ def test_adapter_rejects_non_demo_or_enabled_trading():
     {"server": "Demo-Server"},
     {"account_mode": "REAL"},
     {"account_currency": "EUR"},
-    {"login_sha256": "bad"},
+    {"login_hmac_sha256": "bad"},
 ])
 def test_adapter_rejects_mismatched_account_identity(patch):
     features, candidates, broker, policy = fixture_payloads()
