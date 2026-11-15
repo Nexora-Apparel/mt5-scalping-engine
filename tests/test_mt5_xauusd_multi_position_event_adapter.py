@@ -37,6 +37,11 @@ def fixture_payloads():
     }
     broker = {
         "account_mode": "DEMO", "trading_enabled": False,
+        "account_identity": {
+            "broker": "Exness", "company": "Exness Technologies Ltd",
+            "server": "Exness-MT5Trial", "account_mode": "DEMO",
+            "account_currency": "USD", "login_sha256": "c" * 64,
+        },
         "instrument_specs": {"XAUUSD": {"point_size": 0.01, "tick_size": 0.01, "stops_level_points": 10}},
     }
     policy = {
@@ -81,6 +86,28 @@ def test_adapter_rejects_non_demo_or_enabled_trading():
     features, candidates, broker, policy = fixture_payloads()
     broker["trading_enabled"] = True
     with pytest.raises(MultiPositionAdapterError, match="DEMO"):
+        build_multi_position_events(features, candidates, broker, policy)
+
+
+@pytest.mark.parametrize("patch", [
+    {"broker": "OtherBroker"},
+    {"company": "Unrelated Markets"},
+    {"server": "Demo-Server"},
+    {"account_mode": "REAL"},
+    {"account_currency": "EUR"},
+    {"login_sha256": "bad"},
+])
+def test_adapter_rejects_mismatched_account_identity(patch):
+    features, candidates, broker, policy = fixture_payloads()
+    broker["account_identity"].update(patch)
+    with pytest.raises(MultiPositionAdapterError, match="account_identity"):
+        build_multi_position_events(features, candidates, broker, policy)
+
+
+def test_adapter_rejects_missing_account_identity():
+    features, candidates, broker, policy = fixture_payloads()
+    del broker["account_identity"]
+    with pytest.raises(MultiPositionAdapterError, match="account_identity"):
         build_multi_position_events(features, candidates, broker, policy)
 
 
