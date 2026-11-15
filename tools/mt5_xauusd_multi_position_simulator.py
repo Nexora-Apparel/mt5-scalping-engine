@@ -239,6 +239,10 @@ def simulate_portfolio(
     daily_realized_pnl = 0.0
     daily_loss_locked = False
     overall_loss_locked = ((original_deposit - equity) / original_deposit * 100.0) >= overall_loss_pct
+    daily_loss_lock_time_msc: int | None = None
+    overall_loss_lock_time_msc: int | None = ticks[0].time_msc if overall_loss_locked else None
+    max_daily_drawdown_pct = 0.0
+    max_overall_drawdown_pct = max(0.0, (original_deposit - equity) / original_deposit * 100.0)
     max_concurrent = 0
     max_open_risk = 0.0
     max_margin_used = 0.0
@@ -248,6 +252,8 @@ def simulate_portfolio(
     def advance_portfolio(to_index: int) -> tuple[float, float]:
         """Advance marked equity and loss latches over every observed quote."""
         nonlocal active, daily_realized_pnl, daily_loss_locked, overall_loss_locked
+        nonlocal daily_loss_lock_time_msc, overall_loss_lock_time_msc
+        nonlocal max_daily_drawdown_pct, max_overall_drawdown_pct
         for tick_index in range(last_processed_tick_index + 1, to_index + 1):
             tick = ticks[tick_index]
             matured = [position for position in active
@@ -265,10 +271,16 @@ def simulate_portfolio(
                 tick_value = spec["tick_value_profit"] if signed_delta >= 0 else spec["tick_value_loss"]
                 unrealized += (signed_delta / spec["tick_size"]) * tick_value * position["volume"]
             marked = equity + daily_realized_pnl + unrealized
-            if max(0.0, (equity - marked) / equity * 100.0) >= daily_loss_pct:
+            daily_drawdown = max(0.0, (equity - marked) / equity * 100.0)
+            overall_drawdown = max(0.0, (original_deposit - marked) / original_deposit * 100.0)
+            max_daily_drawdown_pct = max(max_daily_drawdown_pct, daily_drawdown)
+            max_overall_drawdown_pct = max(max_overall_drawdown_pct, overall_drawdown)
+            if daily_drawdown >= daily_loss_pct and not daily_loss_locked:
                 daily_loss_locked = True
-            if max(0.0, (original_deposit - marked) / original_deposit * 100.0) >= overall_loss_pct:
+                daily_loss_lock_time_msc = tick.time_msc
+            if overall_drawdown >= overall_loss_pct and not overall_loss_locked:
                 overall_loss_locked = True
+                overall_loss_lock_time_msc = tick.time_msc
 
         # Recompute at the requested quote even when multiple signals share it.
         tick = ticks[to_index]
@@ -460,9 +472,13 @@ def simulate_portfolio(
             "daily_realized_gross_pnl_money": round(daily_realized_pnl, 8),
             "daily_unrealized_gross_pnl_money": round(final_unrealized, 8),
             "daily_drawdown_percent_at_end": round(final_daily_drawdown_pct, 8),
+            "max_daily_drawdown_percent_observed": round(max_daily_drawdown_pct, 8),
             "daily_loss_locked": daily_loss_locked,
+            "daily_loss_lock_time_msc": daily_loss_lock_time_msc,
             "overall_drawdown_percent_at_end": round(final_overall_drawdown_pct, 8),
+            "max_overall_drawdown_percent_observed": round(max_overall_drawdown_pct, 8),
             "overall_loss_locked": overall_loss_locked,
+            "overall_loss_lock_time_msc": overall_loss_lock_time_msc,
         },
         "trades": trades,
         "limitations": [
