@@ -75,7 +75,7 @@
       "isolation": "one candidate and one portfolio configuration per replay",
       "net_pnl_allowed": false,
       "final_holdout_eligible": false,
-      "validation": "PENDING_IDENTITY_CONTRACT_CI"
+      "validation": "PYTHON_CI_327_PASS_RUN_43702949184"
     },
     "broker_identity_contract": {
       "required_fields": [
