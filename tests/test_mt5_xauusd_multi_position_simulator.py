@@ -192,3 +192,41 @@ def test_tick_value_contract_economics_are_required():
     bad_spec = {key: value for key, value in SPEC.items() if key != "tick_value_profit"}
     with pytest.raises(PortfolioSimulationError, match="tick_value_profit"):
         simulate_portfolio(ticks(), [ev("p1", 1000)], bad_spec, RISK)
+
+
+@pytest.mark.parametrize(
+    ("limit_key", "expected_status", "summary_key"),
+    [
+        ("max_daily_loss_percent", "REJECTED_DAILY_LOSS_LOCK", "daily_loss_locked"),
+        ("max_overall_account_loss_percent", "REJECTED_OVERALL_LOSS_LOCK", "overall_loss_locked"),
+    ],
+)
+def test_transient_intraday_floating_breach_latches_before_equity_recovers(
+    limit_key, expected_status, summary_key
+):
+    stream = [
+        PortfolioTick(1000, 100.00, 100.02),
+        PortfolioTick(1100, 100.00, 100.02),
+        PortfolioTick(2000, 99.90, 99.92),  # temporary floating loss breaches 0.01%
+        PortfolioTick(3000, 100.00, 100.02),  # equity recovers before the next signal
+        PortfolioTick(4000, 100.00, 100.02),
+        PortfolioTick(6000, 100.00, 100.02),
+        PortfolioTick(8000, 100.00, 100.02),
+        PortfolioTick(10000, 100.00, 100.02),
+        PortfolioTick(11100, 100.00, 100.02),
+        PortfolioTick(12000, 100.00, 100.02),
+    ]
+    risk = {**RISK, "risk_per_trade_percent": 0.10, "max_portfolio_risk_percent": 0.50}
+    risk[limit_key] = 0.01
+    result = simulate_portfolio(
+        stream,
+        [ev("breach-position", 1000, stop=1.0, target=1.0),
+         ev("after-recovery", 3000, stop=1.0, target=1.0)],
+        SPEC,
+        risk,
+    )
+    assert result["trades"][0]["status"] == "TIME_STOP"
+    assert result["trades"][1]["status"] == expected_status
+    assert result["summary"][summary_key] is True
+    assert result["summary"]["daily_drawdown_percent_at_end"] < 0.01
+    assert result["summary"]["overall_drawdown_percent_at_end"] < 0.01
