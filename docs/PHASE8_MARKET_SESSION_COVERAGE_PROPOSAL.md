@@ -37,6 +37,23 @@ A derived session-coverage report should:
 5. Keep raw CSV and original manifest immutable. Store classifications in a separate derived report that records source artifact IDs, source CSV SHA-256, classifier version, timezone database version, and generation timestamp.
 6. Never infer missing market data from a session label; a label only describes when a quote was observed.
 
+## Implemented supplemental reporter
+
+A standalone, offline reporter now exists at `tools/mt5_xauusd_market_session_coverage.py`, with regression tests in `tests/test_mt5_xauusd_market_session_coverage.py`.
+
+Example invocation against an already-downloaded collection artifact:
+
+```bash
+python -m tools.mt5_xauusd_market_session_coverage \
+  --manifest path/to/manifest.json \
+  --csv path/to/veltrix_exness_demo_ticks.csv \
+  --output path/to/market_session_coverage.json
+```
+
+The reporter verifies the source CSV SHA-256 against the manifest, checks XAUUSD identity, requires timezone-aware timestamps and monotonic tick order, reconciles `time_msc` with `time_utc`, and writes a separate JSON report. It records session counts, first/last ticks, actual collection-window intersection duration, source artifact/run identifiers when present, classifier version, and timezone database version. It never edits the source files or the intake catalog.
+
+Regression coverage includes November standard-time windows, the UK/US daylight-saving mismatch, hash mismatch, naive timestamps, non-monotonic input, and inconsistent epoch/ISO timestamps. These tests are authored but must still pass CI on the current PR head before the utility is treated as verified.
+
 ## Suggested coverage rule for review
 
 If adopted, require at least 30 continuous minutes of actual collected data in each of the four labels across the validation evidence set. Count elapsed collection-window intersection, not merely tick count. A single collection may contribute to multiple labels only where its UTC interval genuinely intersects them. Report gaps and excluded/off-hours intervals explicitly.
