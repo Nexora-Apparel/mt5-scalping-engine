@@ -90,3 +90,16 @@ Bid/ask values vary. Tick flag 6 is consistent with bid/ask update flags; zero l
 The official Exness MT5 download page links its Windows installer directly to the `download.terminal.free` host, and its download link resolves to the same Exness-specific path observed in this workflow. This establishes that the host/path is linked from the official Exness download page; it reduces the earlier concern that the hostname was an unrelated third-party source.
 
 It does **not** establish the authenticity or integrity of the particular installer bytes used by the GitHub runner. The workflow still lacks recorded Authenticode verification (valid signature, expected publisher, and certificate chain at download time) and a pinned independently trusted binary hash. Keep binary-level verification open until those checks are captured. The official page reference is https://www.exness.com/metatrader-5/ (download link labelled “Download MetaTrader 5”).
+
+
+## Follow-up analysis — why raw tick and quote-cycle spread summaries differ (2026-11-16)
+
+The collector source was inspected to identify the two measurement paths:
+
+- Every collector loop calls `validate_quote(...)` and appends the returned `spread_points` to `spread_samples`. `validate_quote` obtains the latest snapshot through `mt5.symbol_info_tick(symbol)`.
+- Separately, `_collect_symbol_ticks(...)` retrieves the tick stream through `mt5.copy_ticks_from(..., COPY_TICKS_ALL)`; the final CSV is built from those tick records.
+- The loop sleeps for up to one second between quote snapshots. The raw tick stream can contain additional intermediate quote updates that are not represented in the periodic validation-snapshot sample.
+
+Therefore the 1,798-cycle manifest spread summary and the 11,537-row raw-tick spread distribution are **different sampling populations**, not duplicate calculations over the same rows. The raw CSV independently confirms 11,536 observations at 240 points and one observation at 260 points (2026-11-16 06:20:25.248 UTC). The manifest's 1,798 quote snapshots report 240 points throughout. This is consistent with a short-lived wider raw tick occurring between periodic quote snapshots, but the existing manifest does not retain each quote snapshot's timestamp and bid/ask, so the precise correspondence cannot be proven retrospectively.
+
+**Disposition:** classify the difference as an explained sampling-scope difference, while retaining the 260-point raw observation as genuine spread-distribution evidence. It is not evidence of CSV corruption or a hash mismatch. For future collections, retain each quote-validation snapshot (UTC timestamp, bid, ask, point size, spread points, and quote age) in a separate immutable artifact so periodic risk-gate observations can be reconciled directly against the full tick stream. Do not remove or normalize the 260-point tick.
