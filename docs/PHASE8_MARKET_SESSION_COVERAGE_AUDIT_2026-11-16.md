@@ -56,3 +56,12 @@ The missing coverage is New York and the London–New York overlap. A future sup
 ## Limitations
 
 This audit does not establish representative liquidity, executable spread, commission, slippage, latency, profitable strategy behaviour, or certification. The separate raw-spread discrepancy and installer provenance review items remain open. No orders were submitted or managed.
+
+
+## validation_05 targeting recommendation — 2026-11-17
+
+The next eligible validation date can also close the remaining market-session coverage gap; a separate supplemental collection is not inherently necessary. For 17 November 2026, the UK is on GMT (UTC+0) and New York is on EST (UTC-5). Under the documented local windows (London 08:00–17:00 and New York 08:00–17:00), their overlap is 13:00–17:00 UTC.
+
+**Recommended validation_05 window:** 2026-11-17 13:30–14:00 UTC (14:30–15:00 WAT). This is a 30-minute collection wholly inside both the New York proxy and London–New York overlap, on a UTC date distinct from validation_01 (13 Nov), validation_03 (15 Nov), and validation_04 (16 Nov). It preserves the four-date intake policy while targeting the actual evidence gap. It does not guarantee market representativeness or certify execution quality.
+
+This is a scheduling recommendation, not a dispatched or completed collection. The GitHub workflow still requires manual dispatch by the repository owner. If market hours, broker availability, or current session conditions differ, record the actual UTC start/end times and classify the observed window; do not backdate or relabel it.
