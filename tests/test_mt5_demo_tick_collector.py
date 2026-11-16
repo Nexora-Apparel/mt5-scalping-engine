@@ -1,4 +1,4 @@
-import csv,importlib.util
+import csv,hashlib,importlib.util,json
 from datetime import datetime,timedelta,timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -70,6 +70,15 @@ def test_full_collector_records_only_gold_and_passes_integrity(tmp_path,monkeypa
  assert set(m["symbols"])=={"XAUUSD"} and set(m["streams"])=={"XAUUSD"}
  assert m["streams"]["XAUUSD"]["records"]==1802
  assert (tmp_path/"manifest.json").is_file() and (tmp_path/"veltrix_exness_demo_ticks.csv").is_file()
+ quote_path=tmp_path/"quote_validation_samples.csv"
+ assert quote_path.is_file()
+ quote_rows=list(csv.DictReader(quote_path.open(encoding="utf-8",newline="")))
+ quote_meta=m["quote_validation_dataset"]
+ assert quote_meta["records"]==m["quote_validation_cycles"]==len(quote_rows)
+ assert quote_meta["sha256"]==hashlib.sha256(quote_path.read_bytes()).hexdigest()
+ assert all(row["canonical_symbol"]=="XAUUSD" for row in quote_rows)
+ assert all(float(row["spread_points"])==20.0 for row in quote_rows)
+ assert all(row["observed_at_utc"] and row["quote_time_utc"] for row in quote_rows)
 
 def test_collector_rejects_unregistered_validation_session_before_mt5_initialize(monkeypatch):
  monkeypatch.setenv("VELTRIX_SESSION_ID","holdout_01")
