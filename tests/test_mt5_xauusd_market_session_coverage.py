@@ -108,3 +108,16 @@ def test_rejects_mismatched_epoch_and_iso_timestamp(tmp_path):
     manifest["sha256"] = hashlib.sha256(csv_path.read_bytes()).hexdigest()
     with pytest.raises(SessionCoverageError, match="disagree"):
         build_report(manifest, csv_path)
+
+
+
+def test_records_external_source_artifact_and_workflow_provenance(tmp_path):
+    manifest, csv_path = make_source(tmp_path, ["2026-11-16T13:30:00Z"])
+    report = build_report(
+        manifest,
+        csv_path,
+        source_artifact_id="14203352046",
+        workflow_run_id="43814840356",
+    )
+    assert report["source"]["source_artifact_id"] == "14203352046"
+    assert report["source"]["workflow_run_id"] == "43814840356"
