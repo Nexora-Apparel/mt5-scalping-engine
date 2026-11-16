@@ -84,3 +84,9 @@ Bid/ask values vary. Tick flag 6 is consistent with bid/ask update flags; zero l
 3. Verify installer Authenticode publisher/signature and trusted provenance before marking runner software verified.
 4. Obtain independent commission evidence and preserve the signed reviewer attestation and out-of-band trusted public-key fingerprint.
 5. Run strict four-session intake only when validation_01, validation_03, validation_04, and validation_05 are all present and pass the date and evidence gates.
+
+## Follow-up provenance check (2026-11-16)
+
+The official Exness MT5 download page links its Windows installer directly to the `download.terminal.free` host, and its download link resolves to the same Exness-specific path observed in this workflow. This establishes that the host/path is linked from the official Exness download page; it reduces the earlier concern that the hostname was an unrelated third-party source.
+
+It does **not** establish the authenticity or integrity of the particular installer bytes used by the GitHub runner. The workflow still lacks recorded Authenticode verification (valid signature, expected publisher, and certificate chain at download time) and a pinned independently trusted binary hash. Keep binary-level verification open until those checks are captured. The official page reference is https://www.exness.com/metatrader-5/ (download link labelled “Download MetaTrader 5”).
