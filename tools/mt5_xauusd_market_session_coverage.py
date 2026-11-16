@@ -190,6 +190,8 @@ def build_report(manifest: dict[str, Any], csv_path: Path) -> dict[str, Any]:
         "generated_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "source": {
             "session_id": manifest.get("session_id"),
+            "source_artifact_id": manifest.get("artifact_id"),
+            "workflow_run_id": manifest.get("workflow_run_id"),
             "canonical_symbol": "XAUUSD",
             "collection_started_utc": start.isoformat().replace("+00:00", "Z"),
             "collection_ended_utc": end.isoformat().replace("+00:00", "Z"),
