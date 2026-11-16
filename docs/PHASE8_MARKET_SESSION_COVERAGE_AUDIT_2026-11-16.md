@@ -27,6 +27,8 @@ Intervals are start-inclusive/end-exclusive. UTC remains the canonical stored ti
 
 All three hashes matched their respective manifests.
 
+Derived machine-readable output for `validation_04` is stored at `research/session-artifacts/validation_04_market_session_coverage.json`. It binds the original CSV SHA-256, workflow run `43814840356`, and tick artifact `14203352046`; the original source CSV and manifest remain unchanged.
+
 ## Tick classification
 
 | Session | Asian | London | New York | London–New York overlap |
