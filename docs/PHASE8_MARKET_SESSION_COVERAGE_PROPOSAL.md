@@ -64,11 +64,11 @@ This 30-minute-per-label rule is a proposal for owner review. It is not currentl
 
 | Session | UTC window | Classification under this proposal |
 |---|---|---|
-| validation_01 | 2026-11-13 21:20:04–21:50:06 | New York (16:20–16:50 EST) |
+| validation_01 | 2026-11-13 10:23:27–10:53:29 | London (10:23–10:53 GMT) |
 | validation_03 | 2026-11-15 23:14:45–23:44:47 | Outside proposed windows (18:14–18:44 EST; post-New York window) |
 | validation_04 | 2026-11-16 06:10:18–06:40:20 | Asian (15:10–15:40 JST) |
 
-The current evidence therefore contains Asian and New York coverage under this proposed taxonomy, but no dedicated London or London–New York overlap collection. `validation_03` must not be counted as New York-session coverage under the stated 08:00–17:00 New York local definition.
+Independent raw-artifact review corrected the earlier `validation_01` window transcription: it is 10:23–10:53 UTC, not 21:20–21:50 UTC. All three raw CSV hashes match their manifests. Reclassification of every tick under the stated IANA windows gives: `validation_01` — 3,857/3,857 London ticks; `validation_03` — 0 ticks in all four labels; `validation_04` — 11,537/11,537 Asian ticks. Across the three artifacts, London and Asian are represented; New York and London–New York overlap are not. `validation_03` is outside all proposed windows and must not be counted as New York-session coverage.
 
 ## Safety and scope
 
@@ -76,3 +76,16 @@ The current evidence therefore contains Asian and New York coverage under this p
 - No edits to historical raw ticks or manifests.
 - No strategy scoring, parameter tuning, candidate freeze, holdout access, or performance certification.
 - Collector remains Exness DEMO, XAUUSD-only, manual, read-only, with trading and DLL imports disabled.
+
+
+## Independent raw-artifact reclassification — 2026-11-16
+
+The three eligible validation artifacts were downloaded from their original GitHub Actions runs and independently parsed. Each CSV SHA-256 matched its corresponding manifest.
+
+| Session | UTC window | Raw ticks | Asian ticks | London ticks | New York ticks | Overlap ticks |
+|---|---|---:|---:|---:|---:|---:|
+| validation_01 | 13 Nov 10:23:27–10:53:29 | 3,857 | 0 | 3,857 | 0 | 0 |
+| validation_03 | 15 Nov 23:14:45–23:44:47 | 4,035 | 0 | 0 | 0 | 0 |
+| validation_04 | 16 Nov 06:10:18–06:40:20 | 11,537 | 11,537 | 0 | 0 | 0 |
+
+Classification uses the proposal's 09:00–18:00 Tokyo, 08:00–17:00 London, and 08:00–17:00 New York local windows with IANA timezone conversion. Tick labels are descriptive only. These counts do not prove spread representativeness, trade execution quality, or strategy performance.
