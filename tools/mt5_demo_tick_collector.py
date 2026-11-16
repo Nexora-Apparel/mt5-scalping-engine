@@ -334,7 +334,7 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
             "bid", "ask", "point", "spread_points", "quote_age_ms",
         ]
         with quote_csv_path.open("w", encoding="utf-8", newline="") as handle:
-            writer = csv.DictWriter(handle, fieldnames=quote_header, lineterminator="\\n")
+            writer = csv.DictWriter(handle, fieldnames=quote_header, lineterminator="\n")
             writer.writeheader()
             writer.writerows(quote_sample_rows)
             handle.flush()
