@@ -47,12 +47,12 @@ Example invocation against an already-downloaded collection artifact:
 python -m tools.mt5_xauusd_market_session_coverage \
   --manifest path/to/manifest.json \
   --csv path/to/veltrix_exness_demo_ticks.csv \
-  --output path/to/market_session_coverage.json
+  --output path/to/market_session_coverage.json \\\n  --source-artifact-id 14203352046 \\\n  --workflow-run-id 43814840356
 ```
 
 The reporter verifies the source CSV SHA-256 against the manifest, checks XAUUSD identity, requires timezone-aware timestamps and monotonic tick order, reconciles `time_msc` with `time_utc`, and writes a separate JSON report. It records session counts, first/last ticks, actual collection-window intersection duration, source artifact/run identifiers when present, classifier version, and timezone database version. It never edits the source files or the intake catalog.
 
-Regression coverage includes November standard-time windows, the UK/US daylight-saving mismatch, hash mismatch, naive timestamps, non-monotonic input, and inconsistent epoch/ISO timestamps. These tests are authored but must still pass CI on the current PR head before the utility is treated as verified.
+Regression coverage includes November standard-time windows, the UK/US daylight-saving mismatch, hash mismatch, naive timestamps, non-monotonic input, inconsistent epoch/ISO timestamps, and explicit artifact/run provenance. CI on PR #61 HEAD `6ad986610dfd1d490aa3d8934115519e6f3db18a` passed: 241 tests, Python compilation, and shell syntax validation. A subsequent provenance enhancement adds a seventh reporter test and requires a fresh CI run before that latest revision is treated as verified.
 
 ## Suggested coverage rule for review
 
