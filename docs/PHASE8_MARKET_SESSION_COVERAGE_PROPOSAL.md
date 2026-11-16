@@ -91,3 +91,8 @@ The three eligible validation artifacts were downloaded from their original GitH
 | validation_04 | 16 Nov 06:10:18–06:40:20 | 11,537 | 11,537 | 0 | 0 | 0 |
 
 Classification uses the proposal's 09:00–18:00 Tokyo, 08:00–17:00 London, and 08:00–17:00 New York local windows with IANA timezone conversion. Tick labels are descriptive only. These counts do not prove spread representativeness, trade execution quality, or strategy performance.
+
+
+## Forward collector evidence improvement
+
+The read-only collector now persists its periodic quote-validation snapshots in a separate `quote_validation_samples.csv` artifact. The manifest records the snapshot artifact filename, record count, byte count, and SHA-256. Each row carries both the collector observation time and the underlying MT5 quote timestamp, plus bid/ask, point size, spread points, and quote age. This separates risk-gate sampling from the full tick stream and makes future spread reconciliation reproducible. The historical validation_04 artifact remains unchanged; the new file applies to future collections only and is pending CI verification on the current PR head.
