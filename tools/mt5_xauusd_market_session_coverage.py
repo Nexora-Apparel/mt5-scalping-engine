@@ -97,7 +97,13 @@ def _tzdb_version() -> str:
         return "system-zoneinfo-unknown-version"
 
 
-def build_report(\n    manifest: dict[str, Any],\n    csv_path: Path,\n    *,\n    source_artifact_id: str | None = None,\n    workflow_run_id: str | None = None,\n) -> dict[str, Any]:
+def build_report(
+    manifest: dict[str, Any],
+    csv_path: Path,
+    *,
+    source_artifact_id: str | None = None,
+    workflow_run_id: str | None = None,
+) -> dict[str, Any]:
     if not isinstance(manifest, dict):
         raise SessionCoverageError("manifest must be a JSON object")
     if manifest.get("canonical_symbol", "XAUUSD") != "XAUUSD":
@@ -214,11 +220,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", required=True, type=Path)
     parser.add_argument("--csv", required=True, type=Path)
-    parser.add_argument("--output", required=True, type=Path)\n    parser.add_argument("--source-artifact-id")\n    parser.add_argument("--workflow-run-id")
+    parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--source-artifact-id")
+    parser.add_argument("--workflow-run-id")
     args = parser.parse_args()
     try:
         manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
-        report = build_report(\n            manifest,\n            args.csv,\n            source_artifact_id=args.source_artifact_id,\n            workflow_run_id=args.workflow_run_id,\n        )
+        report = build_report(
+            manifest,
+            args.csv,
+            source_artifact_id=args.source_artifact_id,
+            workflow_run_id=args.workflow_run_id,
+        )
     except (OSError, json.JSONDecodeError, SessionCoverageError) as exc:
         parser.exit(2, f"SESSION COVERAGE REPORT BLOCKED: {exc}\n")
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
