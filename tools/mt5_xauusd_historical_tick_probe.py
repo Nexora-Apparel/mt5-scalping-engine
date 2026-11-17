@@ -59,6 +59,7 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
         records = 0
         first_msc = last_msc = None
         previous = None
+        seen = set()
         with csv_path.open("w", encoding="utf-8", newline="") as handle:
             writer = csv.DictWriter(handle, fieldnames=FIELDS, lineterminator="\\n")
             writer.writeheader()
@@ -84,6 +85,10 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
                         raise DiagnosticFailure("historical tick timestamps moved backwards")
                     previous = stamp
                     newest = stamp if newest is None else max(newest, stamp)
+                    key = (stamp, bid, ask, last, volume, volume_real, flags)
+                    if key in seen:
+                        continue
+                    seen.add(key)
                     first_msc = stamp if first_msc is None else min(first_msc, stamp)
                     last_msc = stamp if last_msc is None else max(last_msc, stamp)
                     writer.writerow({"schema_version":"1","source_id":"exness_mt5_demo_historical",
