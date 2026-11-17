@@ -212,20 +212,21 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
 
             if not records_by_key:
                 raise DiagnosticFailure("no historical ticks returned for requested interval")
+            dataset_audit = audit_ticks(partial_path)
+            dataset_audit["dataset"] = csv_path.name
             partial_path.replace(csv_path)
         except Exception:
             if partial_path.exists():
                 partial_path.unlink()
             raise
 
-        dataset_audit = audit_ticks(csv_path)
         digest = dataset_audit["sha256"]
         ordered_stamps = [row["time_msc"] for row in records_by_key.values()]
         manifest = {
             "schema": "VELTRIX_XAUUSD_HISTORICAL_TICK_PROBE_V2",
             "status": "PASS",
             "source": "authenticated Exness MT5 DEMO terminal historical tick API",
-            "source_ref": os.environ.get("GITHUB_REF_NAME", "phase8-distinct-validation-date-guard"),
+            "source_ref": os.environ.get("VELTRIX_SOURCE_REF", "phase8-distinct-validation-date-guard"),
             "source_commit": os.environ.get("VELTRIX_SOURCE_COMMIT"),
             "dispatcher_commit": os.environ.get("GITHUB_SHA"),
             "installer_signer_thumbprint": os.environ.get("MT5_INSTALLER_SIGNER_THUMBPRINT"),
