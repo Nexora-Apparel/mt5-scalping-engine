@@ -39,6 +39,11 @@ def emit(event: str, **fields: Any) -> None:
     print(json.dumps({"event": event, **fields}, sort_keys=True), flush=True)
 
 
+def _masked_login(value: Any) -> str:
+    digits = str(value)
+    return ("*" * max(4, len(digits) - 4) + digits[-4:]) if digits else "[missing]"
+
+
 def validate_account(mt5: Any, expected_login: int, expected_server: str) -> dict[str, Any]:
     terminal = mt5.terminal_info()
     if terminal is None:
@@ -56,7 +61,11 @@ def validate_account(mt5: Any, expected_login: int, expected_server: str) -> dic
     server_match = str(account.server) == expected_server
     trade_mode = int(account.trade_mode)
     if not login_match:
-        raise DiagnosticFailure("connected account login does not match configured login")
+        raise DiagnosticFailure(
+            "connected account login mismatch "
+            f"(configured={_masked_login(expected_login)}, observed={_masked_login(account.login)}, "
+            f"server_match={server_match}); refusing collection"
+        )
     if trade_mode != DEMO_TRADE_MODE:
         raise DiagnosticFailure(f"account trade mode is not DEMO (observed={trade_mode})")
     if not server_match:
@@ -66,6 +75,35 @@ def validate_account(mt5: Any, expected_login: int, expected_server: str) -> dic
         "login_match": login_match, "server_match": server_match, "trade_mode": trade_mode,
         "company": str(getattr(account, "company", "")),
     }
+
+
+def connect_expected_account(mt5: Any, expected_login: int, password: str,
+                             expected_server: str) -> dict[str, Any]:
+    """Explicitly log in if initialize attached to a different terminal account."""
+    terminal = mt5.terminal_info()
+    if terminal is None or not bool(getattr(terminal, "connected", False)):
+        raise DiagnosticFailure("terminal is not connected to a trade server")
+    if bool(getattr(terminal, "trade_allowed", True)):
+        raise DiagnosticFailure("terminal trading permission is enabled; read-only guard requires it disabled")
+    if bool(getattr(terminal, "dlls_allowed", True)):
+        raise DiagnosticFailure("terminal DLL imports are enabled; read-only guard requires it disabled")
+    account = mt5.account_info()
+    if account is None:
+        raise DiagnosticFailure(f"account_info unavailable; last_error={mt5.last_error()}")
+    if int(account.login) != expected_login or str(account.server) != expected_server:
+        login_ok = mt5.login(expected_login, password=password, server=expected_server, timeout=120_000)
+        if not login_ok:
+            refreshed = mt5.account_info()
+            observed = getattr(refreshed, "login", "unknown") if refreshed is not None else "unknown"
+            observed_server = getattr(refreshed, "server", "") if refreshed is not None else ""
+            raise DiagnosticFailure(
+                "explicit MT5 login failed; "
+                f"configured_login={_masked_login(expected_login)}, "
+                f"observed_login={_masked_login(observed)}, "
+                f"server_match={str(observed_server) == expected_server}, "
+                f"last_error={mt5.last_error()}; verify the three GitHub Actions MT5 secrets"
+            )
+    return validate_account(mt5, expected_login, expected_server)
 
 
 def _symbol_name(item: Any) -> str:
@@ -153,7 +191,7 @@ def run_diagnostic(mt5: Any, config: DiagnosticConfig, *, emit_fn: Callable[...,
                           server=config.server, timeout=120_000, portable=True):
         raise DiagnosticFailure(f"MT5 initialize failed; last_error={mt5.last_error()}")
     try:
-        identity = validate_account(mt5, config.login, config.server)
+        identity = connect_expected_account(mt5, config.login, config.password, config.server)
         emit_fn("ACCOUNT_VERIFIED", **identity)
         resolved = {"XAUUSD": discover_symbol(mt5, "XAUUSD")}
         emit_fn("SYMBOLS_RESOLVED", symbols=resolved)
