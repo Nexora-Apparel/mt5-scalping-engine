@@ -105,8 +105,12 @@ def test_probe_retrieves_non_overlapping_chunks_and_writes_verified_csv(
     assert result["position_management"] is False
     assert result["chunks_requested"] == 3
     assert len(api.calls) == 3
-    assert api.calls[0][1] + timedelta(milliseconds=1) == api.calls[1][0]
-    assert api.calls[1][1] + timedelta(milliseconds=1) == api.calls[2][0]
+    assert api.calls[0][0] < start
+    assert api.calls[0][1] > start + timedelta(minutes=1) - timedelta(milliseconds=1)
+    assert api.calls[1][0] < start + timedelta(minutes=1)
+    assert api.calls[1][1] > start + timedelta(minutes=2) - timedelta(milliseconds=1)
+    assert api.calls[2][0] < end
+    assert api.calls[2][1] > end
 
     csv_path = tmp_path / result["csv_file"]
     raw = csv_path.read_bytes()
@@ -220,6 +224,41 @@ def test_probe_stops_on_broker_api_error_and_shuts_down(tmp_path, demo_guards):
     api = FailedAPI()
     with pytest.raises(probe_module.DiagnosticFailure, match="historical tick request failed"):
         probe_module.probe(api, start, start + timedelta(seconds=1), tmp_path)
+
+    assert api.shutdown_called
+    assert not (tmp_path / "xauusd_historical_ticks.csv").exists()
+
+
+
+def test_probe_filters_mt5_boundary_spill_but_keeps_exact_requested_window(
+    tmp_path, demo_guards
+):
+    start = datetime(2026, 11, 17, 13, 50, 0, 282000, tzinfo=timezone.utc)
+    end = start + timedelta(seconds=30)
+    before = ms(start) - 145
+    inside = ms(start)
+    after = ms(end) + 120
+    api = FakeHistoricalMT5([[
+        tick(before), tick(inside), tick(after)
+    ]])
+
+    result = probe_module.probe(api, start, end, tmp_path)
+
+    with (tmp_path / result["csv_file"]).open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert [int(row["time_msc"]) for row in rows] == [inside]
+    assert result["records"] == 1
+    assert result["chunks"][0]["discarded_guard_band_records"] == 2
+    assert result["mt5_query_boundary_padding_milliseconds"] == 2000
+
+
+def test_probe_rejects_ticks_beyond_mt5_guard_band(tmp_path, demo_guards):
+    start = datetime(2026, 11, 13, 9, tzinfo=timezone.utc)
+    far_outside = ms(start) - probe_module.RANGE_PADDING_MILLISECONDS - 1
+    api = FakeHistoricalMT5([[tick(far_outside)]])
+
+    with pytest.raises(probe_module.DiagnosticFailure, match="outside the requested UTC interval"):
+        probe_module.probe(api, start, start + timedelta(seconds=30), tmp_path)
 
     assert api.shutdown_called
     assert not (tmp_path / "xauusd_historical_ticks.csv").exists()
