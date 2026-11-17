@@ -32,6 +32,9 @@ FIELDS = [
     "volume_real", "flags",
 ]
 CHUNK_MILLISECONDS = 60_000
+# MT5 may return adjacent ticks around datetime range boundaries. Query a
+# bounded guard band, then retain only ticks inside the exact requested window.
+RANGE_PADDING_MILLISECONDS = 2_000
 
 
 def parse_utc(value: str) -> datetime:
@@ -153,10 +156,14 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
                 while cursor_ms <= end_ms:
                     chunk_end_ms = min(cursor_ms + CHUNK_MILLISECONDS - 1, end_ms)
                     validate_account(mt5, login, server)
+                    query_start_ms = max(0, cursor_ms - RANGE_PADDING_MILLISECONDS)
+                    query_end_ms = chunk_end_ms + RANGE_PADDING_MILLISECONDS
                     chunk_start = datetime.fromtimestamp(cursor_ms / 1000, tz=timezone.utc)
                     chunk_end = datetime.fromtimestamp(chunk_end_ms / 1000, tz=timezone.utc)
+                    query_start = datetime.fromtimestamp(query_start_ms / 1000, tz=timezone.utc)
+                    query_end = datetime.fromtimestamp(query_end_ms / 1000, tz=timezone.utc)
                     batch = mt5.copy_ticks_range(
-                        broker_symbol, chunk_start, chunk_end, mt5.COPY_TICKS_ALL
+                        broker_symbol, query_start, query_end, mt5.COPY_TICKS_ALL
                     )
                     if batch is None:
                         raise DiagnosticFailure(
@@ -165,16 +172,22 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
                             f"chunk={chunk_start.isoformat()}..{chunk_end.isoformat()}"
                         )
 
-                    chunk_rows = [
-                        _normalize_tick(tick, cursor_ms, chunk_end_ms) for tick in batch
+                    query_rows = [
+                        _normalize_tick(tick, query_start_ms, query_end_ms) for tick in batch
                     ]
-                    # MT5 returns chronological records. Reject a broken source
-                    # sequence rather than silently sorting away an integrity fault.
+                    # Check provider ordering before filtering. MT5 can return a
+                    # small number of adjacent boundary ticks outside the exact
+                    # requested interval; these are expected guard-band records,
+                    # not data to publish. Never widen the accepted dataset.
                     if any(
-                        chunk_rows[index]["time_msc"] < chunk_rows[index - 1]["time_msc"]
-                        for index in range(1, len(chunk_rows))
+                        query_rows[index]["time_msc"] < query_rows[index - 1]["time_msc"]
+                        for index in range(1, len(query_rows))
                     ):
                         raise DiagnosticFailure("historical tick timestamps moved backwards within a chunk")
+                    chunk_rows = [
+                        row for row in query_rows
+                        if cursor_ms <= row["time_msc"] <= chunk_end_ms
+                    ]
                     for row in chunk_rows:
                         key = (
                             row["time_msc"], row["bid"], row["ask"], row["last"],
@@ -185,7 +198,10 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
                     chunks.append({
                         "start_utc": chunk_start.isoformat(),
                         "end_utc": chunk_end.isoformat(),
+                        "query_start_utc": query_start.isoformat(),
+                        "query_end_utc": query_end.isoformat(),
                         "returned_records": len(batch),
+                        "discarded_guard_band_records": len(query_rows) - len(chunk_rows),
                         "unique_records": len({
                             (
                                 row["time_msc"], row["bid"], row["ask"], row["last"],
@@ -248,6 +264,8 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
             "requested_end_utc": datetime.fromtimestamp(end_ms / 1000, tz=timezone.utc).isoformat(),
             "interval_semantics": "inclusive UTC millisecond bounds",
             "retrieval_chunk_milliseconds": CHUNK_MILLISECONDS,
+            "mt5_query_boundary_padding_milliseconds": RANGE_PADDING_MILLISECONDS,
+            "published_interval_filter": "inclusive exact requested UTC millisecond bounds; guard-band records excluded",
             "chunks_requested": len(chunks),
             "chunks": chunks,
             "records": len(records_by_key),
