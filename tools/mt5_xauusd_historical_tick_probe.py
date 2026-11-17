@@ -77,9 +77,17 @@ def _normalize_tick(tick: Any, start_ms: int, end_ms: int) -> dict[str, Any]:
     except (TypeError, ValueError, OverflowError) as exc:
         raise DiagnosticFailure("historical feed returned a malformed tick field") from exc
 
+    if stamp <= 0:
+        raise DiagnosticFailure(f"historical feed returned invalid timestamp: {stamp}")
     if stamp < start_ms or stamp > end_ms:
-        raise DiagnosticFailure("historical API returned a tick outside the requested UTC interval")
-    if stamp <= 0 or not all(math.isfinite(v) for v in (bid, ask, last, volume, volume_real)):
+        raise DiagnosticFailure(
+            "historical API returned a tick outside the requested UTC interval; "
+            f"tick={utc_iso(stamp)} ({stamp} ms); "
+            f"delta_from_start_ms={stamp - start_ms}; "
+            f"delta_from_end_ms={stamp - end_ms}; "
+            f"requested={utc_iso(start_ms)}..{utc_iso(end_ms)}"
+        )
+    if not all(math.isfinite(v) for v in (bid, ask, last, volume, volume_real)):
         raise DiagnosticFailure("historical feed returned non-finite or invalid tick values")
     if bid <= 0 or ask < bid or volume < 0 or volume_real < 0:
         raise DiagnosticFailure("historical feed returned invalid bid/ask/volume values")
