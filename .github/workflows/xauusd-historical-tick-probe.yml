@@ -1,0 +1,115 @@
+name: VELTRIX Exness DEMO historical XAUUSD tick probe
+run-name: VELTRIX historical XAUUSD probe (${{ inputs.from_utc }} to ${{ inputs.to_utc }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_utc:
+        description: Historical interval start (ISO-8601 UTC, e.g. 2026-11-13T09:00:00Z)
+        required: true
+        type: string
+      to_utc:
+        description: Historical interval end (ISO-8601 UTC)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: veltrix-xauusd-historical-probe
+  cancel-in-progress: false
+
+jobs:
+  historical-probe:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Validate credentials without printing them
+        shell: pwsh
+        env:
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (!$env:MT5_LOGIN -or $env:MT5_LOGIN -notmatch '^\d+$') { throw "MT5_LOGIN is missing or invalid." }
+          if (!$env:MT5_PASSWORD -or !$env:MT5_SERVER) { throw "MT5 credentials are incomplete." }
+          Write-Host "Required credentials are present; values are not printed."
+
+      - name: Install and verify official Exness-linked MT5 terminal
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installer = Join-Path $env:RUNNER_TEMP "exness-mt5-setup.exe"
+          $sourceUrl = "https://download.terminal.free/cdn/web/exness.technologies.ltd/mt5/exness5setup.exe"
+          Invoke-WebRequest -Uri $sourceUrl -OutFile $installer
+          if ((Get-Item $installer).Length -lt 1000000) { throw "Installer download is incomplete." }
+          $signature = Get-AuthenticodeSignature -LiteralPath $installer
+          $subject = if ($signature.SignerCertificate) { [string]$signature.SignerCertificate.Subject } else { "" }
+          $ekuExtension = if ($signature.SignerCertificate) { $signature.SignerCertificate.Extensions | Where-Object { $_.Oid.Value -eq "2.5.29.37" } | Select-Object -First 1 } else { $null }
+          $codeSigning = $false
+          if ($ekuExtension) {
+            $eku = [System.Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension]::new($ekuExtension, $false)
+            $codeSigning = @($eku.EnhancedKeyUsages | Where-Object { $_.Value -eq "1.3.6.1.5.5.7.3.3" }).Count -gt 0
+          }
+          if ([string]$signature.Status -ne "Valid") { throw "Installer Authenticode validation failed." }
+          if ($subject -notmatch "^CN=MetaQuotes Ltd\.,\s*O=MetaQuotes Ltd\.") { throw "Installer publisher is not MetaQuotes Ltd." }
+          if (!$codeSigning) { throw "Installer lacks Code Signing EKU." }
+          $setup = Start-Process -FilePath $installer -ArgumentList @("/auto", '/path:"C:\MT5"') -PassThru
+          $terminal = "C:\MT5\terminal64.exe"
+          $deadline = (Get-Date).AddMinutes(3)
+          while ((Get-Date) -lt $deadline -and !(Test-Path $terminal)) { Start-Sleep -Seconds 5 }
+          if (!(Test-Path $terminal)) { throw "MT5 installation incomplete." }
+          New-Item -ItemType Directory -Force -Path "C:\MT5\config" | Out-Null
+          @"
+          [Experts]
+          Enabled=0
+          AllowLiveTrading=0
+          AllowDllImport=0
+          "@ | Set-Content "C:\MT5\config\common.ini" -Encoding Unicode
+          "MT5_TERMINAL=$terminal" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "MT5 installer verified; terminal configured with trading and DLL imports disabled."
+
+      - name: Set up Python and pinned MetaTrader5 integration
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: "x64"
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check "MetaTrader5==5.0.6231"
+          python -m pip install -r requirements.txt
+
+      - name: Retrieve historical XAUUSD ticks (read-only)
+        shell: pwsh
+        env:
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
+          FROM_UTC: ${{ inputs.from_utc }}
+          TO_UTC: ${{ inputs.to_utc }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          python -m tools.mt5_xauusd_historical_tick_probe --from-utc "$env:FROM_UTC" --to-utc "$env:TO_UTC" --output-dir historical-probe
+          if ($LASTEXITCODE -ne 0) { throw "Historical tick probe failed." }
+
+      - name: Stop temporary terminal
+        if: always()
+        shell: pwsh
+        run: |
+          Get-Process -Name terminal64 -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+      - name: Upload historical probe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veltrix-xauusd-historical-probe-${{ github.run_number }}
+          path: historical-probe/
+          if-no-files-found: warn
+          retention-days: 30
