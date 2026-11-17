@@ -14,7 +14,7 @@ def test_installer_gate_requires_valid_authenticode_and_exact_metaquotes_publish
     source = WORKFLOW.read_text(encoding="utf-8")
     assert 'Get-AuthenticodeSignature -LiteralPath $installer' in source
     assert '$signature.Status -ne "Valid"' in source
-    assert '$signerSubject -notmatch "^CN=MetaQuotes Ltd\\.,\\s*O=MetaQuotes Ltd\\."' in source
+    assert 'if ($signerSubject -notmatch "^CN=MetaQuotes Ltd\\.,\\s*O=MetaQuotes Ltd\\."' in source
     assert 'Installer publisher is not the approved MetaQuotes Ltd. publisher' in source
 
 
