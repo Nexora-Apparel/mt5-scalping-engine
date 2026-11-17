@@ -36,6 +36,7 @@ def test_v2_extends_validation_dates_without_mutating_v1_or_candidate_registry()
         "validation_10", "validation_11", "validation_12", "validation_13",
     ]
     assert PLAN_V2["plan_version"] == 2
+    assert PLAN_V2["created_utc"] > "2026-11-17T15:16:20Z"  # after immutable v1 baseline run began
     assert PLAN_V2["collection_requirements"]["minimum_validation_distinct_dates"] == 12
     assert PLAN_V2["evaluation"] == PLAN_V1["evaluation"]
     assert PLAN_V2["evaluation"]["commission_status"] == "UNVERIFIED_REQUIRED_INPUT"
