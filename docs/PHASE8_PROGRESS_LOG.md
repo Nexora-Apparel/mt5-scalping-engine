@@ -212,3 +212,18 @@ Never overwrite a failed result with a later success. Record the later success a
 - **CI/runtime status:** The patch is committed but the new test revision has not yet been observed passing in GitHub Actions. No historical CSV or manifest was produced by run 44137204291. The boundary-padding fix is an evidence-based correction, not yet proven against a subsequent Exness runtime request.
 - **Next action:** Run full CI on the updated branch, then repeat the same 30-minute overlap request. Verify the run checked out this patch, inspect manifest filtering counters, and compare accepted historical ticks with the live capture. Do not expand to multi-day backfill until this exact overlap test and source-parity audit pass.
 - **Safety/release:** XAUUSD-only; authenticated DEMO; read-only; no order or position-management calls. PR #61 remains open/draft/unmerged; holdout remains sealed; no strategy approval.
+
+
+### 2026-11-17 — Third historical probe exposed spill beyond padded query
+
+- **Workflow run:** [44144128359](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44144128359)
+- **Job:** [134254505247](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44144128359/job/134254505247)
+- **Checked-out source:** `5bdaa8377c8babc006409619de0207bb7431e39e`.
+- **Preflight:** 12 focused historical-probe tests passed. Terminal installation, Authenticode validation, MetaQuotes publisher check, and pinned MetaTrader5 package setup passed.
+- **Exact diagnostic:** MT5 returned tick `2026-11-17T13:56:58.040Z`, 242 ms before the *padded query start* `13:56:58.282Z`. The earlier 2,000 ms padding around the logical chunk was not enough because the API itself returned a record outside that padded query.
+- **Corrective implementation:** Added a separate bounded `RANGE_RESPONSE_SPILL_TOLERANCE_MILLISECONDS=2000` around the padded API query for validating provider-returned rows. These outer-spill rows are still excluded by the unchanged exact logical-chunk filter. The manifest records both query padding and response-spill tolerance. Rows beyond the combined bounded envelope still fail closed.
+- **Regression coverage:** Added a test for the observed 242 ms spill beyond the padded query and adjusted the fail-closed test to reject records beyond the combined bound.
+- **New code/test commits:** source and initial regression test followed by test-bound update; verify latest branch CI before another runtime request.
+- **Runtime status:** No CSV or manifest was produced; no historical data accepted. This failure does not establish that Exness lacks history; it establishes MT5 range responses can spill outside the supplied query range.
+- **Next action:** Wait for CI on the latest PR head, inspect the full focused and project test results, then repeat the same 30-minute interval only if CI passes. Do not widen the requested interval or expand to backfill until the overlap/parity audit passes.
+- **Safety:** XAUUSD-only, authenticated Exness DEMO, read-only; no orders or position management. PR #61 remains draft/open/unmerged.
