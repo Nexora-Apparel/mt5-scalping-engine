@@ -51,6 +51,42 @@ jobs:
           $installPath = "C:\MT5"
           Invoke-WebRequest -Uri "https://download.terminal.free/cdn/web/exness.technologies.ltd/mt5/exness5setup.exe" -OutFile $installer
           if ((Get-Item $installer).Length -lt 1000000) { throw "Exness MT5 installer download is incomplete." }
+
+          # Capture binary provenance before execution. A valid Authenticode
+          # chain and an Exness-identifying signer are required; never infer
+          # binary authenticity from the download URL or installed product label.
+          $signature = Get-AuthenticodeSignature -LiteralPath $installer
+          $signerSubject = ""
+          $signerThumbprint = ""
+          $signerIssuer = ""
+          if ($null -ne $signature.SignerCertificate) {
+            $signerSubject = [string]$signature.SignerCertificate.Subject
+            $signerThumbprint = [string]$signature.SignerCertificate.Thumbprint
+            $signerIssuer = [string]$signature.SignerCertificate.Issuer
+          }
+          $installerHash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          $provenance = [ordered]@{
+            schema = "VELTRIX_EXNESS_INSTALLER_PROVENANCE_V1"
+            observed_at_utc = [DateTime]::UtcNow.ToString("o")
+            source_url = "https://download.terminal.free/cdn/web/exness.technologies.ltd/mt5/exness5setup.exe"
+            file_name = [IO.Path]::GetFileName($installer)
+            file_bytes = (Get-Item $installer).Length
+            sha256 = $installerHash
+            authenticode_status = [string]$signature.Status
+            status_message = [string]$signature.StatusMessage
+            signer_subject = $signerSubject
+            signer_thumbprint = $signerThumbprint
+            signer_issuer = $signerIssuer
+            timestamp_signer_subject = if ($signature.TimeStamperCertificate) { [string]$signature.TimeStamperCertificate.Subject } else { "" }
+          }
+          $provenancePath = Join-Path $env:RUNNER_TEMP "exness-installer-provenance.json"
+          $provenance | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $provenancePath -Encoding utf8
+          Write-Host "Installer SHA-256: $installerHash"
+          Write-Host "Installer Authenticode status: $($signature.Status)"
+          Write-Host "Installer signer subject: $signerSubject"
+          if ([string]$signature.Status -ne "Valid") { throw "Exness MT5 installer Authenticode verification failed; installer will not execute." }
+          if ($signerSubject -notmatch "(?i)Exness") { throw "Installer signer identity does not identify Exness; installer will not execute." }
+
           $setup = Start-Process -FilePath $installer -ArgumentList @("/auto", ('/path:' + '"' + $installPath + '"')) -PassThru
           $terminal = Join-Path $installPath "terminal64.exe"
           $editor = Join-Path $installPath "metaeditor64.exe"
@@ -120,6 +156,10 @@ jobs:
           $ErrorActionPreference = "Continue"
           $destination = Join-Path $env:RUNNER_TEMP "veltrix-collector-diagnostics"
           New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          $provenancePath = Join-Path $env:RUNNER_TEMP "exness-installer-provenance.json"
+          if (Test-Path $provenancePath) {
+            Copy-Item -LiteralPath $provenancePath -Destination (Join-Path $destination "exness-installer-provenance.json") -Force
+          }
           foreach ($root in @("C:\MT5\Logs", "C:\MT5\MQL5\Logs")) {
             if (Test-Path $root) {
               $prefix = if ($root -like "*MQL5*") { "experts_" } else { "terminal_" }
