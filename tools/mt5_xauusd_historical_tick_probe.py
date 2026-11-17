@@ -22,6 +22,7 @@ from tools.mt5_demo_tick_collector import (
     DiagnosticFailure,
     connect_expected_account,
     discover_symbol,
+    audit_ticks,
     utc_iso,
     validate_account,
 )
@@ -160,9 +161,13 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
                     chunk_rows = [
                         _normalize_tick(tick, cursor_ms, chunk_end_ms) for tick in batch
                     ]
-                    # Preserve provider order for ticks sharing a millisecond while
-                    # making the chunk's timestamp order deterministic.
-                    chunk_rows.sort(key=lambda row: row["time_msc"])
+                    # MT5 returns chronological records. Reject a broken source
+                    # sequence rather than silently sorting away an integrity fault.
+                    if any(
+                        chunk_rows[index]["time_msc"] < chunk_rows[index - 1]["time_msc"]
+                        for index in range(1, len(chunk_rows))
+                    ):
+                        raise DiagnosticFailure("historical tick timestamps moved backwards within a chunk")
                     for row in chunk_rows:
                         key = (
                             row["time_msc"], row["bid"], row["ask"], row["last"],
@@ -214,7 +219,8 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
                 partial_path.unlink()
             raise
 
-        digest = hashlib.sha256(csv_path.read_bytes()).hexdigest()
+        dataset_audit = audit_ticks(csv_path)
+        digest = dataset_audit["sha256"]
         ordered_stamps = [row["time_msc"] for row in records_by_key.values()]
         manifest = {
             "schema": "VELTRIX_XAUUSD_HISTORICAL_TICK_PROBE_V2",
@@ -237,6 +243,7 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
             "last_tick_utc": utc_iso(max(ordered_stamps)),
             "instrument_point": float(info.point),
             "sha256": digest,
+            "dataset_audit": dataset_audit,
             "csv_file": csv_path.name,
             "interpretation": (
                 "Historical bid/ask quotes are not actual broker fills. "
