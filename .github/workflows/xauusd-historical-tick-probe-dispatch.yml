@@ -39,6 +39,7 @@ jobs:
           $sourceCommit = (git rev-parse HEAD).Trim()
           if ($LASTEXITCODE -ne 0 -or !$sourceCommit) { throw "Could not identify the checked-out Phase 8 source commit." }
           "VELTRIX_SOURCE_COMMIT=$sourceCommit" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "VELTRIX_SOURCE_REF=phase8-distinct-validation-date-guard" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "Historical probe source commit: $sourceCommit"
 
       - name: Set up Python for strict UTC input validation
