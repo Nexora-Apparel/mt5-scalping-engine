@@ -99,6 +99,7 @@ jobs:
           FROM_UTC: ${{ inputs.from_utc }}
           TO_UTC: ${{ inputs.to_utc }}
           VELTRIX_SOURCE_COMMIT: ${{ github.sha }}
+          VELTRIX_SOURCE_REF: ${{ github.ref_name }}
         run: |
           $ErrorActionPreference = "Stop"
           python -m tools.mt5_xauusd_historical_tick_probe --from-utc "$env:FROM_UTC" --to-utc "$env:TO_UTC" --output-dir historical-probe
