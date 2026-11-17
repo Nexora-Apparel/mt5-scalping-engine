@@ -11,8 +11,8 @@
 ## 1. Current project state
 
 - PR #61 is open, draft, and unmerged.
-- The PR head last verified for this log was `3f4be6b674d2d9c421bdb08cde3dc0e4da506025`.
-- `main` remains unchanged.
+- The historical-probe implementation is currently recorded through commit `996d95088c628879349ef7c1d2335f188f868c1d`; the progress-log update itself will create a later PR head.
+- `main` contains a narrowly scoped manual dispatcher at `.github/workflows/xauusd-historical-tick-probe-dispatch.yml` (latest dispatcher commit `bb7c97fe66c7f6f44e4a9d38d07f3080662db9c1`). It checks out the fixed Phase 8 PR branch; it does not merge PR #61 or copy the strategy implementation into `main`.
 - Four eligible live validation sessions are preserved across four distinct UTC dates:
   - `validation_01` — 2026-11-13
   - `validation_03` — 2026-11-15
@@ -46,9 +46,9 @@ Detailed research and source references: [PHASE8_ACCELERATED_VALIDATION_RESEARCH
 | Distinct-date eligibility | Kept `validation_02` excluded from eligible count; four distinct eligible UTC dates remain | Multiple sessions on one date must not be represented as independent dates |
 | Collector session allowlist | Extended accepted IDs to `validation_01` and `validation_03`–`validation_13` | The v2 workflow exposed IDs that the collector previously rejected |
 | Collector tests | Updated accepted-ID coverage and added rejection coverage for `validation_14` | Prevent unregistered collection IDs |
-| Historical tick probe | Added `tools/mt5_xauusd_historical_tick_probe.py` using MetaTrader5 `copy_ticks_range` | Test whether the connected broker terminal can supply historical ticks |
-| Historical probe tests | Added `tests/test_mt5_xauusd_historical_tick_probe.py` | Test UTC parsing, DEMO/read-only manifest behaviour, hashing, and empty results |
-| Manual probe workflow | Added `.github/workflows/xauusd-historical-tick-probe.yml` | Run the bounded historical request on a Windows runner with the configured MT5 terminal |
+| Historical tick probe | Reworked as V2: inclusive UTC millisecond bounds, one-minute non-overlapping requests, strict tick-field validation, duplicate removal, chronological-order checks, atomic CSV publication, shared dataset audit, SHA-256 and source provenance | Prevent silent truncation/partial output and make historical evidence auditable |
+| Historical probe tests | Expanded `tests/test_mt5_xauusd_historical_tick_probe.py` for offset normalization, chunk boundaries, endpoint inclusion, duplicate removal, malformed/out-of-range ticks, non-monotonic responses, DEMO rejection, empty results and API errors | Exercise the probe's fail-closed paths before any broker request |
+| Manual probe workflow | Added PR-branch workflow `.github/workflows/xauusd-historical-tick-probe.yml` and a default-branch dispatcher `.github/workflows/xauusd-historical-tick-probe-dispatch.yml` | GitHub requires the manual-dispatch workflow to exist on the default branch; dispatcher checks out the fixed PR branch without merging it |
 | PR activity record | Added a PR comment describing the probe implementation and intended first comparison interval | Preserve implementation context and avoid implying that the probe has already run |
 | Research redesign | Added `docs/PHASE8_ACCELERATED_VALIDATION_RESEARCH.md` | Evaluate a faster route without weakening statistical or safety gates |
 
@@ -74,24 +74,24 @@ Interpretation: this was a research rejection of the current candidate set on th
 
 ## 5. Current implementation review findings
 
-A source inspection after adding the probe identified issues that must be corrected and tested before manual execution:
+A source inspection identified and the implementation has now addressed these defects:
 
-1. **Python string escaping in the historical probe:** the CSV writer's line terminator and manifest trailing newline appear to be encoded as literal backslash-plus-`n`, rather than actual newline characters. Correct these to match the existing collector's newline handling.
-2. **Default terminal path:** the probe's fallback `MT5_TERMINAL` path contains doubled backslashes in a raw string. Normalize it to the same Windows path convention used by the collector.
-3. **Probe/collector helper contract:** confirm `connect_expected_account`, `discover_symbol`, `utc_iso`, and `DEMO_TRADE_MODE` are imported from the expected module and match their runtime signatures/return values.
-4. **Pagination and ordering:** test full and partial 10,000-record batches, millisecond overlaps, duplicate removal, end-boundary handling, and termination when the broker returns repeated timestamps.
-5. **Workflow dispatch availability:** GitHub generally requires a `workflow_dispatch` workflow to exist on the default branch before it can be manually dispatched from the Actions UI. This workflow currently exists on the PR branch only. Do not merge PR #61 merely to expose the manual button. Resolve dispatch mechanics without silently changing `main` or exposing secrets to untrusted PR code.
+1. **CSV/manifest newline escaping:** corrected to real newline characters; tests assert the CSV does not contain escaped backslash-n records and the manifest ends with a newline.
+2. **Default terminal path:** corrected to `C:\\MT5\\terminal64.exe`, matching the collector's Windows path convention.
+3. **Probe/collector helper contract:** the probe uses the collector's `connect_expected_account`, `discover_symbol`, `utc_iso`, `validate_account`, `audit_ticks`, and `DEMO_TRADE_MODE`; the focused tests stub the account and broker helpers. Runtime integration against Exness remains untested.
+4. **Retrieval completeness and ordering:** replaced the fragile 10,000-record cursor loop with one-minute, inclusive, non-overlapping UTC millisecond windows. Each chunk is independently requested; out-of-range, malformed, and backwards-ordered responses fail closed. The final CSV is audited using the collector's shared audit routine before its manifest is published.
+5. **Workflow dispatch availability:** resolved with a dedicated dispatcher committed to `main`. It has only `contents: read`, checks out the fixed `phase8-distinct-validation-date-guard` branch with persisted credentials disabled, records the exact checked-out commit, and runs focused preflight tests before installing MT5 or using secrets. PR #61 remains unmerged.
 6. **Signer trust:** Authenticode validity, MetaQuotes Ltd. publisher identity, and Code Signing EKU are checked by the workflow. Independent pinning of the signer thumbprint against Exness-controlled evidence is still outstanding.
 
-Until these items are addressed, the historical probe must be treated as **not yet ready for manual execution**.
+The focused preflight tests are wired into the dispatcher, but have not yet been observed passing on GitHub Actions. Do not start a broker probe until the preflight succeeds. Independent installer signer-thumbprint pinning against Exness-controlled evidence remains outstanding.
 
 ## 6. Next implementation sequence
 
 | Order | Next action | Completion evidence |
 |---:|---|---|
-| 1 | Fix the historical probe string/path defects and review helper contracts | Corrected source diff and focused unit tests |
-| 2 | Strengthen pagination, timestamp-boundary, duplicate, and failure-path tests | Passing focused test run |
-| 3 | Review the workflow's dispatch and secret-access design without merging or modifying `main` | Documented, safe manual trigger path |
+| 1 | Complete code review of the V2 probe and focused tests | Source review plus passing preflight run |
+| 2 | Execute focused tests through the main-branch dispatcher preflight | Passing pytest output tied to the checked-out PR commit |
+| 3 | Verify manual dispatcher, branch pinning, permissions, and secret boundaries | Workflow run reaches preflight and does not proceed if tests fail |
 | 4 | Run the full repository Python tests, compilation, and shell syntax checks | Successful CI run tied to the exact PR HEAD |
 | 5 | Provide the owner the direct Actions link and exact input instructions when the workflow is genuinely dispatchable | Manual run instructions with the exact UTC interval |
 | 6 | Run the historical probe over the exact `validation_05` overlap interval | Completed run and downloadable raw CSV/manifest artifact |
@@ -140,3 +140,18 @@ Use this format for each material change:
 - **Next action:**
 
 Never overwrite a failed result with a later success. Record the later success as a new entry and retain the earlier result for auditability.
+
+
+## 10. Append-only engineering update — 2026-11-17
+
+- **Starting PR code commit:** `b700210ed758a19c74ebbbd63867f986ef74a129`
+- **Files changed on PR branch:**
+  - `tools/mt5_xauusd_historical_tick_probe.py`
+  - `tests/test_mt5_xauusd_historical_tick_probe.py`
+- **What changed:** Replaced the original historical request loop with fixed one-minute UTC millisecond windows; normalized tick access for MT5 structured records and test doubles; added finite-value, bid/ask, volume, timestamp-range and chronological-order validation; removed partial output on failure; writes CSV with actual newline delimiters; reuses the collector's `audit_ticks` before publishing the manifest; records the checked-out source commit, dispatcher commit and installer signer thumbprint.
+- **Why:** The original code used an unsafe short-batch termination condition, had literal backslash-n output, and did not prove chunk-by-chunk integrity. A failed or incomplete response must not produce a PASS artifact.
+- **Tests added:** UTC offset handling, non-overlapping chunks, inclusive final endpoint, duplicate removal, SHA-256, CSV/manifest newline integrity, invalid values, out-of-range records, non-monotonic provider response, non-DEMO rejection, empty data and broker API errors.
+- **Manual trigger change on `main`:** Added `.github/workflows/xauusd-historical-tick-probe-dispatch.yml` (dispatcher commits `89fef6def381f564180644871403d0d65dbd86a3`, `35103dd0d651417f265aaa1c326f0fe6d8964626`, `2744af30fbe105789639b1087748ef90f84cb5a7`, and `bb7c97fe66c7f6f44e4a9d38d07f3080662db9c1`). It checks out only the fixed Phase 8 branch and runs focused pytest preflight before MT5 installation and credential use.
+- **Result:** Code and workflow changes committed. Automated test result is **NOT YET RUN / NOT VERIFIED**; GitHub currently reports no check runs for the latest PR code commit.
+- **Remaining risks:** Actual Exness historical API behavior, historical/live source parity, signer-thumbprint independent pinning, and all research/statistical release gates remain outstanding. No historical probe has been executed.
+- **Next action:** Verify the focused preflight through GitHub Actions, correct any failures, then provide the manual dispatcher link and exact validation_05 overlap interval.
