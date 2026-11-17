@@ -252,6 +252,30 @@ def test_probe_filters_mt5_boundary_spill_but_keeps_exact_requested_window(
     assert result["mt5_query_boundary_padding_milliseconds"] == 2000
 
 
+
+def test_probe_discards_mt5_spill_outside_padded_query_boundary(
+    tmp_path, demo_guards
+):
+    start = datetime(2026, 11, 17, 13, 50, 0, 282000, tzinfo=timezone.utc)
+    end = start + timedelta(seconds=30)
+    # MT5 returned a tick 242 ms before the padded query's start in the
+    # production failure. It is within the bounded response-spill tolerance
+    # but must never enter the accepted logical interval.
+    beyond_query_start = ms(start) - probe_module.RANGE_PADDING_MILLISECONDS - 242
+    inside = ms(start) + 10
+    api = FakeHistoricalMT5([[
+        tick(beyond_query_start), tick(inside)
+    ]])
+
+    result = probe_module.probe(api, start, end, tmp_path)
+
+    with (tmp_path / result["csv_file"]).open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert [int(row["time_msc"]) for row in rows] == [inside]
+    assert result["chunks"][0]["discarded_guard_band_records"] == 1
+    assert result["mt5_query_response_spill_tolerance_milliseconds"] == 2000
+
+
 def test_probe_rejects_ticks_beyond_mt5_guard_band(tmp_path, demo_guards):
     start = datetime(2026, 11, 13, 9, tzinfo=timezone.utc)
     far_outside = ms(start) - probe_module.RANGE_PADDING_MILLISECONDS - 1
