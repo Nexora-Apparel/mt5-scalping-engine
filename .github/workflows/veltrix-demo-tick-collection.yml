@@ -13,6 +13,14 @@ on:
           - validation_03
           - validation_04
           - validation_05
+          - validation_06
+          - validation_07
+          - validation_08
+          - validation_09
+          - validation_10
+          - validation_11
+          - validation_12
+          - validation_13
 
 permissions:
   contents: read
