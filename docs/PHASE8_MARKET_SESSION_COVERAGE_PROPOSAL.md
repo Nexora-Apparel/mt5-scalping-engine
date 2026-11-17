@@ -96,3 +96,23 @@ Classification uses the proposal's 09:00–18:00 Tokyo, 08:00–17:00 London, an
 ## Forward collector evidence improvement
 
 The read-only collector now persists its periodic quote-validation snapshots in a separate `quote_validation_samples.csv` artifact. The manifest records the snapshot artifact filename, record count, byte count, and SHA-256. Each row carries both the collector observation time and the underlying MT5 quote timestamp, plus bid/ask, point size, spread points, and quote age. This separates risk-gate sampling from the full tick stream and makes future spread reconciliation reproducible. The historical validation_04 artifact remains unchanged; the new file applies to future collections only. Collector instrumentation and regression tests passed Project tests workflow run `43939726288` on commit `5575a01231fd2ea67127a80b3a7f9cea0467c796` (242 tests passed).
+
+
+## validation_05 completed — 2026-11-17
+
+The successful collection workflow is [run 44096443341](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44096443341), with tick artifact ID `14335284843` and diagnostics artifact ID `14335524258`. The actual collection window was 2026-11-17 13:50:00.282198–14:20:02.314597 UTC (not the earlier planned 13:30–14:00 window). It lasted 1,802 seconds and produced 8,983 XAUUSD ticks. The CSV SHA-256 `5917a92e4feaa05f3f9756426baa59deb068fa21ab0c3950f7385a44c3dc7124` matches the manifest.
+
+Independent timezone classification of all four eligible raw artifacts:
+
+| Session | UTC collection window | Raw ticks | Asian ticks | London ticks | New York ticks | Overlap ticks |
+|---|---|---:|---:|---:|---:|---:|
+| validation_01 | 13 Nov 10:23:27–10:53:29 | 3,857 | 0 | 3,857 | 0 | 0 |
+| validation_03 | 15 Nov 23:14:45–23:44:47 | 4,035 | 0 | 0 | 0 | 0 |
+| validation_04 | 16 Nov 06:10:18–06:40:20 | 11,537 | 11,537 | 0 | 0 | 0 |
+| validation_05 | 17 Nov 13:50:00–14:20:02 | 8,983 | 0 | 8,983 | 8,983 | 8,983 |
+
+For 17 November, the actual 13:50–14:20 UTC collection lies within the proposed London–New York overlap (13:00–17:00 UTC). The four eligible sessions therefore cover the Asian, London, New York, and overlap labels. These labels describe timestamp coverage only; they do not establish representative liquidity, execution quality, or profitability. The optional 30-minute-per-label proposal remains supplemental and is not a new intake gate.
+
+The validation_05 artifact also includes 1,798 quote-validation snapshots. Their SHA-256 `7c21e3d5cbf8e41bc1565cd1ef44b3b698d1fc74a4b34e5a02e750e65f540a0f` matches the manifest. Both the raw tick stream and periodic snapshots observed a constant 240-point spread (0.240 price units) during this collection. Quote age ranged from 137 ms to 1,669 ms (mean approximately 443.6 ms). These are observed sample statistics, not guarantees of future executable costs.
+
+The four eligible raw CSV hashes independently match their manifests, and each manifest reports PASS status, PASS data audit, DEMO account mode, trading disabled, DLL imports disabled, XAUUSD-only identity, and 1,802 seconds duration. Formal six-artifact catalog intake and chronological validation still must be run; collection completion alone does not pass that stage.
