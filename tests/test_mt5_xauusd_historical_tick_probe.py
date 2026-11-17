@@ -111,7 +111,7 @@ def test_probe_retrieves_non_overlapping_chunks_and_writes_verified_csv(
     csv_path = tmp_path / result["csv_file"]
     raw = csv_path.read_bytes()
     assert result["sha256"] == hashlib.sha256(raw).hexdigest()
-    assert b"\\\\n" not in raw
+    assert b"\\n" not in raw
     with csv_path.open(encoding="utf-8", newline="") as handle:
         rows = list(csv.DictReader(handle))
     assert len(rows) == 4
@@ -144,6 +144,19 @@ def test_probe_rejects_invalid_or_out_of_range_ticks(
     assert api.shutdown_called
     assert not (tmp_path / "xauusd_historical_ticks.csv").exists()
     assert not (tmp_path / "xauusd_historical_ticks.csv.partial").exists()
+
+
+def test_probe_rejects_non_monotonic_provider_order(tmp_path, demo_guards):
+    start = datetime(2026, 11, 13, 9, tzinfo=timezone.utc)
+    first = ms(start + timedelta(seconds=2))
+    second = ms(start + timedelta(seconds=1))
+    api = FakeHistoricalMT5([[tick(first), tick(second)]])
+
+    with pytest.raises(probe_module.DiagnosticFailure, match="moved backwards within a chunk"):
+        probe_module.probe(api, start, start + timedelta(seconds=3), tmp_path)
+
+    assert api.shutdown_called
+    assert not (tmp_path / "xauusd_historical_ticks.csv").exists()
 
 
 def test_probe_fails_closed_when_account_is_not_demo(tmp_path, demo_guards, monkeypatch):
