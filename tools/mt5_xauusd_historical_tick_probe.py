@@ -35,6 +35,10 @@ CHUNK_MILLISECONDS = 60_000
 # MT5 may return adjacent ticks around datetime range boundaries. Query a
 # bounded guard band, then retain only ticks inside the exact requested window.
 RANGE_PADDING_MILLISECONDS = 2_000
+# MT5 may also return records just outside the padded API query itself.
+# Bound that provider spill separately; all such rows are still excluded
+# by the exact logical-chunk filter before publication.
+RANGE_RESPONSE_SPILL_TOLERANCE_MILLISECONDS = 2_000
 
 
 def parse_utc(value: str) -> datetime:
@@ -173,7 +177,12 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
                         )
 
                     query_rows = [
-                        _normalize_tick(tick, query_start_ms, query_end_ms) for tick in batch
+                        _normalize_tick(
+                            tick,
+                            query_start_ms - RANGE_RESPONSE_SPILL_TOLERANCE_MILLISECONDS,
+                            query_end_ms + RANGE_RESPONSE_SPILL_TOLERANCE_MILLISECONDS,
+                        )
+                        for tick in batch
                     ]
                     # Check provider ordering before filtering. MT5 can return a
                     # small number of adjacent boundary ticks outside the exact
@@ -265,6 +274,7 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
             "interval_semantics": "inclusive UTC millisecond bounds",
             "retrieval_chunk_milliseconds": CHUNK_MILLISECONDS,
             "mt5_query_boundary_padding_milliseconds": RANGE_PADDING_MILLISECONDS,
+            "mt5_query_response_spill_tolerance_milliseconds": RANGE_RESPONSE_SPILL_TOLERANCE_MILLISECONDS,
             "published_interval_filter": "inclusive exact requested UTC millisecond bounds; guard-band records excluded",
             "chunks_requested": len(chunks),
             "chunks": chunks,
