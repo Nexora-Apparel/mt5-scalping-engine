@@ -278,7 +278,12 @@ def test_probe_discards_mt5_spill_outside_padded_query_boundary(
 
 def test_probe_rejects_ticks_beyond_mt5_guard_band(tmp_path, demo_guards):
     start = datetime(2026, 11, 13, 9, tzinfo=timezone.utc)
-    far_outside = ms(start) - probe_module.RANGE_PADDING_MILLISECONDS - 1
+    far_outside = (
+        ms(start)
+        - probe_module.RANGE_PADDING_MILLISECONDS
+        - probe_module.RANGE_RESPONSE_SPILL_TOLERANCE_MILLISECONDS
+        - 1
+    )
     api = FakeHistoricalMT5([[tick(far_outside)]])
 
     with pytest.raises(probe_module.DiagnosticFailure, match="outside the requested UTC interval"):
