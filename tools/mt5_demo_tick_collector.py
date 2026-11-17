@@ -25,7 +25,7 @@ if str(ROOT) not in sys.path:
 
 from tools.mt5_python_readonly_diagnostic import (
     CANONICAL_SYMBOLS, DEMO_TRADE_MODE, DiagnosticFailure,
-    discover_symbol, validate_account, validate_quote,
+    connect_expected_account, discover_symbol, validate_account, validate_quote,
 )
 
 HEADER = [
@@ -250,7 +250,7 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
         raise DiagnosticFailure(f"MT5 initialize failed; last_error={mt5.last_error()}")
 
     try:
-        identity = validate_account(mt5, login, server)
+        identity = connect_expected_account(mt5, login, password, server)
         if identity["trade_mode"] != DEMO_TRADE_MODE:
             raise DiagnosticFailure("account is not DEMO")
         symbols = {name: discover_symbol(mt5, name) for name in CANONICAL_SYMBOLS}
