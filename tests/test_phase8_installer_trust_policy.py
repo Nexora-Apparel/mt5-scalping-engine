@@ -30,4 +30,4 @@ def test_installer_gate_requires_code_signing_eku_and_records_thumbprint():
 def test_installer_gate_does_not_require_exness_as_software_publisher():
     source = WORKFLOW.read_text(encoding="utf-8")
     assert '$signerSubject -notmatch "(?i)Exness"' not in source
-    assert 'if ($signerSubject -notmatch "^CN=MetaQuotes Ltd.' in source
+    assert 'if ($signerSubject -notmatch "^CN=MetaQuotes Ltd\\\\.,\\\\s*O=MetaQuotes Ltd\\\\.")' in source
