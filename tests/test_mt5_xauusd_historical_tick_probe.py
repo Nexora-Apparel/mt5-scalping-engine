@@ -138,8 +138,15 @@ def test_probe_rejects_invalid_or_out_of_range_ticks(
     end = start + timedelta(seconds=30)
     api = FakeHistoricalMT5([[bad_tick]])
 
-    with pytest.raises(probe_module.DiagnosticFailure, match=message):
+    with pytest.raises(probe_module.DiagnosticFailure, match=message) as exc_info:
         probe_module.probe(api, start, end, tmp_path)
+
+    if "outside the requested UTC interval" in message:
+        diagnostic = str(exc_info.value)
+        assert "tick=" in diagnostic
+        assert "delta_from_start_ms=" in diagnostic
+        assert "delta_from_end_ms=" in diagnostic
+        assert "requested=" in diagnostic
 
     assert api.shutdown_called
     assert not (tmp_path / "xauusd_historical_ticks.csv").exists()
