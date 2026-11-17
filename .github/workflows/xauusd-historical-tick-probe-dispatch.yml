@@ -32,6 +32,12 @@ jobs:
           ref: phase8-distinct-validation-date-guard
           persist-credentials: false
 
+      - name: Set up Python for strict UTC input validation
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: "x64"
+
       - name: Validate credentials and UTC inputs without printing secrets
         shell: pwsh
         env:
@@ -85,11 +91,6 @@ jobs:
           "MT5_INSTALLER_SIGNER_THUMBPRINT=$thumbprint" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "Terminal configured with automated trading and DLL imports disabled."
 
-      - name: Set up Python and pinned MetaTrader5 integration
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          architecture: "x64"
 
       - name: Install pinned dependencies
         shell: pwsh
