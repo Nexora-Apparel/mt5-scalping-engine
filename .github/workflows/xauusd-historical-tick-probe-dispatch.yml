@@ -32,6 +32,15 @@ jobs:
           ref: phase8-distinct-validation-date-guard
           persist-credentials: false
 
+      - name: Record exact checked-out source revision
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $sourceCommit = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or !$sourceCommit) { throw "Could not identify the checked-out Phase 8 source commit." }
+          "VELTRIX_SOURCE_COMMIT=$sourceCommit" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Historical probe source commit: $sourceCommit"
+
       - name: Set up Python for strict UTC input validation
         uses: actions/setup-python@v5
         with:
