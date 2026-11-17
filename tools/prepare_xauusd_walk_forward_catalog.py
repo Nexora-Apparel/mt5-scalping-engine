@@ -6,6 +6,7 @@ connects to MT5, accesses broker credentials, or enables trading.
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import json
 import re
@@ -86,6 +87,78 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _validate_quote_snapshot(manifest: dict[str, Any], artifact_dir: Path) -> str | None:
+    """Verify and retain the optional periodic quote-validation dataset."""
+    metadata = manifest.get("quote_validation_dataset")
+    if metadata is None:
+        return None
+    if not isinstance(metadata, dict):
+        raise ArtifactIntakeError("quote_validation_dataset must be an object")
+    filename = metadata.get("filename")
+    if not isinstance(filename, str) or not filename or Path(filename).name != filename:
+        raise ArtifactIntakeError("quote-validation filename must be a safe basename")
+    matches = list(artifact_dir.rglob(filename))
+    if len(matches) != 1:
+        raise ArtifactIntakeError("quote-validation artifact must contain exactly one declared snapshot CSV")
+    path = matches[0]
+    if path.stat().st_size != metadata.get("bytes"):
+        raise ArtifactIntakeError("quote-validation byte count differs from manifest")
+    if _sha256(path) != metadata.get("sha256"):
+        raise ArtifactIntakeError("quote-validation SHA-256 differs from manifest")
+    expected_records = metadata.get("records")
+    if isinstance(expected_records, bool) or not isinstance(expected_records, int) or expected_records <= 0:
+        raise ArtifactIntakeError("quote-validation record count must be a positive integer")
+
+    required = {
+        "canonical_symbol", "broker_symbol", "observed_at_utc", "quote_time_msc",
+        "quote_time_utc", "bid", "ask", "point", "spread_points", "quote_age_ms",
+    }
+    expected_broker_symbol = manifest.get("symbols", {}).get("XAUUSD")
+    count = 0
+    previous_observed: datetime | None = None
+    previous_quote_msc: int | None = None
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if not reader.fieldnames or not required.issubset(reader.fieldnames):
+            raise ArtifactIntakeError("quote-validation CSV is missing required columns")
+        for line_number, row in enumerate(reader, start=2):
+            if row.get("canonical_symbol") != "XAUUSD" or row.get("broker_symbol") != expected_broker_symbol:
+                raise ArtifactIntakeError(f"quote-validation row {line_number} has incorrect instrument identity")
+            try:
+                observed = datetime.fromisoformat(row["observed_at_utc"].replace("Z", "+00:00"))
+                quote_time = datetime.fromisoformat(row["quote_time_utc"].replace("Z", "+00:00"))
+                quote_msc = int(row["quote_time_msc"])
+                bid, ask = float(row["bid"]), float(row["ask"])
+                point, spread_points = float(row["point"]), float(row["spread_points"])
+                quote_age_ms = int(row["quote_age_ms"])
+            except (TypeError, ValueError, KeyError) as exc:
+                raise ArtifactIntakeError(f"quote-validation row {line_number} contains invalid values") from exc
+            if observed.tzinfo is None or observed.utcoffset() is None or quote_time.tzinfo is None or quote_time.utcoffset() is None:
+                raise ArtifactIntakeError(f"quote-validation row {line_number} timestamps must be timezone-aware")
+            observed = observed.astimezone(timezone.utc)
+            quote_time = quote_time.astimezone(timezone.utc)
+            if round(quote_time.timestamp() * 1000) != quote_msc:
+                raise ArtifactIntakeError(f"quote-validation row {line_number} quote epoch does not match ISO timestamp")
+            if previous_observed is not None and observed < previous_observed:
+                raise ArtifactIntakeError("quote-validation observation timestamps are not monotonic")
+            if previous_quote_msc is not None and quote_msc < previous_quote_msc:
+                raise ArtifactIntakeError("quote-validation quote timestamps are not monotonic")
+            age_from_timestamps = round((observed - quote_time).total_seconds() * 1000)
+            if quote_age_ms < 0 or abs(age_from_timestamps - quote_age_ms) > 2:
+                raise ArtifactIntakeError(f"quote-validation row {line_number} quote age is inconsistent")
+            if not all(map(lambda value: value == value and abs(value) != float("inf"), (bid, ask, point, spread_points))):
+                raise ArtifactIntakeError(f"quote-validation row {line_number} contains non-finite prices")
+            if ask <= bid or point <= 0 or spread_points <= 0:
+                raise ArtifactIntakeError(f"quote-validation row {line_number} has invalid bid/ask or spread")
+            if abs(((ask - bid) / point) - spread_points) > 0.01:
+                raise ArtifactIntakeError(f"quote-validation row {line_number} spread does not reconcile")
+            previous_observed, previous_quote_msc = observed, quote_msc
+            count += 1
+    if count != expected_records:
+        raise ArtifactIntakeError("quote-validation row count differs from manifest")
+    return str(path)
+
+
 def download_session_artifacts(
     session_map: list[dict[str, Any]],
     plan: dict[str, Any],
@@ -141,6 +214,7 @@ def download_session_artifacts(
             raise ArtifactIntakeError(f"{sid}: artifact must contain exactly one CSV and one manifest")
         csv_path, manifest_path = csv_files[0], manifests[0]
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        quote_snapshot_path = _validate_quote_snapshot(manifest, destination)
         digest = _sha256(csv_path)
         development_entry = next((entry for entry in plan["development_sessions"] if entry["session_id"] == sid), None)
         if development_entry is not None:
@@ -185,20 +259,29 @@ def download_session_artifacts(
         final_dir = session_root / sid
         final_csv = final_dir / "veltrix_exness_demo_ticks.csv"
         final_manifest = final_dir / "manifest.json"
+        final_quote_snapshot = final_dir / Path(quote_snapshot_path).name if quote_snapshot_path else None
         if csv_path != final_csv:
             shutil.copy2(csv_path, final_csv)
         if manifest_path != final_manifest:
             shutil.copy2(manifest_path, final_manifest)
+        if quote_snapshot_path and Path(quote_snapshot_path) != final_quote_snapshot:
+            shutil.copy2(quote_snapshot_path, final_quote_snapshot)
+        retained_names = {final_csv.name, final_manifest.name}
+        if final_quote_snapshot:
+            retained_names.add(final_quote_snapshot.name)
         for child in list(final_dir.iterdir()):
             if child.is_dir():
                 shutil.rmtree(child)
-            elif child.name not in {final_csv.name, final_manifest.name}:
+            elif child.name not in retained_names:
                 child.unlink()
-        catalog_items.append({
+        catalog_item = {
             "session_id": sid,
             "csv": f"xauusd_sessions/{sid}/veltrix_exness_demo_ticks.csv",
             "manifest": f"xauusd_sessions/{sid}/manifest.json",
-        })
+        }
+        if final_quote_snapshot:
+            catalog_item["quote_validation_csv"] = f"xauusd_sessions/{sid}/{final_quote_snapshot.name}"
+        catalog_items.append(catalog_item)
 
     catalog = {
         "catalog_schema": "VELTRIX_XAUUSD_WALK_FORWARD_CATALOG_V1",
