@@ -79,6 +79,8 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
                     volume = float(tick["volume"] if hasattr(tick, "dtype") and tick.dtype.names else tick.volume)
                     volume_real = float(tick["volume_real"] if hasattr(tick, "dtype") and tick.dtype.names else tick.volume_real)
                     flags = int(tick["flags"] if hasattr(tick, "dtype") and tick.dtype.names else tick.flags)
+                    if stamp < int(start.timestamp() * 1000) or stamp > int(end.timestamp() * 1000):
+                        raise DiagnosticFailure("historical API returned a tick outside the requested UTC interval")
                     if stamp <= 0 or bid <= 0 or ask < bid:
                         raise DiagnosticFailure("historical feed contains invalid timestamp or bid/ask")
                     if previous is not None and stamp < previous:
