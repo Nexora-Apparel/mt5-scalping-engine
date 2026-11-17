@@ -9,7 +9,7 @@ on:
         required: true
         type: string
         default: |
-          {"sessions":[{"session_id":"session8","run_id":43333365050},{"session_id":"session9","run_id":43338046880}]}
+          {"sessions":[{"session_id":"session8","run_id":43333365050},{"session_id":"session9","run_id":43338046880},{"session_id":"validation_01","run_id":43408593546},{"session_id":"validation_03","run_id":43773683398},{"session_id":"validation_04","run_id":43814840356},{"session_id":"validation_05","run_id":44096443341}]}
 
 permissions:
   actions: read
