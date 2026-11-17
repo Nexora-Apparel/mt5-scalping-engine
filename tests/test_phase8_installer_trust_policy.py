@@ -20,7 +20,7 @@ def test_installer_gate_requires_valid_authenticode_and_exact_metaquotes_publish
 
 def test_installer_gate_requires_code_signing_eku_and_records_thumbprint():
     source = WORKFLOW.read_text(encoding="utf-8")
-    assert '$ekuExtension.Oid.Value -eq "2.5.29.37"' in source
+    assert 'Where-Object { $_.Oid.Value -eq "2.5.29.37" }' in source
     assert '$_.Value -eq "1.3.6.1.5.5.7.3.3"' in source
     assert 'code_signing_eku = $hasCodeSigningEku' in source
     assert 'signer_thumbprint = $signerThumbprint' in source
@@ -30,4 +30,4 @@ def test_installer_gate_requires_code_signing_eku_and_records_thumbprint():
 def test_installer_gate_does_not_require_exness_as_software_publisher():
     source = WORKFLOW.read_text(encoding="utf-8")
     assert '$signerSubject -notmatch "(?i)Exness"' not in source
-    assert '$signerSubject -notmatch "^CN=MetaQuotes Ltd.' in source
+    assert 'if ($signerSubject -notmatch "^CN=MetaQuotes Ltd.' in source
