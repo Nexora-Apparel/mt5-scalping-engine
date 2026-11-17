@@ -54,6 +54,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "UTC inputs must be increasing ISO-8601 timestamps with explicit timezone and millisecond precision." }
           Write-Host "Credentials and UTC interval format validated; secret values are not printed."
 
+      - name: Install project test dependencies and run historical-probe preflight
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          python -m pip install --disable-pip-version-check -r requirements.txt
+          if ($LASTEXITCODE -ne 0) { throw "Project test dependency installation failed." }
+          python -m pytest -q tests/test_mt5_xauusd_historical_tick_probe.py
+          if ($LASTEXITCODE -ne 0) { throw "Historical-probe preflight tests failed; MT5 will not be installed and no historical request will run." }
+
       - name: Install and verify Exness-linked MetaTrader terminal
         shell: pwsh
         run: |
@@ -97,7 +106,6 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           python -m pip install --disable-pip-version-check "MetaTrader5==5.0.6231"
-          python -m pip install -r requirements.txt
           python -c "import MetaTrader5 as mt5; assert mt5.__version__ == '5.0.6231'; print('Pinned MetaTrader5 package verified.')"
           if ($LASTEXITCODE -ne 0) { throw "Pinned MetaTrader5 dependency verification failed." }
 
