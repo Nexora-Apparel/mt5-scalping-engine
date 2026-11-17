@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import hashlib
 import json
 import math
 import os
@@ -226,6 +225,10 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
             "schema": "VELTRIX_XAUUSD_HISTORICAL_TICK_PROBE_V2",
             "status": "PASS",
             "source": "authenticated Exness MT5 DEMO terminal historical tick API",
+            "source_ref": os.environ.get("GITHUB_REF_NAME", "phase8-distinct-validation-date-guard"),
+            "source_commit": os.environ.get("VELTRIX_SOURCE_COMMIT"),
+            "dispatcher_commit": os.environ.get("GITHUB_SHA"),
+            "installer_signer_thumbprint": os.environ.get("MT5_INSTALLER_SIGNER_THUMBPRINT"),
             "account_mode": "DEMO",
             "trading_enabled": False,
             "order_submission": False,
