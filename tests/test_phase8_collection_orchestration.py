@@ -75,3 +75,21 @@ def test_historical_probe_workflow_preserves_provenance_hardening():
     assert "VELTRIX_SOURCE_COMMIT: ${{ github.sha }}" in source
     assert "VELTRIX_SOURCE_REF: ${{ github.ref_name }}" in source
     assert "MT5_INSTALLER_SIGNER_THUMBPRINT=$($signature.SignerCertificate.Thumbprint)" in source
+
+
+def test_default_branch_historical_dispatcher_checks_out_reviewed_branch_and_preflights():
+    source = (ROOT / ".github/workflows/xauusd-historical-tick-probe-dispatch.yml").read_text(encoding="utf-8")
+    assert "workflow_dispatch:" in source
+    assert "ref: phase8-distinct-validation-date-guard" in source
+    assert "persist-credentials: false" in source
+    assert "python -m pytest -q tests/test_mt5_xauusd_historical_tick_probe.py" in source
+    assert "MT5_INSTALLER_SIGNER_THUMBPRINT=$thumbprint" in source
+    assert "AllowLiveTrading=0" in source
+    assert "AllowDllImport=0" in source
+    assert "order_send(" not in source.lower()
+
+
+def test_project_tests_watch_both_historical_probe_workflows():
+    source = (ROOT / ".github/workflows/tests.yml").read_text(encoding="utf-8")
+    assert source.count('.github/workflows/xauusd-historical-tick-probe.yml') == 2
+    assert source.count('.github/workflows/xauusd-historical-tick-probe-dispatch.yml') == 2
