@@ -504,3 +504,13 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Decision:** Do not weaken the replay loader's fail-closed requirements, and do not fabricate missing manifest fields or treat a collector audit PASS as replay-readiness. The current v1/v2 historical CSVs remain retained, hash-verified exploratory source data.
 - **Next engineering task:** Update the historical probe's manifest contract to record DLL-import-disabled status from the actual terminal configuration and verified `symbol_info` currency/point metadata; add tests for those fields and update the immutable source pin through the reviewed PR sequence. Separately implement a provenance-preserving adapter for existing historical artifacts only if the original run evidence can independently substantiate every required field. Then profile/replay the five successful windows with synthetic mechanics events only; do not generate or score candidate signals from this exploratory sample.
 - **Safety:** Historical replay remains research-only. No strategy performance, candidate ranking, tuning, approval, holdout eligibility, or trading claim is permitted.
+
+
+### 2026-11-18 — Runtime-verified historical replay manifest contract implemented
+
+- **Branch:** `phase8-replay-manifest-contract`, based on main commit `1704af7185edf85751d5814bc493cd5d817c1ccf`.
+- **Change:** Historical probe now reads effective MT5 `terminal_info().dlls_allowed` and fails closed unless it is explicitly `False`. The workflow's INI setting is not treated as runtime proof.
+- **Contract metadata:** Probe now requires `symbol_info` to report exact `currency_base=XAU`, `currency_profit=USD`, and a finite positive point size. It records `dll_imports_enabled=false` and structured `instrument_specs.XAUUSD` with broker symbol, currencies and point size, matching the existing Phase 5 replay loader contract. Existing `instrument_point` is retained for compatibility.
+- **Tests added:** Runtime DLL state true/missing cases and wrong/missing currency or invalid point cases fail closed; successful manifest assertions cover all replay-required fields.
+- **Safety boundary:** No historical artifacts are rewritten and no missing metadata is backfilled into old manifests. Existing V1/V2 records remain unchanged until their original runtime evidence can substantiate the fields. No order, candidate signal, candidate tuning, holdout, approval, certification or trading operation is introduced.
+- **Next:** Run focused and full CI on this branch. After review, update the default batch workflow's immutable source pin to the reviewed source commit in a separate workflow change, then collect no new records until the new manifest has been verified on a controlled run.
