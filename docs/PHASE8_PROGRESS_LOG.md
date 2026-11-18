@@ -394,3 +394,12 @@ Never overwrite a failed result with a later success. Record the later success a
 - Follow-up PR #69 CI run [44286145807](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44286145807) passed dependency installation, shell validation, Python compilation, and 263 tests; one legacy orchestration assertion failed because it still required validation_02 in the workflow.
 - The workflow intentionally excludes validation_02 because it duplicates validation_01's UTC date. The test has been updated to assert the current eligible IDs (01, 03, 04, 05, 06) and explicitly assert that 02 is absent.
 - Test correction commit: 3c4ca0efbfa00e93c14e2b2047f80fe29ed6f87d. Awaiting its CI result. This is a test expectation correction only; no collection schedule or strategy rule was changed.
+
+
+## 2026-11-18 — Independent installer signer pin added
+
+- PR #69 project test run [44286249938](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44286249938) passed the complete repository test suite after the distinct-date assertion correction.
+- The batch workflow now requires the GitHub Actions secret EXNESS_MT5_SIGNER_THUMBPRINT to contain a 40-hex-character fingerprint and compares it with the actual installer certificate thumbprint before executing the installer. Missing or mismatched fingerprints fail closed.
+- Added a regression test requiring this independent signer pin, while retaining Authenticode Valid, MetaQuotes Ltd. publisher, Code Signing EKU, and disabled terminal trading/DLL imports.
+- Implementation commits: a2c47038bdacebcd0f2fcf4c8c0b4eeb91732442 (workflow) and 5e44b13fea5ef0cfd8a621bb2fa104b84509e419 (test). CI for these changes is pending.
+- Manual prerequisite remains: Exness must confirm the approved signer thumbprint through an authenticated support channel; the observed certificate fingerprint must not be treated as self-authorizing. No installer execution or historical batch request is authorized by this code change alone.
