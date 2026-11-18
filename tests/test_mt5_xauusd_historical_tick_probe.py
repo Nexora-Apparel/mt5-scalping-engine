@@ -1,5 +1,6 @@
 import csv
 import hashlib
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -78,10 +79,15 @@ def test_parse_utc_requires_timezone_and_normalizes_offsets():
 
 
 def test_probe_retrieves_non_overlapping_chunks_and_writes_verified_csv(
-    tmp_path, demo_guards
+    tmp_path, demo_guards, monkeypatch
 ):
     start = datetime(2026, 11, 13, 9, 0, tzinfo=timezone.utc)
     end = datetime(2026, 11, 13, 9, 2, tzinfo=timezone.utc)
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setenv("VELTRIX_SOURCE_REF", "phase8-test-ref")
+    monkeypatch.setenv("VELTRIX_SOURCE_COMMIT", "a" * 40)
+    monkeypatch.setenv("GITHUB_SHA", "b" * 40)
+    monkeypatch.setenv("MT5_INSTALLER_SIGNER_THUMBPRINT", "C" * 40)
     stamps = [
         ms(start),
         ms(start + timedelta(seconds=59, milliseconds=999)),
@@ -123,6 +129,11 @@ def test_probe_retrieves_non_overlapping_chunks_and_writes_verified_csv(
     assert all(row["canonical_symbol"] == "XAUUSD" for row in rows)
     manifest_text = (tmp_path / "manifest.json").read_text(encoding="utf-8")
     assert manifest_text.endswith("\n")
+    manifest = json.loads(manifest_text)
+    assert manifest["source_ref"] == "phase8-test-ref"
+    assert manifest["source_commit"] == "a" * 40
+    assert manifest["dispatcher_commit"] == "b" * 40
+    assert manifest["installer_signer_thumbprint"] == "C" * 40
     assert result["first_tick_utc"] == probe_module.utc_iso(stamps[0])
     assert result["last_tick_utc"] == probe_module.utc_iso(stamps[-1])
 
