@@ -36,3 +36,13 @@ def test_rejects_total_duration_above_six_hours():
     plan = [_interval(day, "10:00:00.000", "10:31:00.000") for day in range(1, 13)]
     with pytest.raises(DiagnosticFailure, match="six-hour"):
         validate_interval_plan(json.dumps(plan))
+
+
+def test_batch_workflow_requires_independently_pinned_exness_installer_signer():
+    workflow = (ROOT / ".github/workflows/xauusd-historical-tick-batch.yml").read_text(encoding="utf-8")
+    assert "EXNESS_MT5_SIGNER_THUMBPRINT" in workflow
+    assert "independently confirmed" in workflow
+    assert "$thumbprint.ToUpperInvariant() -ne $expectedThumbprint" in workflow
+    assert "Get-AuthenticodeSignature" in workflow
+    assert "AllowLiveTrading=0" in workflow
+    assert "AllowDllImport=0" in workflow
