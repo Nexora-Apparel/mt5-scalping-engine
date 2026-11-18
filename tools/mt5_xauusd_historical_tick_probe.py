@@ -7,6 +7,7 @@ position-management API is called.
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import csv
 import json
 import math
@@ -43,6 +44,69 @@ RANGE_PADDING_MILLISECONDS = 2_000
 # Bound that provider spill separately; all such rows are still excluded
 # by the exact logical-chunk filter before publication.
 RANGE_RESPONSE_SPILL_TOLERANCE_MILLISECONDS = 2_000
+# Standard MQL5 ENUM_TICK_FLAG bits documented by MetaQuotes. Higher bits
+# have been observed in downloaded tick history; preserve them as raw metadata
+# but do not assign undocumented semantics or use them as strategy features.
+DOCUMENTED_TICK_FLAG_MASK = 0x7E
+DOCUMENTED_TICK_FLAGS = {
+    "TICK_FLAG_BID": 0x02,
+    "TICK_FLAG_ASK": 0x04,
+    "TICK_FLAG_LAST": 0x08,
+    "TICK_FLAG_VOLUME": 0x10,
+    "TICK_FLAG_BUY": 0x20,
+    "TICK_FLAG_SELL": 0x40,
+}
+
+
+def _runtime_diagnostics(mt5: Any) -> dict[str, Any]:
+    """Capture terminal/integration versions without making them prerequisites."""
+    package_version = getattr(mt5, "__version__", None)
+    terminal_version = None
+    version_fn = getattr(mt5, "version", None)
+    if callable(version_fn):
+        try:
+            value = version_fn()
+            terminal_version = list(value) if isinstance(value, (tuple, list)) else str(value)
+        except Exception:
+            terminal_version = None
+    terminal_build = None
+    terminal_info_fn = getattr(mt5, "terminal_info", None)
+    if callable(terminal_info_fn):
+        try:
+            info = terminal_info_fn()
+            terminal_build = getattr(info, "build", None) if info is not None else None
+        except Exception:
+            terminal_build = None
+    return {
+        "python_integration_version": str(package_version) if package_version is not None else None,
+        "terminal_version": terminal_version,
+        "terminal_build": int(terminal_build) if terminal_build is not None else None,
+    }
+
+
+def _tick_flag_diagnostics(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    raw_counts = Counter(row["flags"] for row in rows)
+    unknown_counts = Counter(
+        row["flags"] & ~DOCUMENTED_TICK_FLAG_MASK
+        for row in rows
+        if row["flags"] & ~DOCUMENTED_TICK_FLAG_MASK
+    )
+    return {
+        "documented_flag_mask_hex": f"0x{DOCUMENTED_TICK_FLAG_MASK:02X}",
+        "documented_flags": {
+            name: f"0x{value:02X}" for name, value in DOCUMENTED_TICK_FLAGS.items()
+        },
+        "raw_flag_value_counts": {
+            f"0x{value:08X}": count for value, count in sorted(raw_counts.items())
+        },
+        "nonstandard_mask_counts": {
+            f"0x{value:08X}": count for value, count in sorted(unknown_counts.items())
+        },
+        "interpretation": (
+            "Raw flags are preserved in the CSV. Only the six documented MQL5 "
+            "bits are interpreted; nonstandard bits are retained but uninterpreted."
+        ),
+    }
 
 
 def parse_utc(value: str) -> datetime:
@@ -90,6 +154,8 @@ def _normalize_tick(tick: Any, start_ms: int, end_ms: int) -> dict[str, Any]:
 
     if stamp <= 0:
         raise DiagnosticFailure(f"historical feed returned invalid timestamp: {stamp}")
+    if flags < 0 or flags > 0xFFFFFFFF:
+        raise DiagnosticFailure(f"historical feed returned flags outside uint32 range: {flags}")
     if stamp < start_ms or stamp > end_ms:
         raise DiagnosticFailure(
             "historical API returned a tick outside the requested UTC interval; "
@@ -277,7 +343,10 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
             raise
 
         digest = dataset_audit["sha256"]
-        ordered_stamps = [row["time_msc"] for row in records_by_key.values()]
+        diagnostic_rows = list(records_by_key.values())
+        ordered_stamps = [row["time_msc"] for row in diagnostic_rows]
+        runtime_diagnostics = _runtime_diagnostics(mt5)
+        tick_flag_diagnostics = _tick_flag_diagnostics(diagnostic_rows)
         manifest = {
             "schema": "VELTRIX_XAUUSD_HISTORICAL_TICK_PROBE_V2",
             "status": "PASS",
@@ -305,6 +374,8 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
             "first_tick_utc": utc_iso(min(ordered_stamps)),
             "last_tick_utc": utc_iso(max(ordered_stamps)),
             "instrument_point": float(info.point),
+            "runtime": runtime_diagnostics,
+            "tick_flag_diagnostics": tick_flag_diagnostics,
             "sha256": digest,
             "dataset_audit": dataset_audit,
             "csv_file": csv_path.name,
