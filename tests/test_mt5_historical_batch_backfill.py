@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
 
 from tools.mt5_historical_batch_backfill import validate_interval_plan
 from tools.mt5_demo_tick_collector import DiagnosticFailure
