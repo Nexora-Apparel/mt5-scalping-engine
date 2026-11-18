@@ -265,3 +265,13 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Result:** TEST ADDED / NOT YET VERIFIED.
 - **Safety:** Test-only change. No change to DEMO checks, XAUUSD-only scope, read-only behavior, query bounds, trading controls, candidate logic, or holdout state.
 - **Next action:** Verify the PR #61 workflow run and its complete test result. Keep PR #61 and PR #67 unmerged. After explicit approval and merge of PR #67, run one bounded DEMO probe and inspect all four manifest values before any historical backfill.
+
+
+### 2026-11-18 — External installer-link and PR #67 workflow audit
+
+- **Official download-link check:** Exness's official MT5 page links its Windows installer to `download.terminal.free/cdn/web/exness.technologies.ltd/mt5/exness5setup.exe`, matching the URL used by the workflow. The executable itself cannot be previewed as a webpage; the workflow's Authenticode validation remains the executable integrity gate.
+- **Sources checked:** Exness official MT5 download page, https://www.exness.com/metatrader-5/ ; Exness Help Center desktop MT5 installation guide, https://get.exness.help/hc/en-us/articles/360011514572-MT5-Trading-guide-Desktop .
+- **Workflow audit:** PR #67 branch still disables checkout credential persistence, verifies Authenticode status, MetaQuotes Ltd. publisher and Code Signing EKU, then exports the signer thumbprint and explicit source ref/commit to the probe process.
+- **Important remaining trust gap:** Capturing the thumbprint is not the same as independently pinning it. The thumbprint still needs comparison against Exness-controlled, independently obtained evidence before installer identity can be treated as pinned.
+- **CI:** PR #67's latest Project tests run #44158505860 passed. The new PR #61 provenance-manifest regression run #44214575190 also passed, including the full unit/fail-closed test step.
+- **Decision:** No workflow dispatch, merge, or broader backfill performed. The next broker-connected probe remains gated on PR #67 merge and inspection of the resulting artifact's provenance fields.
