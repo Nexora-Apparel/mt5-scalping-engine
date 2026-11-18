@@ -340,3 +340,13 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Operational boundary:** The DEMO collection workflow is manual-dispatch only. The connected GitHub integration in this session can inspect runs and artifacts but does not expose workflow dispatch. The owner must start the \`validation_06\` collection from Actions at the planned time; allow installer startup before the target collection window and confirm the manifest's actual start/end timestamps. No automatic schedule was added.
 - **PR state:** PR #61 remains open/draft/unmerged. No merge or holdout access was performed.
 
+
+
+## 2026-11-18 — Manual collection workflow dropdown repaired
+
+- Root cause confirmed: GitHub's `workflow_dispatch` form reads the workflow definition from the default branch. The default-branch `.github/workflows/veltrix-demo-tick-collection.yml` exposed only `validation_01`–`validation_04`, while the reviewed Phase 8 branch already registered `validation_01` and `validation_03`–`validation_13`.
+- Updated the default-branch workflow in commit `9375082d7a99e3bf42f812a0ce61e48a8f54e3d1` to expose the registered IDs `validation_01`, `validation_03`–`validation_13`; `validation_02` remains excluded from the eligible distinct-date sequence.
+- The dispatch workflow now checks out the reviewed collector source at immutable commit `603069d081ddd701d2a3024d2349cd9fb41f8674`, rather than implicitly using the older default-branch collector. Checkout credential persistence remains disabled.
+- Preserved DEMO credential validation, XAUUSD-only collector scope, read-only behavior, terminal trading/DLL disablement, Authenticode validation, bounded collection and artifact audit steps from the reviewed workflow.
+- Verified the committed default-branch workflow contains all 12 registered session IDs, the pinned source SHA, and the checkout credential safeguard. This is a workflow-definition verification, not a live collection run; no session was dispatched by this change.
+- Next: refresh the GitHub Actions manual-dispatch page and confirm `validation_06` is selectable. Dispatch `validation_06` once for its preregistered date; do not rerun `validation_05`.
