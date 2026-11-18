@@ -21,26 +21,22 @@
     {
       "id": "hist_20261102_asia",
       "from_utc": "2026-11-02T06:00:00.000Z",
-      "to_utc": "2026-11-02T06:30:00.000Z",
-      "session_label": "Asian"
+      "to_utc": "2026-11-02T06:30:00.000Z"
     },
     {
       "id": "hist_20261104_london",
       "from_utc": "2026-11-04T10:00:00.000Z",
-      "to_utc": "2026-11-04T10:30:00.000Z",
-      "session_label": "London"
+      "to_utc": "2026-11-04T10:30:00.000Z"
     },
     {
       "id": "hist_20261106_overlap",
       "from_utc": "2026-11-06T14:30:00.000Z",
-      "to_utc": "2026-11-06T15:00:00.000Z",
-      "session_label": "London-New York overlap"
+      "to_utc": "2026-11-06T15:00:00.000Z"
     },
     {
       "id": "hist_20261110_new_york",
       "from_utc": "2026-11-10T17:30:00.000Z",
-      "to_utc": "2026-11-10T18:00:00.000Z",
-      "session_label": "New York after London close"
+      "to_utc": "2026-11-10T18:00:00.000Z"
     }
   ],
   "max_per_interval_minutes": 31,
@@ -62,5 +58,23 @@
     "gap and spread diagnostics reviewed",
     "historical quotes never represented as actual fills"
   ],
-  "expansion_rule": "Expand only after all four feasibility intervals are returned and individually audited. A successful feasibility batch does not authorize candidate tuning, validation promotion, holdout access, certification, or trading."
+  "expansion_rule": "Expand only after all four feasibility intervals are returned and individually audited. A successful feasibility batch does not authorize candidate tuning, validation promotion, holdout access, certification, or trading.",
+  "session_windows": [
+    {
+      "interval_id": "hist_20261102_asia",
+      "label": "Asian"
+    },
+    {
+      "interval_id": "hist_20261104_london",
+      "label": "London"
+    },
+    {
+      "interval_id": "hist_20261106_overlap",
+      "label": "London-New York overlap"
+    },
+    {
+      "interval_id": "hist_20261110_new_york",
+      "label": "New York after London close"
+    }
+  ]
 }
