@@ -11,6 +11,7 @@ import csv
 import json
 import math
 import os
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -116,6 +117,20 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
     end_ms = _to_epoch_milliseconds(end, "end")
     if start_ms >= end_ms:
         raise DiagnosticFailure("a valid increasing UTC interval is required")
+
+    # Provenance is part of the publication contract, not optional metadata.
+    # Refuse to connect or publish if any workflow identity is absent/malformed.
+    provenance = {
+        "source_ref": os.environ.get("VELTRIX_SOURCE_REF", "").strip(),
+        "source_commit": os.environ.get("VELTRIX_SOURCE_COMMIT", "").strip(),
+        "dispatcher_commit": os.environ.get("GITHUB_SHA", "").strip(),
+        "installer_signer_thumbprint": os.environ.get("MT5_INSTALLER_SIGNER_THUMBPRINT", "").strip(),
+    }
+    if not provenance["source_ref"]:
+        raise DiagnosticFailure("required provenance field is missing: source_ref")
+    for field in ("source_commit", "dispatcher_commit", "installer_signer_thumbprint"):
+        if not re.fullmatch(r"[0-9a-fA-F]{40}", provenance[field]):
+            raise DiagnosticFailure(f"required provenance field is missing or malformed: {field}")
 
     login = int(os.environ.get("MT5_LOGIN", "0"))
     password = os.environ.get("MT5_PASSWORD", "")
@@ -259,10 +274,10 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
             "schema": "VELTRIX_XAUUSD_HISTORICAL_TICK_PROBE_V2",
             "status": "PASS",
             "source": "authenticated Exness MT5 DEMO terminal historical tick API",
-            "source_ref": os.environ.get("VELTRIX_SOURCE_REF", "phase8-distinct-validation-date-guard"),
-            "source_commit": os.environ.get("VELTRIX_SOURCE_COMMIT"),
-            "dispatcher_commit": os.environ.get("GITHUB_SHA"),
-            "installer_signer_thumbprint": os.environ.get("MT5_INSTALLER_SIGNER_THUMBPRINT"),
+            "source_ref": provenance["source_ref"],
+            "source_commit": provenance["source_commit"],
+            "dispatcher_commit": provenance["dispatcher_commit"],
+            "installer_signer_thumbprint": provenance["installer_signer_thumbprint"],
             "account_mode": "DEMO",
             "trading_enabled": False,
             "order_submission": False,

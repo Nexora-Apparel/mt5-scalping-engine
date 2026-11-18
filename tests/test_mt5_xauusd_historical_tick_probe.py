@@ -60,6 +60,10 @@ def demo_guards(monkeypatch):
     monkeypatch.setenv("MT5_LOGIN", "12345678")
     monkeypatch.setenv("MT5_PASSWORD", "test-only-placeholder")
     monkeypatch.setenv("MT5_SERVER", "Exness-MT5Trial")
+    monkeypatch.setenv("VELTRIX_SOURCE_REF", "phase8-test-ref")
+    monkeypatch.setenv("VELTRIX_SOURCE_COMMIT", "a" * 40)
+    monkeypatch.setenv("GITHUB_SHA", "b" * 40)
+    monkeypatch.setenv("MT5_INSTALLER_SIGNER_THUMBPRINT", "C" * 40)
     monkeypatch.delenv("MT5_TERMINAL", raising=False)
     monkeypatch.setattr(
         probe_module, "connect_expected_account",
@@ -76,6 +80,47 @@ def test_parse_utc_requires_timezone_and_normalizes_offsets():
     )
     with pytest.raises(ValueError, match="include Z"):
         probe_module.parse_utc("2026-11-13T12:00:00")
+
+
+
+@pytest.mark.parametrize(
+    "missing_field",
+    [
+        "VELTRIX_SOURCE_REF",
+        "VELTRIX_SOURCE_COMMIT",
+        "GITHUB_SHA",
+        "MT5_INSTALLER_SIGNER_THUMBPRINT",
+    ],
+)
+def test_probe_fails_closed_before_terminal_initialization_without_provenance(
+    tmp_path, demo_guards, monkeypatch, missing_field
+):
+    monkeypatch.delenv(missing_field, raising=False)
+    start = datetime(2026, 11, 13, 9, 0, tzinfo=timezone.utc)
+    api = FakeHistoricalMT5()
+
+    with pytest.raises(probe_module.DiagnosticFailure, match="provenance field"):
+        probe_module.probe(api, start, start + timedelta(seconds=1), tmp_path)
+
+    assert api.initialize_args is None
+    assert not api.calls
+    assert not (tmp_path / "xauusd_historical_ticks.csv").exists()
+    assert not (tmp_path / "manifest.json").exists()
+
+
+def test_probe_rejects_malformed_commit_or_signer_fingerprint_before_terminal_initialization(
+    tmp_path, demo_guards, monkeypatch
+):
+    start = datetime(2026, 11, 13, 9, 0, tzinfo=timezone.utc)
+    api = FakeHistoricalMT5()
+    monkeypatch.setenv("VELTRIX_SOURCE_COMMIT", "not-a-commit-sha")
+
+    with pytest.raises(probe_module.DiagnosticFailure, match="source_commit"):
+        probe_module.probe(api, start, start + timedelta(seconds=1), tmp_path)
+
+    assert api.initialize_args is None
+    assert not api.calls
+
 
 
 def test_probe_retrieves_non_overlapping_chunks_and_writes_verified_csv(
