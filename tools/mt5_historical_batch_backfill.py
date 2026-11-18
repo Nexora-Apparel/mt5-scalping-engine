@@ -152,7 +152,7 @@ def run_batch(mt5: Any, intervals: list[dict[str, Any]], output_dir: Path) -> di
             else "FAIL"
         )
         manifest_path.write_text(
-            json.dumps(manifest, indent=2, sort_keys=True) + "\\n",
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
     return manifest
