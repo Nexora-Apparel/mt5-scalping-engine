@@ -387,3 +387,10 @@ Never overwrite a failed result with a later success. Record the later success a
 - Corrective commit ebf1ff509b1c86a9f06214a80ded69ff29678ea5 copies the diagnostic module from the reviewed PR #61 branch into PR #69. This preserves explicit DEMO account login, terminal trading/DLL-disabled checks, XAUUSD-only symbol discovery, and quote validation.
 - The correction has been committed but its CI result is not yet available. No historical batch workflow was dispatched and no MT5 credentials were used by the failed Linux CI job.
 - The batch workflow remains a candidate for a small, preregistered feasibility run only after CI passes and its default-branch dispatcher is available. Installer Authenticode checks still do not constitute independent Exness signer-thumbprint confirmation.
+
+
+## 2026-11-18 — CI follow-up: stale distinct-date test corrected
+
+- Follow-up PR #69 CI run [44286145807](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44286145807) passed dependency installation, shell validation, Python compilation, and 263 tests; one legacy orchestration assertion failed because it still required validation_02 in the workflow.
+- The workflow intentionally excludes validation_02 because it duplicates validation_01's UTC date. The test has been updated to assert the current eligible IDs (01, 03, 04, 05, 06) and explicitly assert that 02 is absent.
+- Test correction commit: 3c4ca0efbfa00e93c14e2b2047f80fe29ed6f87d. Awaiting its CI result. This is a test expectation correction only; no collection schedule or strategy rule was changed.
