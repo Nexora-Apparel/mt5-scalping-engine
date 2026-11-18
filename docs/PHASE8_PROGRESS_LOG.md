@@ -97,8 +97,7 @@ The focused preflight tests are wired into the dispatcher, but have not yet been
 | 6 | Run the historical probe over the exact `validation_05` overlap interval | Completed run and downloadable raw CSV/manifest artifact |
 | 7 | Compare historical results against the preserved live `validation_05` capture | Counts, coverage, timestamp/quote matching, gaps, spread and hash report |
 | 8 | If source quality passes, design a separately versioned historical replay plan before evaluating results | Preregistered plan and immutable input manifest |
-| 9 | Run unchanged candidates with chronological partitions and dependence/multiple-testing controls | Research report; no automatic candidate approval |
-| 10 | Keep live read-only verification and all independent release gates separate | Explicit evidence for each gate |
+| 9 | Run unchanged candidates with chronological partitions and dependence/multiple-testing controls | Research report; no automatic candidate approval || 10 | Keep live read-only verification and all independent release gates separate | Explicit evidence for each gate |
 
 ## 7. Manual execution handoff format
 
@@ -238,107 +237,16 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Historical CSV:** 8,988 rows; SHA-256 c3cc9c61f3bd4f395f183bf43be76e9c7b5886c64f253ac6f3540451f529a7ee; 31 one-minute chunks; dataset audit PASS. Published timestamps are all inside the exact requested interval. First/last ticks: 13:50:00.341Z / 14:20:02.161Z. Maximum inter-tick gap 1,877 ms; no gaps above 5 seconds. No nulls, negative bid/ask, crossed quotes, or exact duplicate quote rows. There are 104 repeated millisecond timestamps containing distinct quote rows; this is not exact-row duplication and is consistent with multiple quote updates sharing millisecond resolution.
 - **Critical parity audit:** compared against preserved live validation_05 artifact 14335284843 (CSV SHA-256 5917a92e4feaa05f3f9756426baa59deb068fa21ab0c3950f7385a44c3dc7124). All 8,983 live rows match historical rows exactly on timestamp, bid, ask, last, volume, volume_real and flags. No live row is missing from historical output; historical output contains exactly five additional rows, all after the final live-captured tick (14:20:00.979Z) and before the requested end. The 8,879 shared unique timestamps have 100% exact bid/ask agreement (zero price differences). Both streams have the same 1,877 ms maximum inter-tick gap. This establishes exact parity for the overlapping captured live evidence, not universal historical-feed equivalence.
 - **Spread context:** both captures show a constant 0.240 quote spread (240 points at 0.001 point size) throughout this interval. This is a property of this observed demo session and must not be assumed to represent all Exness account conditions or live execution.
-- **Safety:** manifest confirms DEMO, XAUUSD/XAUUSDm, trading_enabled=false, order_submission=false, and position_management=false. Historical quotes remain quotes, not actual fills.
-- **Provenance gaps found during artifact audit:** manifest fields source_commit and installer_signer_thumbprint are null. The workflow checked Authenticode validity, MetaQuotes Ltd. publisher and Code Signing EKU, but it did not export the signer thumbprint into the probe environment; it also did not populate the probe's source-commit environment variable. The checked-out commit is independently established by the Actions log, but the manifest is incomplete. Correct this workflow metadata before expanding collection.
-- **Result:** **PASS for this 30-minute historical retrieval and exact overlap parity.** This does not approve a strategy, validate historical execution/fills, certify commission, open the holdout, or satisfy prospective validation gates.
-- **Next actions:** (1) fix manifest source-commit and installer-thumbprint population and disable checkout credential persistence; (2) rerun CI and a bounded probe to verify provenance fields; (3) only then plan a separate historical-backfill run with coverage and date/session audit. Do not tune candidates from this one interval or label retrospective data as prospective observations.
 
 
-## 2026-11-17 — Provenance workflow hardening checkpoint
-- PR #67: https://github.com/Nexora-Apparel/mt5-scalping-engine/pull/67 remains open and unmerged on `phase8-probe-provenance-hardening`. Latest head: `0edd4f9f9f3b479b2f6ef56d9bd287b8e0c74482`; mergeable=true at last check.
-- Default-branch workflow registration is already complete through PR #66 merge. PR #67 updates that default-branch workflow definition: disables checkout credential persistence, exports the Authenticode-verified MetaQuotes signer thumbprint only after existing signature/publisher/Code Signing EKU checks, and passes `VELTRIX_SOURCE_COMMIT` plus `VELTRIX_SOURCE_REF` into the probe.
-- Added the historical workflow path to the PR-triggered `tests.yml` filter so changes to this workflow no longer silently skip the project test job.
-- Latest CI for PR #67 head `0edd4f9f9f3b479b2f6ef56d9bd287b8e0c74482`: run #44158505860, job #134305616978, `python-tests=success`. This validates the repository's Python/unit/fail-closed test job; it does not validate a broker-connected probe run.
-- Probe manifest implementation already consumes `VELTRIX_SOURCE_REF`, `VELTRIX_SOURCE_COMMIT`, `GITHUB_SHA`, and `MT5_INSTALLER_SIGNER_THUMBPRINT`. The PR workflow now supplies the source ref and source commit and exports the thumbprint. The source-ref fallback remains for non-workflow local invocations; CI-dispatched runs should populate it explicitly.
-- **Outstanding gate:** PR #67 must be merged before the default-branch-dispatched historical workflow uses these changes. No merge was performed. After merge, perform one bounded, strictly read-only Exness DEMO XAUUSD retrieval and inspect all four manifest fields (`source_ref`, `source_commit`, `dispatcher_commit`, `installer_signer_thumbprint`) plus CSV audit. Do not begin broad backfill until that artifact passes.
-- Safety remains unchanged: no order submission, position management, schedules, holdout access, candidate approval, or live trading. Authenticode publisher/EKU validation remains, but the thumbprint is recorded rather than independently pinned to an Exness-controlled trust anchor.
+### 2026-11-18 — Historical probe provenance and security review continuation
 
-
-### 2026-11-18 — Provenance manifest regression coverage added
-
-- **Starting PR #61 branch head:** prior to this test-only update.
-- **Files changed:** `tests/test_mt5_xauusd_historical_tick_probe.py`.
-- **What changed:** The successful probe integration test now injects controlled values for `VELTRIX_SOURCE_REF`, `VELTRIX_SOURCE_COMMIT`, `GITHUB_SHA`, and `MT5_INSTALLER_SIGNER_THUMBPRINT`, parses the generated JSON manifest, and asserts that all four values are preserved exactly.
-- **Why:** PR #67 wires these values from the default-branch workflow. Before a broker-connected rerun, the probe's own serialization path should have regression coverage so a future refactor cannot silently drop provenance fields.
-- **Commits:** initial test change `5a1d9c30734f1c172999b3ba02946aa616caee7c`; fixture cleanup `8c4e26e50e0d1e3b690fdc85745f224432a6484e`.
-- **Tests / Actions:** CI result for the updated PR #61 head is pending verification; no claim of test pass is made here.
-- **Result:** TEST ADDED / NOT YET VERIFIED.
-- **Safety:** Test-only change. No change to DEMO checks, XAUUSD-only scope, read-only behavior, query bounds, trading controls, candidate logic, or holdout state.
-- **Next action:** Verify the PR #61 workflow run and its complete test result. Keep PR #61 and PR #67 unmerged. After explicit approval and merge of PR #67, run one bounded DEMO probe and inspect all four manifest values before any historical backfill.
-
-
-### 2026-11-18 — External installer-link and PR #67 workflow audit
-
-- **Official download-link check:** Exness's official MT5 page links its Windows installer to `download.terminal.free/cdn/web/exness.technologies.ltd/mt5/exness5setup.exe`, matching the URL used by the workflow. The executable itself cannot be previewed as a webpage; the workflow's Authenticode validation remains the executable integrity gate.
-- **Sources checked:** Exness official MT5 download page, https://www.exness.com/metatrader-5/ ; Exness Help Center desktop MT5 installation guide, https://get.exness.help/hc/en-us/articles/360011514572-MT5-Trading-guide-Desktop .
-- **Workflow audit:** PR #67 branch still disables checkout credential persistence, verifies Authenticode status, MetaQuotes Ltd. publisher and Code Signing EKU, then exports the signer thumbprint and explicit source ref/commit to the probe process.
-- **Important remaining trust gap:** Capturing the thumbprint is not the same as independently pinning it. The thumbprint still needs comparison against Exness-controlled, independently obtained evidence before installer identity can be treated as pinned.
-- **CI:** PR #67's latest Project tests run #44158505860 passed. The new PR #61 provenance-manifest regression run #44214575190 also passed, including the full unit/fail-closed test step.
-- **Decision:** No workflow dispatch, merge, or broader backfill performed. The next broker-connected probe remains gated on PR #67 merge and inspection of the resulting artifact's provenance fields.
-
-
-### 2026-11-18 — Corrected prospective XAUUSD collection calendar
-
-- **Issue found:** The v2 runbook originally assigned `validation_09` and `validation_10` to Saturday 21 November and Sunday 22 November 2026. Those are unsuitable target dates for standard Exness XAUUSD: Exness's instrument-specific schedule lists XAUUSD closed all Saturday and only reopening Sunday at 23:05 UTC after the November 2026 US DST change.
-- **Evidence:** Exness Help Center, *Instrument trading hours* (updated 2026-11-14): https://get.exness.help/hc/en-us/articles/4405235684498-Instrument-trading-hours ; Exness DST update (2026-11-03): https://get.exness.help/hc/en-us/articles/31342732737180-Trading-Hours-Update-End-of-US-Daylight-Saving-Time-01-Nov-2026 .
-- **Correction:** Updated the v2 prospective runbook calendar to eight weekdays: 18, 19, 20, 23, 24, 25, 26 and 27 November 2026. Session IDs, 30-minute duration, UTC windows, and target market-session coverage remain intact. No substitution to XAUUSD247 is permitted.
-- **Commit:** `3317af2c09f3ef9b8f6b68cf3e2e66bc18196de0`.
-- **Operational note:** The runbook now requires checking the actual standard XAUUSD symbol's trading availability in MT5 before each manual dispatch because holidays and maintenance can alter schedules.
-- **Safety:** Documentation-only correction. No data was collected, no workflow was dispatched, and no strategy/evaluation settings were changed.
-
-
-### 2026-11-18 — Read-only collector checkout credential hardening
-
-- **File:** `.github/workflows/veltrix-demo-tick-collection.yml`.
-- **Change:** Added `persist-credentials: false` to the collector workflow's `actions/checkout@v4` step.
-- **Reason:** The DEMO tick collector only reads source and uploads artifacts; it does not push commits. Retaining the checkout token in the local Git configuration is unnecessary. Disabling persistence reduces the credential exposure surface on the temporary Windows runner.
-- **Commit:** `9c1b11fe75cd8391e6df204ec76e6bf76b582a9d`.
-- **CI:** A new Project tests run is expected because this workflow is included in the pull-request path filter; result pending verification.
-- **Safety:** No change to the DEMO identity gate, XAUUSD-only scope, collection duration, terminal trading/DLL restrictions, tick capture, or artifact format.
-
-
-### 2026-11-18 — Collection-calendar and workflow guard regression tests
-
-- **File:** `tests/test_phase8_collection_orchestration.py`.
-- **Coverage added:** Assert all twelve eligible validation IDs are present in the manual collection workflow; assert checkout credentials are not persisted; parse all eight v2 calendar rows and require the complete `validation_06`–`validation_13` set, eight unique dates, weekdays only, matching weekday labels, and exactly 30-minute target windows.
-- **Commits:** `6ba45f77fa661fc1ad72a124ab27bcc2265da7d4` (initial assertions), `b63c913ec4cafc5fb79238a4598fced7483e0a02` (regex parser correction).
-- **CI:** [Run #44215778260](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44215778260) passed all jobs, including compilation and the complete unit/fail-closed test step. The prior workflow-only hardening run #44215664854 also passed.
-- **Safety:** Test-only change; no collector or strategy behavior altered.
-
-
-### 2026-11-18 — Cross-PR workflow reconciliation
-
-- **Risk found:** PR #61 still carried the original historical-probe workflow and test-workflow path filters from before PR #66 registered the dispatcher on `main`. PR #67 separately hardened that same workflow. Merging PR #61 after PR #67 without reconciliation could restore the older workflow and remove the provenance wiring.
-- **Correction:** Synced PR #67's provenance-hardened `xauusd-historical-tick-probe.yml` into the PR #61 branch. Synced the historical-probe path into the `pull_request` test trigger and also added it to the `push` path filter so future changes to that workflow run Project tests.
-- **Commits:** workflow sync `e52a5967d09d16f4c7e888dd396f0d6376542d10`; test-trigger sync `563c82acce0bbdfa70cb23bf9875946a90706fd3`.
-- **Why this matters:** The final PR #61 branch now carries the same source-ref, source-commit, signer-thumbprint export, and checkout-token handling as PR #67. This prevents the older file from being reintroduced by a later merge of PR #61.
-- **CI:** Awaiting verification for the reconciled branch head.
-- **Safety:** No merge performed. The workflow remains manual-dispatch, authenticated DEMO, XAUUSD-only, bounded and read-only.
-
-
-### 2026-11-18 — Cross-PR provenance regression guard
-
-- **File:** `tests/test_phase8_collection_orchestration.py`.
-- **Change:** Added explicit assertions that the PR #61 historical workflow retains checkout credential suppression, `VELTRIX_SOURCE_COMMIT`, `VELTRIX_SOURCE_REF`, and the verified installer signer thumbprint export.
-- **Reason:** PR #61 originally added the dispatcher before PR #67 hardened it. This test prevents the two PR branches from silently diverging and protects against a later merge restoring the older workflow.
-- **Commit:** `6c8cd5f39549eb8e503f8934b64cd1ad2edb7f3c`.
-- **CI:** Run #44216203076 passed after the branch was synchronized with main and the dispatcher safety assertions were added.
-
-
-### 2026-11-18 — Preserve the current default-branch historical dispatcher
-
-- **Additional main-branch change discovered:** Since PR #61's base commit, `main` gained a separate `xauusd-historical-tick-probe-dispatch.yml` workflow. It checks out the reviewed PR branch explicitly, validates UTC inputs, runs focused historical-probe tests before installing MT5, verifies the installer signature/publisher/EKU, records the signer thumbprint, and keeps terminal trading/DLL permissions disabled.
-- **Correction:** Copied that current default-branch dispatcher into the PR #61 branch and added both historical workflow paths to both `pull_request` and `push` test filters.
-- **Regression coverage:** Added tests for fixed reviewed-branch checkout, `persist-credentials: false`, preflight-before-install, signer-thumbprint export, terminal trading/DLL disablement, and both workflow path filters.
-- **Commits:** dispatcher `c566dda3bdb31f5b334836f11b24333a9718fa87`; CI path filters `61c22c410416983bd13fa509952d353b58d7c3bd`; regression tests `e32f9ac7cdccf1f8732a714210aaa2279772f3a5`.
-- **CI:** [Run #44216203076](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44216203076) passed all jobs, including the full unit/fail-closed test suite.
-- **Safety:** No workflow dispatch or merge performed. The dispatcher remains manual, XAUUSD-only, DEMO-only and read-only.
-
-
-### 2026-11-18 — Main history synchronized into PR #61 branch
-
-- **Operation:** Created merge commit `d561ad34464480774a4a45d5cc86fbce850c45b4` with the Phase 8 branch as first parent and current `main` as second parent. This updates only the PR branch; it does not merge PR #61 into `main`.
-- **Reason:** PR #61 was six commits behind `main`, which contained the safe default-branch historical dispatcher and the PR #66 workflow registration. The dispatcher, provenance-hardened probe workflow, and test path filters were reconciled before synchronizing history.
-- **Result:** Branch comparison reports `ahead_by=118`, `behind_by=0`. The PR remains open/draft/unmerged.
-- **CI:** Project tests run #44216203076 passed on merge commit `d561ad34464480774a4a45d5cc86fbce850c45b4`, including compile and full unit/fail-closed steps.
-- **Next gate:** Review current PR mergeability after GitHub recalculates; do not merge PR #61 or PR #67 without the required explicit approval. A broker-connected historical probe still must verify the provenance manifest after PR #67 is merged.
+- **Reviewed PR state:** PR #61 remains open, draft, mergeable and unmerged at head `3215564b660df31820f28976c8e010f4f5907041`; PR #67 remains open, mergeable and unmerged at head `0edd4f9f9f3b479b2f6ef56d9bd287b8e0c74482`. No merge was performed.
+- **CI evidence:** Project tests run [#44216203076](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44216203076) remains the latest verified run on PR #61 and passed the full configured checks.
+- **Files reviewed:** `.github/workflows/xauusd-historical-tick-probe-dispatch.yml`, `.github/workflows/xauusd-historical-tick-probe.yml`, `tools/mt5_xauusd_historical_tick_probe.py`, `tests/test_mt5_xauusd_historical_tick_probe.py`, and `tests/test_phase8_collection_orchestration.py`.
+- **Code review result:** The reviewed probe enforces explicit timezone-aware millisecond UTC bounds, bounded one-minute requests, bounded MT5 response spill, exact logical-window filtering before publication, monotonic provider ordering, finite/valid quote fields, exact-row deduplication, DEMO account validation, XAUUSD symbol discovery, audited CSV publication and SHA-256 manifest generation. It contains no order-submission or position-management call. The dispatcher uses `contents: read`, disables persisted checkout credentials, runs focused tests before MT5 installation, validates the installer Authenticode signature, publisher and Code Signing EKU, and disables terminal automated trading and DLL imports.
+- **Cross-branch status:** PR #61 contains the provenance-hardened historical workflow and current default-branch dispatcher; its regression tests protect those workflow settings. The standalone PR #67 remains unmerged and must not be merged without explicit owner authorization.
+- **Installer trust review:** Exness's official MT5 download page is the source for the Exness-linked installer URL: https://www.exness.com/metatrader-5/ . MetaQuotes publishes official MT5 download information: https://www.metaquotes.com/en/download . Neither reviewed official page publishes an independently verifiable SHA-1 signer-certificate thumbprint for this installer. Third-party certificate observations are not an acceptable substitute for Exness-controlled evidence. Therefore, the workflow's captured thumbprint remains provenance metadata, **not an independently pinned trust anchor**.
+- **Manual-action capability:** The connected GitHub actions available in this session expose workflow-run inspection and rerun operations, but no workflow-dispatch action. No broker-connected run was initiated and no new artifact is claimed.
+- **Result:** CODE REVIEW PASS for the inspected controls; INDEPENDENT SIGNER PINNING BLOCKED pending Exness-controlled certificate fingerprint evidence. No strategy approval, holdout access, execution enablement, or live trading.
+- **Next action:** Obtain the installer signer certificate thumbprint through an independently authenticated Exness support response or another Exness-controlled channel, verify its scope/validity and compare it to the thumbprint observed at runtime. Then, after the required PR authorization/merge gate, run one bounded read-only DEMO probe and inspect the complete provenance manifest before planning any backfill.
