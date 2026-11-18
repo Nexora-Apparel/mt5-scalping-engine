@@ -63,16 +63,16 @@ These are target windows, not asserted actual collection times. Runner startup a
 
 | Session ID | Target UTC date | Target UTC window | Intended coverage |
 |---|---|---|---|
-| validation_06 | 2026-11-18 | 06:00–06:30 | Asian |
-| validation_07 | 2026-11-19 | 10:00–10:30 | London |
-| validation_08 | 2026-11-20 | 13:30–14:00 | London–New York overlap |
-| validation_09 | 2026-11-21 | 06:00–06:30 | Asian |
-| validation_10 | 2026-11-22 | 10:00–10:30 | London |
-| validation_11 | 2026-11-23 | 13:30–14:00 | London–New York overlap |
-| validation_12 | 2026-11-24 | 17:30–18:00 | New York after London close |
-| validation_13 | 2026-11-25 | 10:00–10:30 | London |
+| validation_06 | 2026-11-18 (Wed) | 06:00–06:30 | Asian |
+| validation_07 | 2026-11-19 (Thu) | 10:00–10:30 | London |
+| validation_08 | 2026-11-20 (Fri) | 13:30–14:00 | London–New York overlap |
+| validation_09 | 2026-11-23 (Mon) | 06:00–06:30 | Asian |
+| validation_10 | 2026-11-24 (Tue) | 10:00–10:30 | London |
+| validation_11 | 2026-11-25 (Wed) | 13:30–14:00 | London–New York overlap |
+| validation_12 | 2026-11-26 (Thu) | 17:30–18:00 | New York after London close |
+| validation_13 | 2026-11-27 (Fri) | 10:00–10:30 | London |
 
-Use one collection per UTC date. Do not run multiple sessions on one date and count them as distinct-date evidence. Do not relabel a session if actual timestamps fall outside the intended window. The workflow dropdown now exposes these eight IDs.
+All eight target dates are weekdays. This avoids scheduling ordinary XAUUSD sessions on Saturday or Sunday, when standard XAUUSD is closed (do not substitute XAUUSD247). Exness publishes the instrument-specific schedule and can change it for holidays or maintenance; verify the actual symbol's trading availability in MT5 before each dispatch. Use one collection per UTC date. Do not run multiple sessions on one date and count them as distinct-date evidence. Do not relabel a session if actual timestamps fall outside the intended window. The workflow dropdown now exposes these eight IDs.
 
 After the eight collection runs succeed, update the JSON session map supplied to the v2 validation workflow with their actual GitHub Actions run IDs. The current workflow input default contains only the already completed v1 sessions; it is intentionally not populated with invented future run IDs.
 
