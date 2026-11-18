@@ -7,8 +7,10 @@ def test_phase8_collection_is_manual_only_and_session_id_bound():
     source = (ROOT / ".github/workflows/veltrix-demo-tick-collection.yml").read_text(encoding="utf-8")
     assert "workflow_dispatch:" in source
     assert "validation_session_id:" in source
-    for session_id in ("validation_01", "validation_02", "validation_03", "validation_04"):
+    # validation_02 is deliberately excluded: it duplicates validation_01's UTC date.
+    for session_id in ("validation_01", "validation_03", "validation_04", "validation_05", "validation_06"):
         assert session_id in source
+    assert "validation_02" not in source
     assert "\\n  schedule:" not in source
     assert "\\n  push:" not in source
     assert "VELTRIX_SESSION_ID:" in source
