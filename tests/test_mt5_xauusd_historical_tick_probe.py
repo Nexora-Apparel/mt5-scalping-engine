@@ -15,7 +15,7 @@ def ms(value: datetime) -> int:
 
 
 def tick(stamp: int, *, bid=3000.0, ask=3000.2, last=3000.1,
-         volume=1.0, volume_real=1.0, flags=3):
+         volume=1.0, volume_real=1.0, flags=6):
     return SimpleNamespace(
         time_msc=stamp, bid=bid, ask=ask, last=last,
         volume=volume, volume_real=volume_real, flags=flags,
