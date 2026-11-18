@@ -10,9 +10,17 @@ on:
         type: choice
         options:
           - validation_01
-          - validation_02
           - validation_03
           - validation_04
+          - validation_05
+          - validation_06
+          - validation_07
+          - validation_08
+          - validation_09
+          - validation_10
+          - validation_11
+          - validation_12
+          - validation_13
 
 permissions:
   contents: read
@@ -27,8 +35,11 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 50
     steps:
-      - name: Check out source
+      - name: Check out reviewed Phase 8 collector source
         uses: actions/checkout@v4
+        with:
+          ref: 603069d081ddd701d2a3024d2349cd9fb41f8674
+          persist-credentials: false
 
       - name: Validate credentials without printing them
         shell: pwsh
@@ -51,6 +62,57 @@ jobs:
           $installPath = "C:\MT5"
           Invoke-WebRequest -Uri "https://download.terminal.free/cdn/web/exness.technologies.ltd/mt5/exness5setup.exe" -OutFile $installer
           if ((Get-Item $installer).Length -lt 1000000) { throw "Exness MT5 installer download is incomplete." }
+
+          # Exness's own MT5 page links to this exact MetaQuotes-hosted
+          # installer path. The software publisher is MetaQuotes, not Exness.
+          # Trust requires the exact approved source path, a valid Windows
+          # Authenticode chain, the exact MetaQuotes publisher DN, and Code
+          # Signing EKU. Never accept a generic "valid signature" alone.
+          $sourceUrl = "https://download.terminal.free/cdn/web/exness.technologies.ltd/mt5/exness5setup.exe"
+          $signature = Get-AuthenticodeSignature -LiteralPath $installer
+          $signerSubject = ""
+          $signerThumbprint = ""
+          $signerIssuer = ""
+          $hasCodeSigningEku = $false
+          if ($null -ne $signature.SignerCertificate) {
+            $signerSubject = [string]$signature.SignerCertificate.Subject
+            $signerThumbprint = [string]$signature.SignerCertificate.Thumbprint
+            $signerIssuer = [string]$signature.SignerCertificate.Issuer
+            $ekuExtension = $signature.SignerCertificate.Extensions |
+              Where-Object { $_.Oid.Value -eq "2.5.29.37" } |
+              Select-Object -First 1
+            if ($null -ne $ekuExtension) {
+              $eku = [System.Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension]::new($ekuExtension, $false)
+              $hasCodeSigningEku = @($eku.EnhancedKeyUsages | Where-Object { $_.Value -eq "1.3.6.1.5.5.7.3.3" }).Count -gt 0
+            }
+          }
+          $installerHash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          $provenance = [ordered]@{
+            schema = "VELTRIX_EXNESS_INSTALLER_PROVENANCE_V2"
+            observed_at_utc = [DateTime]::UtcNow.ToString("o")
+            source_url = $sourceUrl
+            source_policy = "Exact installer URL linked by the official Exness MT5 download page"
+            file_name = [IO.Path]::GetFileName($installer)
+            file_bytes = (Get-Item $installer).Length
+            sha256 = $installerHash
+            authenticode_status = [string]$signature.Status
+            status_message = [string]$signature.StatusMessage
+            signer_subject = $signerSubject
+            signer_thumbprint = $signerThumbprint
+            signer_issuer = $signerIssuer
+            code_signing_eku = $hasCodeSigningEku
+            timestamp_signer_subject = if ($signature.TimeStamperCertificate) { [string]$signature.TimeStamperCertificate.Subject } else { "" }
+          }
+          $provenancePath = Join-Path $env:RUNNER_TEMP "exness-installer-provenance.json"
+          $provenance | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $provenancePath -Encoding utf8
+          Write-Host "Installer SHA-256: $installerHash"
+          Write-Host "Installer Authenticode status: $($signature.Status)"
+          Write-Host "Installer signer subject: $signerSubject"
+          Write-Host "Installer Code Signing EKU: $hasCodeSigningEku"
+          if ([string]$signature.Status -ne "Valid") { throw "MT5 installer Authenticode chain validation failed; installer will not execute." }
+          if ($signerSubject -notmatch "^CN=MetaQuotes Ltd\.,\s*O=MetaQuotes Ltd\.") { throw "Installer publisher is not the approved MetaQuotes Ltd. publisher; installer will not execute." }
+          if (!$signerThumbprint -or !$hasCodeSigningEku) { throw "Installer signing certificate lacks required identity or Code Signing EKU; installer will not execute." }
+
           $setup = Start-Process -FilePath $installer -ArgumentList @("/auto", ('/path:' + '"' + $installPath + '"')) -PassThru
           $terminal = Join-Path $installPath "terminal64.exe"
           $editor = Join-Path $installPath "metaeditor64.exe"
@@ -73,7 +135,7 @@ jobs:
           AllowDllImport=0
           "@ | Set-Content (Join-Path $configDir "common.ini") -Encoding Unicode
           "MT5_TERMINAL=$terminal" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
-          Write-Host "Official Exness terminal installed; automated trading and DLL imports disabled."
+          Write-Host "MetaQuotes MT5 terminal obtained from the official Exness-linked installer path; automated trading and DLL imports disabled."
 
       - name: Set up 64-bit Python
         uses: actions/setup-python@v5
@@ -120,6 +182,10 @@ jobs:
           $ErrorActionPreference = "Continue"
           $destination = Join-Path $env:RUNNER_TEMP "veltrix-collector-diagnostics"
           New-Item -ItemType Directory -Force -Path $destination | Out-Null
+          $provenancePath = Join-Path $env:RUNNER_TEMP "exness-installer-provenance.json"
+          if (Test-Path $provenancePath) {
+            Copy-Item -LiteralPath $provenancePath -Destination (Join-Path $destination "exness-installer-provenance.json") -Force
+          }
           foreach ($root in @("C:\MT5\Logs", "C:\MT5\MQL5\Logs")) {
             if (Test-Path $root) {
               $prefix = if ($root -like "*MQL5*") { "experts_" } else { "terminal_" }
