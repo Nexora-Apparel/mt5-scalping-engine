@@ -178,6 +178,8 @@ def test_probe_retrieves_non_overlapping_chunks_and_writes_verified_csv(
     assert manifest["source_commit"] == "a" * 40
     assert manifest["dispatcher_commit"] == "b" * 40
     assert manifest["installer_signer_thumbprint"] == "C" * 40
+    assert manifest["tick_flag_diagnostics"]["raw_flag_value_counts"] == {"0x00000003": 4}
+    assert manifest["tick_flag_diagnostics"]["nonstandard_mask_counts"] == {}
     assert result["first_tick_utc"] == probe_module.utc_iso(stamps[0])
     assert result["last_tick_utc"] == probe_module.utc_iso(stamps[-1])
 
@@ -190,6 +192,36 @@ def test_probe_retrieves_non_overlapping_chunks_and_writes_verified_csv(
         (tick(1794560400000, bid=3001.0, ask=3000.0), "invalid bid/ask"),
     ],
 )
+def test_probe_preserves_and_diagnoses_nonstandard_tick_flag_bits(tmp_path, demo_guards):
+    start = datetime(2026, 11, 13, 9, tzinfo=timezone.utc)
+    stamp = ms(start)
+    api = FakeHistoricalMT5([[tick(stamp, flags=0x86)]])
+
+    result = probe_module.probe(api, start, start + timedelta(seconds=1), tmp_path)
+
+    with (tmp_path / result["csv_file"]).open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert int(rows[0]["flags"]) == 0x86
+    diagnostics = result["tick_flag_diagnostics"]
+    assert diagnostics["raw_flag_value_counts"] == {"0x00000086": 1}
+    assert diagnostics["nonstandard_mask_counts"] == {"0x00000080": 1}
+    assert diagnostics["documented_flags"]["TICK_FLAG_BID"] == "0x02"
+    assert diagnostics["documented_flags"]["TICK_FLAG_ASK"] == "0x04"
+    assert "uninterpreted" in diagnostics["interpretation"]
+
+
+@pytest.mark.parametrize("flags", [-1, 0x1_0000_0000])
+def test_probe_rejects_tick_flags_outside_uint32_range(tmp_path, demo_guards, flags):
+    start = datetime(2026, 11, 13, 9, tzinfo=timezone.utc)
+    api = FakeHistoricalMT5([[tick(ms(start), flags=flags)]])
+
+    with pytest.raises(probe_module.DiagnosticFailure, match="flags outside uint32 range"):
+        probe_module.probe(api, start, start + timedelta(seconds=1), tmp_path)
+
+    assert api.shutdown_called
+    assert not (tmp_path / "xauusd_historical_ticks.csv").exists()
+
+
 def test_probe_rejects_invalid_or_out_of_range_ticks(
     tmp_path, demo_guards, bad_tick, message
 ):
