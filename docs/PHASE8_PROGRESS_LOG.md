@@ -252,3 +252,16 @@ Never overwrite a failed result with a later success. Record the later success a
 - Probe manifest implementation already consumes `VELTRIX_SOURCE_REF`, `VELTRIX_SOURCE_COMMIT`, `GITHUB_SHA`, and `MT5_INSTALLER_SIGNER_THUMBPRINT`. The PR workflow now supplies the source ref and source commit and exports the thumbprint. The source-ref fallback remains for non-workflow local invocations; CI-dispatched runs should populate it explicitly.
 - **Outstanding gate:** PR #67 must be merged before the default-branch-dispatched historical workflow uses these changes. No merge was performed. After merge, perform one bounded, strictly read-only Exness DEMO XAUUSD retrieval and inspect all four manifest fields (`source_ref`, `source_commit`, `dispatcher_commit`, `installer_signer_thumbprint`) plus CSV audit. Do not begin broad backfill until that artifact passes.
 - Safety remains unchanged: no order submission, position management, schedules, holdout access, candidate approval, or live trading. Authenticode publisher/EKU validation remains, but the thumbprint is recorded rather than independently pinned to an Exness-controlled trust anchor.
+
+
+### 2026-11-18 — Provenance manifest regression coverage added
+
+- **Starting PR #61 branch head:** prior to this test-only update.
+- **Files changed:** `tests/test_mt5_xauusd_historical_tick_probe.py`.
+- **What changed:** The successful probe integration test now injects controlled values for `VELTRIX_SOURCE_REF`, `VELTRIX_SOURCE_COMMIT`, `GITHUB_SHA`, and `MT5_INSTALLER_SIGNER_THUMBPRINT`, parses the generated JSON manifest, and asserts that all four values are preserved exactly.
+- **Why:** PR #67 wires these values from the default-branch workflow. Before a broker-connected rerun, the probe's own serialization path should have regression coverage so a future refactor cannot silently drop provenance fields.
+- **Commits:** initial test change `5a1d9c30734f1c172999b3ba02946aa616caee7c`; fixture cleanup `8c4e26e50e0d1e3b690fdc85745f224432a6484e`.
+- **Tests / Actions:** CI result for the updated PR #61 head is pending verification; no claim of test pass is made here.
+- **Result:** TEST ADDED / NOT YET VERIFIED.
+- **Safety:** Test-only change. No change to DEMO checks, XAUUSD-only scope, read-only behavior, query bounds, trading controls, candidate logic, or holdout state.
+- **Next action:** Verify the PR #61 workflow run and its complete test result. Keep PR #61 and PR #67 unmerged. After explicit approval and merge of PR #67, run one bounded DEMO probe and inspect all four manifest values before any historical backfill.
