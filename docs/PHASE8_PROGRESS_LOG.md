@@ -322,7 +322,7 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Change:** Added explicit assertions that the PR #61 historical workflow retains checkout credential suppression, `VELTRIX_SOURCE_COMMIT`, `VELTRIX_SOURCE_REF`, and the verified installer signer thumbprint export.
 - **Reason:** PR #61 originally added the dispatcher before PR #67 hardened it. This test prevents the two PR branches from silently diverging and protects against a later merge restoring the older workflow.
 - **Commit:** `6c8cd5f39549eb8e503f8934b64cd1ad2edb7f3c`.
-- **CI:** Awaiting run result.
+- **CI:** Run #44216203076 passed after the branch was synchronized with main and the dispatcher safety assertions were added.
 
 
 ### 2026-11-18 — Preserve the current default-branch historical dispatcher
@@ -331,5 +331,14 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Correction:** Copied that current default-branch dispatcher into the PR #61 branch and added both historical workflow paths to both `pull_request` and `push` test filters.
 - **Regression coverage:** Added tests for fixed reviewed-branch checkout, `persist-credentials: false`, preflight-before-install, signer-thumbprint export, terminal trading/DLL disablement, and both workflow path filters.
 - **Commits:** dispatcher `c566dda3bdb31f5b334836f11b24333a9718fa87`; CI path filters `61c22c410416983bd13fa509952d353b58d7c3bd`; regression tests `e32f9ac7cdccf1f8732a714210aaa2279772f3a5`.
-- **CI:** Awaiting verification for the dispatcher reconciliation.
+- **CI:** [Run #44216203076](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44216203076) passed all jobs, including the full unit/fail-closed test suite.
 - **Safety:** No workflow dispatch or merge performed. The dispatcher remains manual, XAUUSD-only, DEMO-only and read-only.
+
+
+### 2026-11-18 — Main history synchronized into PR #61 branch
+
+- **Operation:** Created merge commit `d561ad34464480774a4a45d5cc86fbce850c45b4` with the Phase 8 branch as first parent and current `main` as second parent. This updates only the PR branch; it does not merge PR #61 into `main`.
+- **Reason:** PR #61 was six commits behind `main`, which contained the safe default-branch historical dispatcher and the PR #66 workflow registration. The dispatcher, provenance-hardened probe workflow, and test path filters were reconciled before synchronizing history.
+- **Result:** Branch comparison reports `ahead_by=118`, `behind_by=0`. The PR remains open/draft/unmerged.
+- **CI:** Project tests run #44216203076 passed on merge commit `d561ad34464480774a4a45d5cc86fbce850c45b4`, including compile and full unit/fail-closed steps.
+- **Next gate:** Review current PR mergeability after GitHub recalculates; do not merge PR #61 or PR #67 without the required explicit approval. A broker-connected historical probe still must verify the provenance manifest after PR #67 is merged.
