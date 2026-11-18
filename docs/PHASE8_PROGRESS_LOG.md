@@ -295,3 +295,12 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Commit:** `9c1b11fe75cd8391e6df204ec76e6bf76b582a9d`.
 - **CI:** A new Project tests run is expected because this workflow is included in the pull-request path filter; result pending verification.
 - **Safety:** No change to the DEMO identity gate, XAUUSD-only scope, collection duration, terminal trading/DLL restrictions, tick capture, or artifact format.
+
+
+### 2026-11-18 — Collection-calendar and workflow guard regression tests
+
+- **File:** `tests/test_phase8_collection_orchestration.py`.
+- **Coverage added:** Assert all twelve eligible validation IDs are present in the manual collection workflow; assert checkout credentials are not persisted; parse all eight v2 calendar rows and require the complete `validation_06`–`validation_13` set, eight unique dates, weekdays only, matching weekday labels, and exactly 30-minute target windows.
+- **Commits:** `6ba45f77fa661fc1ad72a124ab27bcc2265da7d4` (initial assertions), `b63c913ec4cafc5fb79238a4598fced7483e0a02` (regex parser correction).
+- **CI:** Awaiting confirmation for the latest test commit; the previous workflow-only hardening run #44215664854 passed.
+- **Safety:** Test-only change; no collector or strategy behavior altered.
