@@ -275,3 +275,13 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Important remaining trust gap:** Capturing the thumbprint is not the same as independently pinning it. The thumbprint still needs comparison against Exness-controlled, independently obtained evidence before installer identity can be treated as pinned.
 - **CI:** PR #67's latest Project tests run #44158505860 passed. The new PR #61 provenance-manifest regression run #44214575190 also passed, including the full unit/fail-closed test step.
 - **Decision:** No workflow dispatch, merge, or broader backfill performed. The next broker-connected probe remains gated on PR #67 merge and inspection of the resulting artifact's provenance fields.
+
+
+### 2026-11-18 — Corrected prospective XAUUSD collection calendar
+
+- **Issue found:** The v2 runbook originally assigned `validation_09` and `validation_10` to Saturday 21 November and Sunday 22 November 2026. Those are unsuitable target dates for standard Exness XAUUSD: Exness's instrument-specific schedule lists XAUUSD closed all Saturday and only reopening Sunday at 23:05 UTC after the November 2026 US DST change.
+- **Evidence:** Exness Help Center, *Instrument trading hours* (updated 2026-11-14): https://get.exness.help/hc/en-us/articles/4405235684498-Instrument-trading-hours ; Exness DST update (2026-11-03): https://get.exness.help/hc/en-us/articles/31342732737180-Trading-Hours-Update-End-of-US-Daylight-Saving-Time-01-Nov-2026 .
+- **Correction:** Updated the v2 prospective runbook calendar to eight weekdays: 18, 19, 20, 23, 24, 25, 26 and 27 November 2026. Session IDs, 30-minute duration, UTC windows, and target market-session coverage remain intact. No substitution to XAUUSD247 is permitted.
+- **Commit:** `3317af2c09f3ef9b8f6b68cf3e2e66bc18196de0`.
+- **Operational note:** The runbook now requires checking the actual standard XAUUSD symbol's trading availability in MT5 before each manual dispatch because holidays and maintenance can alter schedules.
+- **Safety:** Documentation-only correction. No data was collected, no workflow was dispatched, and no strategy/evaluation settings were changed.
