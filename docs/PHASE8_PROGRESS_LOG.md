@@ -262,3 +262,13 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Historical probe:** Not dispatched. The available GitHub integration has no workflow-dispatch action, and the authenticated signer pinning gate remains open. No new broker artifact or CSV is claimed.
 - **Result:** PR #67 MERGED; PR #61 SYNC REQUIRED; SIGNER PINNING BLOCKED; HISTORICAL PROBE NOT RUN.
 - **Next action:** Obtain Exness-controlled signer evidence; synchronize PR #61 with current `main`; verify branch CI; then use the default-branch manual dispatcher for a single bounded, read-only Exness DEMO XAUUSD request and audit all provenance fields and CSV contents.
+
+
+### 2026-11-18 — Official Exness installer source confirmed
+
+- **Owner instruction:** Use only the official installer source for the historical XAUUSD probe.
+- **Primary-source verification:** Inspected the live official Exness MT5 page at https://www.exness.com/metatrader-5/ . Its Windows MT5 download control links directly to the exact URL already configured in the Phase 8 dispatcher: https://download.terminal.free/cdn/web/exness.technologies.ltd/mt5/exness5setup.exe . The link was followed from the official Exness page; the endpoint returned an executable download response. This establishes the URL's provenance from Exness's own download page, rather than reliance on a third-party mirror or a guessed installer URL.
+- **Independent developer source:** MetaQuotes's official download page is https://www.metaquotes.com/en/download and also links to its Windows MT5 download.
+- **Workflow disposition:** The dispatch workflow's current installer URL already matches the official Exness page's link exactly; no source substitution is needed. Keep the Authenticode checks (valid signature, MetaQuotes Ltd. publisher, Code Signing EKU) and capture the signer thumbprint in the manifest. Do not describe the captured thumbprint as independently pinned merely because the download URL is official.
+- **Safety:** The installer is used only in the bounded, read-only historical probe. DEMO identity checks, XAUUSD-only scope, disabled automated trading and DLL imports, and absence of order submission/position management remain mandatory.
+- **Next action:** Synchronize PR #61 with current main, verify CI, then dispatch only after the provenance and safety gates are satisfied. Audit the manifest and CSV before any historical backfill.
