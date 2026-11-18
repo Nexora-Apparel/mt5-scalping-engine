@@ -37,6 +37,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Validate credentials without printing them
         shell: pwsh
