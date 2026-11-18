@@ -49,3 +49,15 @@ def test_batch_workflow_requires_independently_pinned_exness_installer_signer():
     assert "Get-AuthenticodeSignature" in workflow
     assert "AllowLiveTrading=0" in workflow
     assert "AllowDllImport=0" in workflow
+
+
+def test_preregistered_feasibility_plan_is_bounded_and_not_holdout():
+    plan = json.loads((ROOT / "research/xauusd_historical_replay_feasibility_v1.json").read_text(encoding="utf-8"))
+    intervals = validate_interval_plan(json.dumps(plan["intervals"]))
+    assert plan["status"] == "PREREGISTERED_EXPLORATORY_ONLY"
+    assert plan["eligible_for_v1_validation"] is False
+    assert plan["eligible_for_v1_holdout"] is False
+    assert plan["eligible_for_candidate_approval"] is False
+    assert len(intervals) == 4
+    assert len({item["utc_date"] for item in intervals}) == 4
+    assert sum(item["duration_milliseconds"] for item in intervals) == 7_200_000
