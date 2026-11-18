@@ -109,8 +109,10 @@ def run_batch(mt5: Any, intervals: list[dict[str, Any]], output_dir: Path) -> di
         "interpretation": "Historical quotes are retrospective observations, not actual broker fills or prospective live sessions.",
     }
     manifest_path = output_dir / "batch_manifest.json"
-    try:
-        for item in intervals:
+    successful = 0
+    failed = 0
+    for item in intervals:
+        try:
             result = probe(
                 mt5,
                 parse_utc(item["from_utc"]),
@@ -127,19 +129,33 @@ def run_batch(mt5: Any, intervals: list[dict[str, Any]], output_dir: Path) -> di
                 "account_mode": result["account_mode"],
                 "dataset_sha256": result["sha256"],
                 "dataset_audit": result["dataset_audit"],
-                "manifest_path": f'{item["id"]}/manifest.json',
-                "csv_path": f'{item["id"]}/xauusd_historical_ticks.csv',
+                "manifest_path": item["id"] + "/manifest.json",
+                "csv_path": item["id"] + "/xauusd_historical_ticks.csv",
             })
-            manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        manifest["status"] = "PASS"
-    except Exception as exc:
-        manifest["status"] = "FAIL"
-        manifest["error"] = f"{type(exc).__name__}: {exc}"
-        raise
-    finally:
-        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            successful += 1
+        except Exception as exc:
+            # A missing historical interval must not suppress evidence from
+            # later preregistered dates. Record the failure and continue.
+            failed += 1
+            manifest["intervals"].append({
+                **item,
+                "status": "FAIL",
+                "records": 0,
+                "error": type(exc).__name__ + ": " + str(exc)[:1000],
+            })
+        manifest["attempted_count"] = len(manifest["intervals"])
+        manifest["successful_count"] = successful
+        manifest["failed_count"] = failed
+        manifest["status"] = (
+            "PASS" if failed == 0
+            else "PARTIAL" if successful > 0
+            else "FAIL"
+        )
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2, sort_keys=True) + "\\n",
+            encoding="utf-8",
+        )
     return manifest
-
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -151,7 +167,8 @@ def main() -> int:
         import MetaTrader5 as mt5
         result = run_batch(mt5, intervals, args.output_dir)
         print(json.dumps(result, indent=2, sort_keys=True))
-        return 0
+        # PARTIAL means every interval was attempted and failures are recorded.
+        return 1 if result["status"] == "FAIL" else 0
     except (DiagnosticFailure, ValueError, OSError, RuntimeError) as exc:
         print(json.dumps({"status": "FAIL", "error": str(exc)}), file=sys.stderr)
         return 1
