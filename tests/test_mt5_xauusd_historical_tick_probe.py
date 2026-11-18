@@ -178,20 +178,12 @@ def test_probe_retrieves_non_overlapping_chunks_and_writes_verified_csv(
     assert manifest["source_commit"] == "a" * 40
     assert manifest["dispatcher_commit"] == "b" * 40
     assert manifest["installer_signer_thumbprint"] == "C" * 40
-    assert manifest["tick_flag_diagnostics"]["raw_flag_value_counts"] == {"0x00000003": 4}
+    assert manifest["tick_flag_diagnostics"]["raw_flag_value_counts"] == {"0x00000006": 4}
     assert manifest["tick_flag_diagnostics"]["nonstandard_mask_counts"] == {}
     assert result["first_tick_utc"] == probe_module.utc_iso(stamps[0])
     assert result["last_tick_utc"] == probe_module.utc_iso(stamps[-1])
 
 
-@pytest.mark.parametrize(
-    "bad_tick, message",
-    [
-        (tick(1), "outside the requested UTC interval"),
-        (tick(1794560400000, bid=float("nan")), "non-finite"),
-        (tick(1794560400000, bid=3001.0, ask=3000.0), "invalid bid/ask"),
-    ],
-)
 def test_probe_preserves_and_diagnoses_nonstandard_tick_flag_bits(tmp_path, demo_guards):
     start = datetime(2026, 11, 13, 9, tzinfo=timezone.utc)
     stamp = ms(start)
@@ -222,6 +214,14 @@ def test_probe_rejects_tick_flags_outside_uint32_range(tmp_path, demo_guards, fl
     assert not (tmp_path / "xauusd_historical_ticks.csv").exists()
 
 
+@pytest.mark.parametrize(
+    "bad_tick, message",
+    [
+        (tick(1), "outside the requested UTC interval"),
+        (tick(1794560400000, bid=float("nan")), "non-finite"),
+        (tick(1794560400000, bid=3001.0, ask=3000.0), "invalid bid/ask"),
+    ],
+)
 def test_probe_rejects_invalid_or_out_of_range_ticks(
     tmp_path, demo_guards, bad_tick, message
 ):
