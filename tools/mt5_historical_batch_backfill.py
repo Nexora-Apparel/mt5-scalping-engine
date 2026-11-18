@@ -157,6 +157,7 @@ def run_batch(mt5: Any, intervals: list[dict[str, Any]], output_dir: Path) -> di
         )
     return manifest
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--intervals-json", required=True, help="JSON array of preregistered UTC intervals")
