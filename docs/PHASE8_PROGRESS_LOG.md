@@ -514,3 +514,12 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Tests added:** Runtime DLL state true/missing cases and wrong/missing currency or invalid point cases fail closed; successful manifest assertions cover all replay-required fields.
 - **Safety boundary:** No historical artifacts are rewritten and no missing metadata is backfilled into old manifests. Existing V1/V2 records remain unchanged until their original runtime evidence can substantiate the fields. No order, candidate signal, candidate tuning, holdout, approval, certification or trading operation is introduced.
 - **Next:** Run focused and full CI on this branch. After review, update the default batch workflow's immutable source pin to the reviewed source commit in a separate workflow change, then collect no new records until the new manifest has been verified on a controlled run.
+
+
+### 2026-11-18 — Historical replay manifest contract merged; dispatcher pin update prepared
+
+- **Implementation PR:** [#71](https://github.com/Nexora-Apparel/mt5-scalping-engine/pull/71), merged after Project Tests passed. Squash merge commit: `1b8b6bf518a0bc997611183f0120295b82588a5e`.
+- **CI:** PR run [44301980063](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44301980063) completed SUCCESS. The workflow completed Python compilation and the unit/fail-closed configuration test step.
+- **Dispatcher change:** Prepared a separate PR to update the immutable historical batch source checkout from `2b797d670998fadce237164c26ec25d2b2ba961a` to the reviewed manifest-contract commit `1b8b6bf518a0bc997611183f0120295b82588a5e`.
+- **Safety:** No new collection has been dispatched. Existing V1/V2 artifacts remain unchanged and are not replay-ready absent original runtime metadata evidence. No order submission, position management, strategy evaluation, candidate tuning, holdout, approval, certification or trading authorization.
+- **Next:** Validate and merge the dispatcher pin update, then perform one bounded, explicitly labelled manifest-contract smoke capture before attempting to profile the historical datasets. This smoke capture validates the collector/replay contract; it is not additional strategy evidence or a replacement in either preregistered sample.
