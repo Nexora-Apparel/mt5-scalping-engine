@@ -240,6 +240,22 @@ def test_probe_fails_closed_when_account_is_not_demo(tmp_path, demo_guards, monk
     assert not api.calls
 
 
+def test_probe_rejects_interval_over_31_minutes_before_terminal_initialization(
+    tmp_path, demo_guards
+):
+    start = datetime(2026, 11, 13, 9, 0, tzinfo=timezone.utc)
+    api = FakeHistoricalMT5()
+
+    with pytest.raises(probe_module.DiagnosticFailure, match="31-minute safety limit"):
+        probe_module.probe(
+            api, start, start + timedelta(minutes=31, milliseconds=1), tmp_path
+        )
+
+    assert api.initialize_args is None
+    assert not api.calls
+    assert not (tmp_path / "xauusd_historical_ticks.csv").exists()
+
+
 def test_probe_rejects_empty_interval_and_non_millisecond_boundaries(tmp_path, demo_guards):
     start = datetime(2026, 11, 13, 9, tzinfo=timezone.utc)
     api = FakeHistoricalMT5()

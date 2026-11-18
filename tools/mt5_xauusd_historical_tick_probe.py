@@ -33,6 +33,9 @@ FIELDS = [
     "volume_real", "flags",
 ]
 CHUNK_MILLISECONDS = 60_000
+# One historical verification request is capped; larger backfills require a
+# separately reviewed collection plan and multiple bounded requests.
+MAX_PROBE_DURATION_MILLISECONDS = 31 * 60 * 1000
 # MT5 may return adjacent ticks around datetime range boundaries. Query a
 # bounded guard band, then retain only ticks inside the exact requested window.
 RANGE_PADDING_MILLISECONDS = 2_000
@@ -117,6 +120,11 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
     end_ms = _to_epoch_milliseconds(end, "end")
     if start_ms >= end_ms:
         raise DiagnosticFailure("a valid increasing UTC interval is required")
+    if end_ms - start_ms > MAX_PROBE_DURATION_MILLISECONDS:
+        raise DiagnosticFailure(
+            "historical probe interval exceeds the 31-minute safety limit; "
+            "use a separately reviewed bounded collection plan"
+        )
 
     # Provenance is part of the publication contract, not optional metadata.
     # Refuse to connect or publish if any workflow identity is absent/malformed.
