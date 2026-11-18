@@ -1,0 +1,66 @@
+{
+  "schema": "VELTRIX_XAUUSD_HISTORICAL_REPLAY_FEASIBILITY_V1",
+  "version": 1,
+  "status": "PREREGISTERED_EXPLORATORY_ONLY",
+  "created_utc": "2026-11-18",
+  "instrument": "XAUUSD",
+  "broker": "Exness",
+  "access_account_mode": "DEMO",
+  "source_type": "authenticated_mt5_copy_ticks_range_historical_quotes",
+  "data_role": "HISTORICAL_REPLAY_FEASIBILITY_EXPLORATORY_NOT_HOLDOUT",
+  "eligible_for_v1_validation": false,
+  "eligible_for_v1_holdout": false,
+  "eligible_for_candidate_approval": false,
+  "candidate_registry_changes_permitted": false,
+  "execution_enabled": false,
+  "order_submission": false,
+  "position_management": false,
+  "trading_enabled": false,
+  "selection_policy": "Four 30-minute weekday intervals selected before retrieval across two calendar weeks and four UTC session windows; dates precede the existing Phase 8 prospective validation dates. These observations are exploratory only and are not represented as prospective live sessions or untouched holdout data.",
+  "intervals": [
+    {
+      "id": "hist_20261102_asia",
+      "from_utc": "2026-11-02T06:00:00.000Z",
+      "to_utc": "2026-11-02T06:30:00.000Z",
+      "session_label": "Asian"
+    },
+    {
+      "id": "hist_20261104_london",
+      "from_utc": "2026-11-04T10:00:00.000Z",
+      "to_utc": "2026-11-04T10:30:00.000Z",
+      "session_label": "London"
+    },
+    {
+      "id": "hist_20261106_overlap",
+      "from_utc": "2026-11-06T14:30:00.000Z",
+      "to_utc": "2026-11-06T15:00:00.000Z",
+      "session_label": "London-New York overlap"
+    },
+    {
+      "id": "hist_20261110_new_york",
+      "from_utc": "2026-11-10T17:30:00.000Z",
+      "to_utc": "2026-11-10T18:00:00.000Z",
+      "session_label": "New York after London close"
+    }
+  ],
+  "max_per_interval_minutes": 31,
+  "aggregate_duration_hours": 2,
+  "planned_intervals": 4,
+  "required_provenance": [
+    "source_ref",
+    "source_commit",
+    "dispatcher_commit",
+    "installer_signer_thumbprint"
+  ],
+  "acceptance_checks": [
+    "DEMO account identity verified",
+    "XAUUSD-only contract resolved from broker catalogue",
+    "exact requested UTC coverage recorded",
+    "nonempty audited CSV per interval",
+    "SHA-256 recorded for every CSV",
+    "bid/ask validity and timestamp ordering pass",
+    "gap and spread diagnostics reviewed",
+    "historical quotes never represented as actual fills"
+  ],
+  "expansion_rule": "Expand only after all four feasibility intervals are returned and individually audited. A successful feasibility batch does not authorize candidate tuning, validation promotion, holdout access, certification, or trading."
+}
