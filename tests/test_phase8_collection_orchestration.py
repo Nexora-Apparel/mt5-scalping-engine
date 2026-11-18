@@ -67,3 +67,11 @@ def test_v2_xauusd_collection_calendar_uses_eight_unique_weekdays():
         assert (end - start).total_seconds() == 30 * 60
         dates.append(session_date)
     assert len(set(dates)) == 8
+
+
+def test_historical_probe_workflow_preserves_provenance_hardening():
+    source = (ROOT / ".github/workflows/xauusd-historical-tick-probe.yml").read_text(encoding="utf-8")
+    assert "persist-credentials: false" in source
+    assert "VELTRIX_SOURCE_COMMIT: ${{ github.sha }}" in source
+    assert "VELTRIX_SOURCE_REF: ${{ github.ref_name }}" in source
+    assert "MT5_INSTALLER_SIGNER_THUMBPRINT=$($signature.SignerCertificate.Thumbprint)" in source
