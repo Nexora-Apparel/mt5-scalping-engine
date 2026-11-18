@@ -224,10 +224,32 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
             raise DiagnosticFailure("historical probe requires a verified DEMO account")
         validate_account(mt5, login, server)
 
+        # Read the effective terminal security state; the INI file written by
+        # the workflow is configuration intent, not runtime proof.
+        terminal_info_fn = getattr(mt5, "terminal_info", None)
+        terminal_info = terminal_info_fn() if callable(terminal_info_fn) else None
+        if terminal_info is None or getattr(terminal_info, "dlls_allowed", None) is not False:
+            raise DiagnosticFailure(
+                "terminal runtime does not prove DLL imports are disabled"
+            )
+
         broker_symbol = discover_symbol(mt5, "XAUUSD")
         info = mt5.symbol_info(broker_symbol)
-        if info is None or not math.isfinite(float(getattr(info, "point", 0.0))) or float(info.point) <= 0:
-            raise DiagnosticFailure("XAUUSD instrument metadata or point size is unavailable")
+        if info is None:
+            raise DiagnosticFailure("XAUUSD instrument metadata is unavailable")
+        try:
+            point = float(getattr(info, "point", 0.0))
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise DiagnosticFailure("XAUUSD point size is invalid") from exc
+        currency_base = getattr(info, "currency_base", None)
+        currency_profit = getattr(info, "currency_profit", None)
+        if (
+            not math.isfinite(point) or point <= 0
+            or currency_base != "XAU" or currency_profit != "USD"
+        ):
+            raise DiagnosticFailure(
+                "XAUUSD contract metadata is missing or does not verify XAU/USD"
+            )
 
         output_dir.mkdir(parents=True, exist_ok=True)
         csv_path = output_dir / "xauusd_historical_ticks.csv"
@@ -357,6 +379,7 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
             "installer_signer_thumbprint": provenance["installer_signer_thumbprint"],
             "account_mode": "DEMO",
             "trading_enabled": False,
+            "dll_imports_enabled": False,
             "order_submission": False,
             "position_management": False,
             "canonical_symbol": "XAUUSD",
@@ -373,7 +396,15 @@ def probe(mt5: Any, start: datetime, end: datetime, output_dir: Path) -> dict[st
             "records": len(records_by_key),
             "first_tick_utc": utc_iso(min(ordered_stamps)),
             "last_tick_utc": utc_iso(max(ordered_stamps)),
-            "instrument_point": float(info.point),
+            "instrument_point": point,
+            "instrument_specs": {
+                "XAUUSD": {
+                    "broker_symbol": broker_symbol,
+                    "currency_base": currency_base,
+                    "currency_profit": currency_profit,
+                    "point": point,
+                }
+            },
             "runtime": runtime_diagnostics,
             "tick_flag_diagnostics": tick_flag_diagnostics,
             "sha256": digest,
