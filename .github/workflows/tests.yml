@@ -21,6 +21,7 @@ on:
       - ".github/workflows/veltrix-market-profile.yml"
       - ".github/workflows/veltrix-multi-session-certification.yml"
       - ".github/workflows/xauusd-historical-tick-probe.yml"
+      - ".github/workflows/xauusd-historical-tick-probe-dispatch.yml"
   push:
     branches:
       - main
@@ -40,6 +41,7 @@ on:
       - ".github/workflows/veltrix-market-profile.yml"
       - ".github/workflows/veltrix-multi-session-certification.yml"
       - ".github/workflows/xauusd-historical-tick-probe.yml"
+      - ".github/workflows/xauusd-historical-tick-probe-dispatch.yml"
 
 permissions:
   contents: read
