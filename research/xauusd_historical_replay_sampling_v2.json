@@ -1,0 +1,77 @@
+{
+  "schema": "VELTRIX_XAUUSD_HISTORICAL_REPLAY_SAMPLING_V2",
+  "version": 2,
+  "status": "PREREGISTERED_EXPLORATORY_ONLY",
+  "created_utc": "2026-11-18",
+  "instrument": "XAUUSD",
+  "broker": "Exness",
+  "access_account_mode": "DEMO",
+  "source_type": "authenticated_mt5_copy_ticks_range_historical_quotes",
+  "data_role": "HISTORICAL_REPLAY_FEASIBILITY_EXPLORATORY_NOT_HOLDOUT",
+  "eligible_for_v1_validation": false,
+  "eligible_for_v1_holdout": false,
+  "eligible_for_candidate_approval": false,
+  "candidate_registry_changes_permitted": false,
+  "execution_enabled": false,
+  "order_submission": false,
+  "position_management": false,
+  "trading_enabled": false,
+  "selection_policy": "Four new 30-minute weekday intervals across four distinct UTC dates and four UTC session windows, selected after the v1 feasibility batch showed successful historical retrieval on 2026-11-06 overlap and 2026-11-10 New York windows. The new dates do not repeat the v1 feasibility dates (2026-11-02, 04, 06, 10) or the known historical/live parity date (2026-11-17). Session windows are distributed across Asia, London, London-New York overlap, and New York. All intervals are fixed before retrieval; no substitution based on runtime outcome is permitted.",
+  "prior_feasibility_evidence": {
+    "v1_plan": "research/xauusd_historical_replay_feasibility_v1.json",
+    "workflow_run": 44290221351,
+    "successful_prior_dates": ["2026-11-06", "2026-11-10"],
+    "failed_prior_dates": ["2026-11-02", "2026-11-04"],
+    "interpretation": "Prior outcomes inform feasibility only. They are not included in this v2 sample and are not reclassified."
+  },
+  "intervals": [
+    {
+      "id": "hist2_20261105_london",
+      "from_utc": "2026-11-05T10:00:00.000Z",
+      "to_utc": "2026-11-05T10:30:00.000Z"
+    },
+    {
+      "id": "hist2_20261109_asia",
+      "from_utc": "2026-11-09T06:00:00.000Z",
+      "to_utc": "2026-11-09T06:30:00.000Z"
+    },
+    {
+      "id": "hist2_20261111_overlap",
+      "from_utc": "2026-11-11T14:30:00.000Z",
+      "to_utc": "2026-11-11T15:00:00.000Z"
+    },
+    {
+      "id": "hist2_20261112_new_york",
+      "from_utc": "2026-11-12T17:30:00.000Z",
+      "to_utc": "2026-11-12T18:00:00.000Z"
+    }
+  ],
+  "session_windows": [
+    {"interval_id": "hist2_20261105_london", "label": "London"},
+    {"interval_id": "hist2_20261109_asia", "label": "Asian"},
+    {"interval_id": "hist2_20261111_overlap", "label": "London-New York overlap"},
+    {"interval_id": "hist2_20261112_new_york", "label": "New York after London close"}
+  ],
+  "planned_intervals": 4,
+  "max_per_interval_minutes": 31,
+  "aggregate_duration_hours": 2,
+  "required_provenance": [
+    "source_ref",
+    "source_commit",
+    "dispatcher_commit",
+    "installer_signer_thumbprint"
+  ],
+  "acceptance_checks": [
+    "DEMO account identity verified",
+    "XAUUSD-only contract resolved from broker catalogue",
+    "exact requested UTC coverage recorded",
+    "nonempty audited CSV for every successful interval",
+    "SHA-256 recorded and independently recomputed for every published CSV",
+    "bid/ask validity and timestamp ordering pass",
+    "maximum intertick gap and spread diagnostics reviewed",
+    "failed intervals remain explicit and do not suppress later attempts",
+    "historical quotes never represented as actual fills"
+  ],
+  "expansion_rule": "Expand only if all four intervals return nonempty individually audited datasets with complete requested-window coverage and no unexplained data-integrity failures. If any interval fails or returns incomplete coverage, preserve the partial result and preregister a separate follow-up plan; do not substitute dates inside this plan. Passing this feasibility plan does not authorize candidate tuning, validation promotion, holdout access, certification, or trading.",
+  "statistical_boundary": "Exploratory retrospective quotes only. This plan is not part of the V1 validation partition, is not untouched holdout, and cannot be represented as prospective live collection. No candidate registry changes, parameter tuning, strategy approval, or execution are permitted."
+}
