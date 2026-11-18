@@ -403,3 +403,9 @@ Never overwrite a failed result with a later success. Record the later success a
 - Added a regression test requiring this independent signer pin, while retaining Authenticode Valid, MetaQuotes Ltd. publisher, Code Signing EKU, and disabled terminal trading/DLL imports.
 - Implementation commits: a2c47038bdacebcd0f2fcf4c8c0b4eeb91732442 (workflow) and 5e44b13fea5ef0cfd8a621bb2fa104b84509e419 (test). CI for these changes is pending.
 - Manual prerequisite remains: Exness must confirm the approved signer thumbprint through an authenticated support channel; the observed certificate fingerprint must not be treated as self-authorizing. No installer execution or historical batch request is authorized by this code change alone.
+
+
+## 2026-11-18 — Signer-pin regression test import fix
+
+- CI run [44286486336](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44286486336) passed compilation and 264 tests but failed the newly added workflow-guard test because its test module had no ROOT path constant. This was a test harness defect, not a workflow or signer-validation failure.
+- Added pathlib.Path and a repository-root constant in commit 8065e971d9cabab233dea33445746f3b8593e6ba. Re-run pending.
