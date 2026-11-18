@@ -24,6 +24,13 @@ def tick(stamp: int, *, bid=3000.0, ask=3000.2, last=3000.1,
 
 class FakeHistoricalMT5:
     COPY_TICKS_ALL = 3
+    __version__ = "5.0.6231"
+
+    def version(self):
+        return (500, 5432, "2026.11.18")
+
+    def terminal_info(self):
+        return SimpleNamespace(build=5432)
 
     def __init__(self, batches=None):
         self.batches = batches or []
@@ -178,6 +185,9 @@ def test_probe_retrieves_non_overlapping_chunks_and_writes_verified_csv(
     assert manifest["source_commit"] == "a" * 40
     assert manifest["dispatcher_commit"] == "b" * 40
     assert manifest["installer_signer_thumbprint"] == "C" * 40
+    assert manifest["runtime"]["python_integration_version"] == "5.0.6231"
+    assert manifest["runtime"]["terminal_version"] == [500, 5432, "2026.11.18"]
+    assert manifest["runtime"]["terminal_build"] == 5432
     assert manifest["tick_flag_diagnostics"]["raw_flag_value_counts"] == {"0x00000006": 4}
     assert manifest["tick_flag_diagnostics"]["nonstandard_mask_counts"] == {}
     assert result["first_tick_utc"] == probe_module.utc_iso(stamps[0])
