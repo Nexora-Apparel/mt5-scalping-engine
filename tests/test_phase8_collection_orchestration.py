@@ -51,7 +51,7 @@ def test_phase8_collection_workflow_has_no_trade_execution_or_scheduled_trigger(
 def test_v2_xauusd_collection_calendar_uses_eight_unique_weekdays():
     document = (ROOT / "docs/PHASE8_VALIDATION_V2_PROSPECTIVE_REPLICATION.md").read_text(encoding="utf-8")
     rows = re.findall(
-        r"^\\| (validation_(?:0[6-9]|1[0-3])) \\| (\\d{4}-\\d{2}-\\d{2}) \\((Mon|Tue|Wed|Thu|Fri|Sat|Sun)\\) \\| (\\d{2}:\\d{2})–(\\d{2}:\\d{2}) \\|",
+        r"^\| (validation_(?:0[6-9]|1[0-3])) \| (\d{4}-\d{2}-\d{2}) \((Mon|Tue|Wed|Thu|Fri|Sat|Sun)\) \| (\d{2}:\d{2})–(\d{2}:\d{2}) \|",
         document,
         flags=re.MULTILINE,
     )
