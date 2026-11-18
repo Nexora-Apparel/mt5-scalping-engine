@@ -323,3 +323,13 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Reason:** PR #61 originally added the dispatcher before PR #67 hardened it. This test prevents the two PR branches from silently diverging and protects against a later merge restoring the older workflow.
 - **Commit:** `6c8cd5f39549eb8e503f8934b64cd1ad2edb7f3c`.
 - **CI:** Awaiting run result.
+
+
+### 2026-11-18 — Preserve the current default-branch historical dispatcher
+
+- **Additional main-branch change discovered:** Since PR #61's base commit, `main` gained a separate `xauusd-historical-tick-probe-dispatch.yml` workflow. It checks out the reviewed PR branch explicitly, validates UTC inputs, runs focused historical-probe tests before installing MT5, verifies the installer signature/publisher/EKU, records the signer thumbprint, and keeps terminal trading/DLL permissions disabled.
+- **Correction:** Copied that current default-branch dispatcher into the PR #61 branch and added both historical workflow paths to both `pull_request` and `push` test filters.
+- **Regression coverage:** Added tests for fixed reviewed-branch checkout, `persist-credentials: false`, preflight-before-install, signer-thumbprint export, terminal trading/DLL disablement, and both workflow path filters.
+- **Commits:** dispatcher `c566dda3bdb31f5b334836f11b24333a9718fa87`; CI path filters `61c22c410416983bd13fa509952d353b58d7c3bd`; regression tests `e32f9ac7cdccf1f8732a714210aaa2279772f3a5`.
+- **CI:** Awaiting verification for the dispatcher reconciliation.
+- **Safety:** No workflow dispatch or merge performed. The dispatcher remains manual, XAUUSD-only, DEMO-only and read-only.
