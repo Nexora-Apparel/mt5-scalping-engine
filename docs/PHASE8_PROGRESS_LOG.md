@@ -409,3 +409,11 @@ Never overwrite a failed result with a later success. Record the later success a
 
 - CI run [44286486336](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44286486336) passed compilation and 264 tests but failed the newly added workflow-guard test because its test module had no ROOT path constant. This was a test harness defect, not a workflow or signer-validation failure.
 - Added pathlib.Path and a repository-root constant in commit 8065e971d9cabab233dea33445746f3b8593e6ba. Re-run pending.
+
+
+## 2026-11-18 — Preregistered four-date feasibility sample
+
+- Added research/xauusd_historical_replay_feasibility_v1.json before retrieving any of its intervals. It defines four 30-minute weekday windows across two weeks and four UTC session windows: 2 Nov (06:00 UTC), 4 Nov (10:00 UTC), 6 Nov (14:30 UTC), and 10 Nov (17:30 UTC).
+- This is explicitly exploratory historical replay only. It is ineligible for the existing V1 validation partition, sealed holdout, and candidate approval. It does not replace prospective validation dates or the existing V1 plan.
+- The plan contains only the exact three interval keys accepted by the batch runner; session labels are stored separately as metadata. Added a regression test for schema validity, four distinct dates, 2-hour aggregate duration, and non-holdout status.
+- The batch workflow remains gated by the independent Exness-confirmed signer fingerprint secret. No batch has been dispatched and no new historical data has been retrieved.
