@@ -304,3 +304,13 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Commits:** `6ba45f77fa661fc1ad72a124ab27bcc2265da7d4` (initial assertions), `b63c913ec4cafc5fb79238a4598fced7483e0a02` (regex parser correction).
 - **CI:** [Run #44215778260](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44215778260) passed all jobs, including compilation and the complete unit/fail-closed test step. The prior workflow-only hardening run #44215664854 also passed.
 - **Safety:** Test-only change; no collector or strategy behavior altered.
+
+
+### 2026-11-18 — Cross-PR workflow reconciliation
+
+- **Risk found:** PR #61 still carried the original historical-probe workflow and test-workflow path filters from before PR #66 registered the dispatcher on `main`. PR #67 separately hardened that same workflow. Merging PR #61 after PR #67 without reconciliation could restore the older workflow and remove the provenance wiring.
+- **Correction:** Synced PR #67's provenance-hardened `xauusd-historical-tick-probe.yml` into the PR #61 branch. Synced the historical-probe path into the `pull_request` test trigger and also added it to the `push` path filter so future changes to that workflow run Project tests.
+- **Commits:** workflow sync `e52a5967d09d16f4c7e888dd396f0d6376542d10`; test-trigger sync `563c82acce0bbdfa70cb23bf9875946a90706fd3`.
+- **Why this matters:** The final PR #61 branch now carries the same source-ref, source-commit, signer-thumbprint export, and checkout-token handling as PR #67. This prevents the older file from being reintroduced by a later merge of PR #61.
+- **CI:** Awaiting verification for the reconciled branch head.
+- **Safety:** No merge performed. The workflow remains manual-dispatch, authenticated DEMO, XAUUSD-only, bounded and read-only.
