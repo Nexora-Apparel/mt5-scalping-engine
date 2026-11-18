@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Nexora-Apparel/mt5-scalping-engine
-          ref: 9972e6a2645b57c841db8df2066ca91f5d1350ca
+          ref: 89454273f64d1867bc57ee5a31a14a7f7511b127
           persist-credentials: false
 
       - name: Record exact source revision
