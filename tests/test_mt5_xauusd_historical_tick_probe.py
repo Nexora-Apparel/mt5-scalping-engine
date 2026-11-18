@@ -83,7 +83,6 @@ def test_probe_retrieves_non_overlapping_chunks_and_writes_verified_csv(
 ):
     start = datetime(2026, 11, 13, 9, 0, tzinfo=timezone.utc)
     end = datetime(2026, 11, 13, 9, 2, tzinfo=timezone.utc)
-    monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setenv("VELTRIX_SOURCE_REF", "phase8-test-ref")
     monkeypatch.setenv("VELTRIX_SOURCE_COMMIT", "a" * 40)
     monkeypatch.setenv("GITHUB_SHA", "b" * 40)
