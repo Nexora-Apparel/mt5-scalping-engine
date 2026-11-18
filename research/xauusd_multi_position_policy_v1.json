@@ -1,0 +1,142 @@
+{
+  "policy_schema": "VELTRIX_XAUUSD_MULTI_POSITION_POLICY_V1",
+  "version": 1,
+  "status": "PREREGISTERED_RESEARCH_ONLY",
+  "canonical_symbol": "XAUUSD",
+  "broker": "Exness",
+  "account_mode": "DEMO",
+  "execution_enabled": false,
+  "live_trading_enabled": false,
+  "daily_trade_count_minimum": null,
+  "daily_trade_count_maximum": null,
+  "profit_target_money": null,
+  "profit_cap_money": null,
+  "simultaneous_position_count_cap": null,
+  "holding_seconds": [
+    15,
+    30,
+    60
+  ],
+  "stop_distance_method": "max(past_only_volatility_scale_price * stop_volatility_multiple, broker_minimum_stop_distance), rounded upward to broker tick size",
+  "take_profit_method": "stop_distance * take_profit_reward_r_multiple, rounded upward to broker tick size",
+  "volatility_scale_method": "sqrt(sum(realized_volatility_bps^2)) across the event's registered lookback windows strictly preceding the signal window",
+  "stop_volatility_multipliers": [
+    1,
+    1.5,
+    2
+  ],
+  "take_profit_reward_r_multiples": [
+    0.5,
+    1,
+    1.5
+  ],
+  "risk_controls": {
+    "per_trade_risk_percent_hard_max": 0.25,
+    "aggregate_open_stop_risk_percent_hard_max": 0.5,
+    "daily_loss_percent_hard_max": 15,
+    "overall_account_loss_percent_hard_max": 50,
+    "position_volume_rounding": "down_to_broker_volume_step",
+    "unresolved_positions_reserve_risk_and_margin": true,
+    "margin_reserve_required": true,
+    "stale_or_invalid_market_data": "reject_new_entry",
+    "cooldown_seconds": 0,
+    "max_consecutive_losses": 0,
+    "zero_values_disable_entry_pause": true,
+    "daily_loss_reactivation": "MANUAL_OWNER_CONFIRMATION_REQUIRED",
+    "daily_loss_baseline": "verified_server_day_starting_equity",
+    "overall_account_loss_reactivation": "MANUAL_OWNER_CONFIRMATION_REQUIRED",
+    "overall_account_loss_baseline": "owner_verified_original_deposit",
+    "current_implementation_reactivation": "DAILY_REARM_OPERATOR_REASON_EVIDENCE_AUDIT_SCRIPT_RUNTIME_PASS_2026_11_14; OVERALL_LOSS_AUDIT_CHAINED_MANUAL_DEMO_REARM_RUNTIME_PASS_2026_11_14",
+    "overall_loss_runtime_validation": "MQL5_RUNTIME_PASS_RUN_43549639530_ALL_6_SENTINELS_PASS; PYTHON_CI_291_PASS_RUN_43549639320",
+    "portfolio_drawdown_monitoring": "EVERY_OBSERVED_QUOTE; LATCH_DAILY_AND_OVERALL_LOCKS_ON_FIRST_BREACH; REPORT_PEAK_DRAWDOWN_AND_FIRST_BREACH_TIMESTAMP",
+    "owner_reactivation": "MANUAL_DAILY_AND_OVERALL_DEMO_TERMINAL_SCRIPTS_WITH_OPERATOR_REASON_EVIDENCE_ATTRIBUTION_AND_CHECKSUM_CHAINED_AUDIT; OPERATOR_ID_IS_SELF_ASSERTED_NOT_CRYPTOGRAPHIC_IDENTITY; OWNER_RUNBOOK_DOCS_VELTRIX_OWNER_REACTIVATION_RUNBOOK"
+  },
+  "evaluation": {
+    "slippage_points_per_side": [
+      0,
+      1,
+      2,
+      5
+    ],
+    "commission_status": "UNVERIFIED_REQUIRED_INPUT",
+    "net_performance_allowed": false,
+    "overall_loss_enforcement": "OWNER_VERIFIED_ORIGINAL_DEPOSIT_50_PERCENT_HARD_LOCK_IN_RESEARCH_SIMULATOR",
+    "dynamic_risk_sizing": "RECALCULATE_FROM_MARKED_EQUITY_AT_EACH_ENTRY",
+    "phase8_isolation": true,
+    "no_holdout_tuning": true,
+    "robustness_harness": {
+      "module": "tools/mt5_xauusd_multi_position_robustness.py",
+      "slippage_points_per_side": [
+        0,
+        1,
+        2,
+        5
+      ],
+      "isolation": "one candidate and one portfolio configuration per replay",
+      "net_pnl_allowed": false,
+      "final_holdout_eligible": false,
+      "validation": "PYTHON_CI_332_PASS_RUN_43703345325"
+    },
+    "broker_identity_contract": {
+      "required_fields": [
+        "broker",
+        "company",
+        "server",
+        "account_mode",
+        "account_currency",
+        "login_hmac_sha256"
+      ],
+      "required_values": {
+        "broker": "Exness",
+        "account_mode": "DEMO",
+        "account_currency": "USD"
+      },
+      "collector_checks": [
+        "company identifies Exness",
+        "server identifies Exness",
+        "account currency is USD",
+        "configured login and server match connected account",
+        "XAUUSD contract reports XAU base, USD profit, positive contract size, and positive tick size"
+      ],
+      "event_binding": "event payload account identity must exactly match robustness broker snapshot",
+      "raw_login_persisted": false,
+      "cryptographic_broker_attestation": false,
+      "required_instrument_fields": [
+        "currency_base",
+        "currency_profit",
+        "contract_size",
+        "point_size",
+        "tick_size"
+      ],
+      "required_instrument_values": {
+        "currency_base": "XAU",
+        "currency_profit": "USD"
+      },
+      "enforcement_stages": [
+        "read_only_collector",
+        "event_adapter",
+        "robustness_harness",
+        "direct_simulator_cli"
+      ],
+      "login_fingerprint": "HMAC-SHA-256 keyed with configured account password; raw login and password are never persisted",
+      "validation": "PYTHON_CI_332_PASS_RUN_43703345325",
+      "limitation": "Terminal-reported metadata and a keyed login fingerprint are consistency evidence, not a cryptographically signed broker attestation"
+    }
+  },
+  "notes": [
+    "This is a separate multi-position research policy; it does not alter the frozen Phase 8 registry.",
+    "The five-second holding horizon from the legacy candidate registry is excluded from this policy because the user's minimum intended holding window is 10 seconds.",
+    "The stop and target grids are research hypotheses, not selected or profitable settings.",
+    "There is no fixed position-count cap. Aggregate stop risk, margin, broker volume rules, and safety controls are binding.",
+    "The 15.00% daily loss value is a hard shutdown ceiling, never a loss target; the separate 50.00% overall account-loss ceiling is measured from the owner-verified original deposit and never resets.",
+    "No daily profit target or profit cap exists. Floating PnL and verified trading costs count toward both loss limits.",
+    "Daily reactivation now uses a manually launched DEMO/USD-only terminal script with operator, reason and evidence-reference attribution stored in the checksum-chained journal. Overall-loss reactivation uses a dedicated manually launched DEMO-only terminal script, operator/reason/evidence-reference attribution, an exact confirmation phrase, equity recovery above the threshold, and a checksum-chained audit journal. Operator attribution is self-asserted, not cryptographic identity. The EA must be reinitialized after the separate script completes to reload the unlocked state. Latest MQL5 compile/runtime validation passed in run 43549639530; all six sentinels passed. The risk-controls sentinel exercises the complete daily reactivation core, invalid confirmation and missing operator rejection, operator/reason/evidence replay, persisted baseline replacement, and restart recovery. The shared production account-verification path also requires USD currency. Latest Python CI passed 291 tests in run 43549639320, including five-way overlapping-position capacity, unresolved-gap exposure reservation, rejection of cross-UTC-date replays, UTC-aware feature timestamps, exact signal-window alignment, and USD-only account-control source enforcement. The manual script has not been run against a real DEMO account. No broker execution is enabled.",
+    "No broker execution is enabled.",
+    "The audit-chain/manual-script implementation (including the traceable evidence-reference input) passed the dedicated overall-loss terminal runtime test and all five companion runtime sentinels in run 43545106284. Python CI passed 285 tests in run 43549639320. The manual script itself has not been executed against a real DEMO account.",
+    "The multi-position robustness harness partitions each candidate/configuration independently and runs identical UTC-session quotes at 0/1/2/5 points of assumed slippage per side. It reports gross-only diagnostics, unresolved status, drawdown peaks and first lock timestamps; commission remains unverified, net PnL is null, and no configuration is selected. The quote-by-quote simulator latches daily/overall locks at the first observed breach even if equity later recovers. Python CI passed 298 tests in run 43697363506.",
+    "Same-quote concurrency regression verifies multiple signals sharing one executable quote are sized against one live marked-equity and aggregate-risk state; a third signal is rejected when broker volume-step rounding leaves insufficient capacity. Latest Python CI passed 299 tests in run 43697512870.",
+    "Broker identity evidence is now required at collection, event adaptation, and robustness replay. The collector records an Exness company/server assertion, DEMO mode, USD account currency, and password-keyed HMAC-SHA-256 login fingerprint without persisting the raw login. The adapter binds that identity into event output and the robustness harness requires an exact identity match. This is a consistency gate, not cryptographic broker attestation; independent terminal/account evidence and instrument economics still require owner review.",
+    "The collector, adapter, and robustness harness now fail closed on malformed instrument_specs, non-XAU base currency, non-USD profit currency, or missing/nonpositive contract size. Broker-provided contract size and tick size are recorded without substituting generic market assumptions.",
+    "The collector derives an HMAC-SHA-256 login fingerprint keyed with the configured account password, preventing offline login-number enumeration from the manifest. Neither raw login nor password is persisted."
+  ]
+}

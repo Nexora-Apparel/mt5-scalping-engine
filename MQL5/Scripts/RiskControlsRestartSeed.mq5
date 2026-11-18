@@ -36,6 +36,9 @@ bool PrepareCleanState(void)
                                (long)TEST_LOGIN,HashText64(TEST_SERVER));
    if(FileIsExist(journal,FILE_COMMON) && !FileDelete(journal,FILE_COMMON))
       return false;
+   GlobalVariableDel("VX_ORIGDEP_"+suffix);
+   GlobalVariableDel("VX_OVERALL_LOCK_"+suffix);
+   GlobalVariableDel("VX_OVERALL_SUM_"+suffix);
    string keys[8];
    keys[0]="VX_ESTOP_"+suffix; keys[1]="VX_DAY_"+suffix;
    keys[2]="VX_EQ_"+suffix; keys[3]="VX_LOCK_"+suffix;
@@ -53,7 +56,8 @@ bool SeedEmergencyStop(string &reason)
    config.risk_per_trade_percent=0.10;
    config.max_portfolio_risk_percent=0.25;
    config.max_daily_loss_percent=1.00;
-   config.max_positions=1;
+   config.verified_original_deposit=10000.0;
+   config.original_deposit_verified=true;
    config.cooldown_seconds=30;
    config.max_consecutive_losses=3;
    CVxRiskControls controls;

@@ -211,6 +211,22 @@ jobs:
           if (!(Test-Path $compiled)) { throw "Risk-controls runtime-test EX5 artifact was not created." }
           Write-Host "Risk-controls runtime-test script compiled."
 
+      - name: Compile overall account-loss guard runtime test script
+        shell: pwsh
+        run: |
+          $source = (Resolve-Path "MQL5\\Scripts\\OverallAccountLossGuardRuntimeTest.mq5").Path
+          $log = Join-Path (Split-Path $source) "OverallAccountLossGuardRuntimeTest.log"
+          if (Test-Path $log) { Remove-Item $log -Force }
+          Start-Process -FilePath $env:METAEDITOR -ArgumentList @('/compile:"' + $source + '"', '/log') -Wait | Out-Null
+          Start-Sleep -Seconds 2
+          if (!(Test-Path $log)) { throw "MetaEditor did not produce the overall-loss runtime-test compilation log." }
+          $logText = Get-Content $log -Raw
+          Get-Content $log
+          if ($logText -match "(?i)\\b[1-9]\\d* errors?\\b" -or $logText -notmatch "(?i)0 errors?" -or $logText -match "(?i)\\b[1-9]\\d* warnings?\\b") {
+            throw "Overall-loss runtime-test script did not compile with zero errors and warnings."
+          }
+          if (!(Test-Path (Join-Path (Split-Path $source) "OverallAccountLossGuardRuntimeTest.ex5"))) { throw "Overall-loss runtime-test EX5 artifact missing." }
+
       - name: Compile terminal process-restart seed script
         shell: pwsh
         run: |
@@ -242,6 +258,38 @@ jobs:
             throw "Restart-verification script did not compile with zero errors and warnings."
           }
           if (!(Test-Path (Join-Path (Split-Path $source) "RiskControlsRestartVerify.ex5"))) { throw "Restart-verification EX5 artifact missing." }
+
+      - name: Compile manual overall-loss owner reactivation script
+        shell: pwsh
+        run: |
+          $source = (Resolve-Path "MQL5\\Scripts\\OverallLossOwnerRearm.mq5").Path
+          $log = Join-Path (Split-Path $source) "OverallLossOwnerRearm.log"
+          if (Test-Path $log) { Remove-Item $log -Force }
+          Start-Process -FilePath $env:METAEDITOR -ArgumentList @('/compile:"' + $source + '"', '/log') -Wait | Out-Null
+          Start-Sleep -Seconds 2
+          if (!(Test-Path $log)) { throw "MetaEditor did not produce the owner-reactivation compilation log." }
+          $logText = Get-Content $log -Raw
+          Get-Content $log
+          if ($logText -match "(?i)\\b[1-9]\\d* errors?\\b" -or $logText -notmatch "(?i)0 errors?" -or $logText -match "(?i)\\b[1-9]\\d* warnings?\\b") {
+            throw "Owner-reactivation script did not compile with zero errors and warnings."
+          }
+          if (!(Test-Path (Join-Path (Split-Path $source) "OverallLossOwnerRearm.ex5"))) { throw "Owner-reactivation script EX5 artifact missing." }
+
+      - name: Compile manual daily-loss owner reactivation script
+        shell: pwsh
+        run: |
+          $source = (Resolve-Path "MQL5\\Scripts\\DailyLossOwnerRearm.mq5").Path
+          $log = Join-Path (Split-Path $source) "DailyLossOwnerRearm.log"
+          if (Test-Path $log) { Remove-Item $log -Force }
+          Start-Process -FilePath $env:METAEDITOR -ArgumentList @('/compile:"' + $source + '"', '/log') -Wait | Out-Null
+          Start-Sleep -Seconds 2
+          if (!(Test-Path $log)) { throw "MetaEditor did not produce the daily owner-reactivation compilation log." }
+          $logText = Get-Content $log -Raw
+          Get-Content $log
+          if ($logText -match "(?i)\\b[1-9]\\d* errors?\\b" -or $logText -notmatch "(?i)0 errors?" -or $logText -match "(?i)\\b[1-9]\\d* warnings?\\b") {
+            throw "Daily owner-reactivation script did not compile with zero errors and warnings."
+          }
+          if (!(Test-Path (Join-Path (Split-Path $source) "DailyLossOwnerRearm.ex5"))) { throw "Daily owner-reactivation script EX5 artifact missing." }
 
       - name: Compile risk journal storage-failure runtime test
         shell: pwsh
@@ -275,6 +323,7 @@ jobs:
           Copy-Item "MQL5\\Scripts\\RiskControlsRestartSeed.ex5" $scriptDirectory -Force
           Copy-Item "MQL5\\Scripts\\RiskControlsRestartVerify.ex5" $scriptDirectory -Force
           Copy-Item "MQL5\\Scripts\\RiskJournalFailureRuntimeTest.ex5" $scriptDirectory -Force
+          Copy-Item "MQL5\\Scripts\\OverallAccountLossGuardRuntimeTest.ex5" $scriptDirectory -Force
 
           function Invoke-Mt5RuntimeScript([string]$scriptName, [string]$resultName) {
             $resultPath = Join-Path $installPath ("MQL5\\Files\\" + $resultName)
@@ -317,6 +366,7 @@ jobs:
                     Copy-Item "MQL5\\Scripts\\RiskControlsRestartSeed.ex5" $dataScripts -Force
                     Copy-Item "MQL5\\Scripts\\RiskControlsRestartVerify.ex5" $dataScripts -Force
                     Copy-Item "MQL5\\Scripts\\RiskJournalFailureRuntimeTest.ex5" $dataScripts -Force
+                    Copy-Item "MQL5\\Scripts\\OverallAccountLossGuardRuntimeTest.ex5" $dataScripts -Force
                   }
                 }
               }
@@ -375,6 +425,7 @@ jobs:
           Invoke-Mt5RuntimeScript "RiskControlsRestartSeed" "veltrix_risk_restart_seed.result"
           Invoke-Mt5RuntimeScript "RiskControlsRestartVerify" "veltrix_risk_restart_verify.result"
           Invoke-Mt5RuntimeScript "RiskJournalFailureRuntimeTest" "veltrix_risk_journal_failure_test.result"
+          Invoke-Mt5RuntimeScript "OverallAccountLossGuardRuntimeTest" "veltrix_overall_loss_guard_runtime_test.result"
 
       - name: Upload terminal-side risk runtime results
         if: always()
@@ -387,8 +438,18 @@ jobs:
             C:\\MT5\\MQL5\\Files\\veltrix_risk_restart_seed.result
             C:\\MT5\\MQL5\\Files\\veltrix_risk_restart_verify.result
             C:\\MT5\\MQL5\\Files\\veltrix_risk_journal_failure_test.result
+            C:\\MT5\\MQL5\\Files\\veltrix_overall_loss_guard_runtime_test.result
           if-no-files-found: warn
           retention-days: 30
+
+      - name: Upload overall account-loss guard runtime-test script artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Veltrix-overall-loss-guard-runtime-test
+          path: MQL5/Scripts/OverallAccountLossGuardRuntimeTest.ex5
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload risk controls runtime-test script artifact
         if: success()
@@ -396,6 +457,15 @@ jobs:
         with:
           name: Veltrix-risk-controls-runtime-test
           path: MQL5/Scripts/RiskControlsRuntimeTest.ex5
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload daily-loss owner reactivation script artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Veltrix-daily-loss-owner-reactivation-script
+          path: MQL5/Scripts/DailyLossOwnerRearm.ex5
           if-no-files-found: error
           retention-days: 14
 
