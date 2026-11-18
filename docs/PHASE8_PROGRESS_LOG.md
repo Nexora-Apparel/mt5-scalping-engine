@@ -417,3 +417,12 @@ Never overwrite a failed result with a later success. Record the later success a
 - This is explicitly exploratory historical replay only. It is ineligible for the existing V1 validation partition, sealed holdout, and candidate approval. It does not replace prospective validation dates or the existing V1 plan.
 - The plan contains only the exact three interval keys accepted by the batch runner; session labels are stored separately as metadata. Added a regression test for schema validity, four distinct dates, 2-hour aggregate duration, and non-holdout status.
 - The batch workflow remains gated by the independent Exness-confirmed signer fingerprint secret. No batch has been dispatched and no new historical data has been retrieved.
+
+
+## 2026-11-18 — Default-branch historical batch dispatcher merged
+
+- PR #69 was merged to main after the updated Project Tests run [44286771020](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44286771020) passed. Merge commit: e2bd4191fd0beff1d83b30a504fede8c8eeef4a0.
+- Verified on main that .github/workflows/xauusd-historical-tick-batch.yml exists, checks out the pinned reviewed batch source commit 054bcb2a22c3887a7416d08c8d2138bef0c7cc2d, and requires the EXNESS_MT5_SIGNER_THUMBPRINT secret to match the installer certificate before execution.
+- Verified the preregistered four-date feasibility plan is present on main. Its data role is exploratory historical replay only; it is explicitly ineligible for V1 validation, sealed holdout, or candidate approval.
+- PR #61 remains open/draft/unmerged. PR #68 remains open/unmerged against PR #61. No historical batch has been dispatched; no credentials have been used by this workflow.
+- Manual blocker before any broker access: obtain the approved signer thumbprint from authenticated Exness support and add it to repository Actions secrets as EXNESS_MT5_SIGNER_THUMBPRINT. The workflow fails closed if this secret is absent or mismatched.
