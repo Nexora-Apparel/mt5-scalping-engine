@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Validate credentials without printing them
         shell: pwsh
@@ -59,6 +61,8 @@ jobs:
           if ([string]$signature.Status -ne "Valid") { throw "Installer Authenticode validation failed." }
           if ($subject -notmatch "^CN=MetaQuotes Ltd\.,\s*O=MetaQuotes Ltd\.") { throw "Installer publisher is not MetaQuotes Ltd." }
           if (!$codeSigning) { throw "Installer lacks Code Signing EKU." }
+          if (!$signature.SignerCertificate -or !$signature.SignerCertificate.Thumbprint) { throw "Installer signer thumbprint is unavailable." }
+          "MT5_INSTALLER_SIGNER_THUMBPRINT=$($signature.SignerCertificate.Thumbprint)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           $setup = Start-Process -FilePath $installer -ArgumentList @("/auto", '/path:"C:\MT5"') -PassThru
           $terminal = "C:\MT5\terminal64.exe"
           $deadline = (Get-Date).AddMinutes(3)
@@ -94,6 +98,8 @@ jobs:
           MT5_SERVER: ${{ secrets.MT5_SERVER }}
           FROM_UTC: ${{ inputs.from_utc }}
           TO_UTC: ${{ inputs.to_utc }}
+          VELTRIX_SOURCE_COMMIT: ${{ github.sha }}
+          VELTRIX_SOURCE_REF: ${{ github.ref_name }}
         run: |
           $ErrorActionPreference = "Stop"
           python -m tools.mt5_xauusd_historical_tick_probe --from-utc "$env:FROM_UTC" --to-utc "$env:TO_UTC" --output-dir historical-probe

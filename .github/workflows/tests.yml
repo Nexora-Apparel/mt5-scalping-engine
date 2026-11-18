@@ -20,6 +20,7 @@ on:
       - ".github/workflows/veltrix-demo-tick-collection.yml"
       - ".github/workflows/veltrix-market-profile.yml"
       - ".github/workflows/veltrix-multi-session-certification.yml"
+      - ".github/workflows/xauusd-historical-tick-probe.yml"
   push:
     branches:
       - main
