@@ -99,6 +99,8 @@ def test_batch_continues_after_one_interval_fails(monkeypatch, tmp_path):
     assert result["failed_count"] == 1
     assert result["intervals"][0]["error"].endswith("no historical ticks returned for requested interval")
     assert result["intervals"][1]["records"] == 17
-    saved = json.loads((tmp_path / "batch_manifest.json").read_text(encoding="utf-8"))
+    manifest_text = (tmp_path / "batch_manifest.json").read_text(encoding="utf-8")
+    assert manifest_text.endswith("\n")
+    saved = json.loads(manifest_text)
     assert saved["status"] == "PARTIAL"
     assert saved["attempted_count"] == 2
