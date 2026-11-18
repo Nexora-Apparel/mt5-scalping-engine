@@ -250,3 +250,15 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Manual-action capability:** The connected GitHub actions available in this session expose workflow-run inspection and rerun operations, but no workflow-dispatch action. No broker-connected run was initiated and no new artifact is claimed.
 - **Result:** CODE REVIEW PASS for the inspected controls; INDEPENDENT SIGNER PINNING BLOCKED pending Exness-controlled certificate fingerprint evidence. No strategy approval, holdout access, execution enablement, or live trading.
 - **Next action:** Obtain the installer signer certificate thumbprint through an independently authenticated Exness support response or another Exness-controlled channel, verify its scope/validity and compare it to the thumbprint observed at runtime. Then, after the required PR authorization/merge gate, run one bounded read-only DEMO probe and inspect the complete provenance manifest before planning any backfill.
+
+
+### 2026-11-18 — PR #67 merged; Phase 8 branch synchronization required
+
+- **Owner authorization:** The owner explicitly confirmed approval to complete the outstanding PR authorization gate and continue the listed sequence.
+- **PR #67:** Successfully merged into `main` using a merge commit. PR: https://github.com/Nexora-Apparel/mt5-scalping-engine/pull/67 . Merge commit: `efcb9edcb4a3973e2a04fb8713aebf1a5ca05bff`. This publishes checkout credential hardening and explicit source commit/ref plus installer signer thumbprint provenance wiring on the default branch.
+- **PR #61 impact:** After PR #67 merged, GitHub reports PR #61 still open/draft/unmerged but temporarily not mergeable; its feature branch is now 120 commits ahead and 4 commits behind `main`. No force push or merge was attempted. Reconcile the four new main commits into the Phase 8 branch and rerun CI before considering any merge of PR #61.
+- **Main-branch workflow status:** The merge succeeded. The connected workflow-run query returned no run records for the merge commit at the time of inspection; this is not evidence of a passing post-merge workflow.
+- **Signer fingerprint:** No authenticated Exness support channel is connected in this environment, and the reviewed official public Exness/MetaQuotes pages do not provide an independently verifiable signer certificate thumbprint. No support ticket or response was fabricated. Obtain the fingerprint through the owner's authenticated Exness support account, then compare the exact SHA-1 thumbprint to the runtime Authenticode signer certificate before treating it as pinned.
+- **Historical probe:** Not dispatched. The available GitHub integration has no workflow-dispatch action, and the authenticated signer pinning gate remains open. No new broker artifact or CSV is claimed.
+- **Result:** PR #67 MERGED; PR #61 SYNC REQUIRED; SIGNER PINNING BLOCKED; HISTORICAL PROBE NOT RUN.
+- **Next action:** Obtain Exness-controlled signer evidence; synchronize PR #61 with current `main`; verify branch CI; then use the default-branch manual dispatcher for a single bounded, read-only Exness DEMO XAUUSD request and audit all provenance fields and CSV contents.
