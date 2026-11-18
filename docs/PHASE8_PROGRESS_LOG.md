@@ -326,3 +326,5 @@ Never overwrite a failed result with a later success. Record the later success a
 
 - **Fixture precision correction:** Test tick fixtures now default to the documented BID|ASK mask \`0x06\` rather than the earlier placeholder value \`0x03\`; this avoids accidentally treating reserved bit \`0x01\` as a documented flag in baseline diagnostics. Commit \`ff9ee5b560649a6b32196f17702fb428abfe5a2b\`. The production capture's raw values are unchanged.
 
+- **CI defect found and corrected:** The first CI attempt after adding flag tests failed during pytest collection because a parameterization decorator was inadvertently attached to the new diagnostic test rather than the existing invalid-tick test. The fixture's default documented mask was also corrected to \`0x06\`. The decorator is now restored to the intended test and the baseline assertion expects \`0x00000006\`. Corrective commit: \`ad9c3324eb4fd3fd3f222b3219e74403b8c2fcdd\`. The failed runs were test-collection failures, not a production collector failure. Fresh CI is required on the corrected head.
+
