@@ -12,7 +12,6 @@ import json
 import os
 import re
 import sys
-from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -51,6 +50,8 @@ def validate_interval_plan(raw: str) -> list[dict[str, Any]]:
         if duration_ms <= 0 or duration_ms > MAX_PROBE_DURATION_MILLISECONDS:
             raise DiagnosticFailure(f"interval {interval_id} must be positive and no longer than 31 minutes")
         date_key = start.date().isoformat()
+        if end.date() != start.date():
+            raise DiagnosticFailure(f"interval {interval_id} must not cross a UTC date boundary")
         if date_key in dates:
             raise DiagnosticFailure("each historical interval must use a distinct UTC date")
         dates.add(date_key)
