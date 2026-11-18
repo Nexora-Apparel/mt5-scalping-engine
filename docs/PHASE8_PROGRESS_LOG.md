@@ -285,3 +285,13 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Commit:** `3317af2c09f3ef9b8f6b68cf3e2e66bc18196de0`.
 - **Operational note:** The runbook now requires checking the actual standard XAUUSD symbol's trading availability in MT5 before each manual dispatch because holidays and maintenance can alter schedules.
 - **Safety:** Documentation-only correction. No data was collected, no workflow was dispatched, and no strategy/evaluation settings were changed.
+
+
+### 2026-11-18 — Read-only collector checkout credential hardening
+
+- **File:** `.github/workflows/veltrix-demo-tick-collection.yml`.
+- **Change:** Added `persist-credentials: false` to the collector workflow's `actions/checkout@v4` step.
+- **Reason:** The DEMO tick collector only reads source and uploads artifacts; it does not push commits. Retaining the checkout token in the local Git configuration is unnecessary. Disabling persistence reduces the credential exposure surface on the temporary Windows runner.
+- **Commit:** `9c1b11fe75cd8391e6df204ec76e6bf76b582a9d`.
+- **CI:** A new Project tests run is expected because this workflow is included in the pull-request path filter; result pending verification.
+- **Safety:** No change to the DEMO identity gate, XAUUSD-only scope, collection duration, terminal trading/DLL restrictions, tick capture, or artifact format.
