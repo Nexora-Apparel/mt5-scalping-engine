@@ -439,3 +439,18 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Workflow:** Updated the default-dispatch workflow's immutable checkout pin to the new reviewed source commit `2b797d670998fadce237164c26ec25d2b2ba961a`. The workflow still requires the independent Exness-confirmed signer thumbprint secret.
 - **Result:** Implementation committed on branch `phase8-historical-batch-failure-isolation`; CI and live MT5 runtime are pending. This change resolves the batch-abort defect in code, but does not resolve broker-side historical coverage. The prior run remains a failed evidence record.
 - **Next:** Run full CI on the PR, merge only after tests pass, then re-run the exact four preregistered intervals. The new runner will attempt all four and produce a per-date diagnostic manifest even when some dates return no ticks.
+
+
+
+## 2026-11-18 — Failure-isolated historical batch merged and main CI passed
+
+- **Triggering runtime evidence:** Historical batch run [44288731924](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44288731924) returned zero ticks for the first interval (2026-11-02 06:00–06:30 UTC) and aborted before attempting the other three dates.
+- **Corrective PR:** [#70](https://github.com/Nexora-Apparel/mt5-scalping-engine/pull/70), merged as `5cb5e336cf0ee79eb66f99bf2ca5838aa699d79b`.
+- **Behavior:** Every preregistered interval is now attempted independently. Each result or exception is written to the aggregate manifest immediately. Aggregate `PARTIAL` means at least one interval succeeded and at least one failed; it is an artifact-preservation status, not a data-coverage pass. `FAIL` means no interval returned an audited dataset. No dates or time bounds are silently changed.
+- **Regression:** The test simulates an empty first interval followed by a successful second interval, verifies both attempts, validates the per-interval error/success records, and asserts the aggregate manifest is valid newline-terminated JSON.
+- **PR CI:** [Run 44289795783](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44289795783) passed: 267 tests, Python compilation, dependency installation and shell syntax validation.
+- **Main CI:** [Run 44289918551](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44289918551) passed on the merge commit: 267 tests, Python compilation, dependency installation and shell syntax validation.
+- **Dispatcher verification:** Main workflow `.github/workflows/xauusd-historical-tick-batch.yml` now pins immutable source commit `2b797d670998fadce237164c26ec25d2b2ba961a`, which contains the corrected failure-isolated runner and newline-safe manifest output. Signer comparison remains fail-closed and the run #44288731924 reached/passed that gate.
+- **Current evidence boundary:** The previous batch remains failed and only its first interval was attempted. The other three dates have no runtime result yet. The new behavior is code/CI verified; it has not yet been exercised against the broker.
+- **Next action:** Re-dispatch the unchanged preregistered four-interval plan. Inspect all four per-date outcomes and artifacts. If all return empty, classify the broker's accessible historical range as inadequate for those dates and design a new separately versioned, preregistered sampling plan centered on known retrievable periods; do not rewrite v1's selected dates or count retrospective quotes as prospective sessions.
+- **Safety:** Exness DEMO identity, XAUUSD-only scope, bounded requests, independent signer pin, terminal trading/DLL disabled, read-only collection, provenance, hashes and audit gates remain unchanged. No orders, candidate tuning, holdout access, approval, certification or live deployment.
