@@ -1,0 +1,135 @@
+name: VELTRIX Exness DEMO historical XAUUSD batch backfill
+run-name: VELTRIX historical XAUUSD batch (${{ github.run_number }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      intervals_json:
+        description: 'Prereviewed JSON array: [{"id":"d1","from_utc":"2026-10-12T10:00:00.000Z","to_utc":"2026-10-12T10:30:00.000Z"}]'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: veltrix-xauusd-historical-batch
+  cancel-in-progress: false
+
+jobs:
+  historical-batch:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out reviewed historical backfill source
+        uses: actions/checkout@v4
+        with:
+          repository: Nexora-Apparel/mt5-scalping-engine
+          ref: 054bcb2a22c3887a7416d08c8d2138bef0c7cc2d
+          persist-credentials: false
+
+      - name: Record exact source revision
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $sourceCommit = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or !$sourceCommit) { throw "Could not identify source revision." }
+          "VELTRIX_SOURCE_COMMIT=$sourceCommit" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "VELTRIX_SOURCE_REF=phase8-historical-batch-backfill" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Historical batch source commit: $sourceCommit"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: "x64"
+
+      - name: Install dependencies and validate interval plan
+        shell: pwsh
+        env:
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
+          INTERVALS_JSON: ${{ inputs.intervals_json }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (!$env:MT5_LOGIN -or $env:MT5_LOGIN -notmatch '^\d+$') { throw "MT5_LOGIN is missing or invalid." }
+          if (!$env:MT5_PASSWORD -or !$env:MT5_SERVER) { throw "MT5 credentials are incomplete." }
+          python -m pip install --disable-pip-version-check -r requirements.txt
+          if ($LASTEXITCODE -ne 0) { throw "Dependency installation failed." }
+          python -c "import os; from tools.mt5_historical_batch_backfill import validate_interval_plan; p=validate_interval_plan(os.environ['INTERVALS_JSON']); print(f'Validated {len(p)} distinct-date intervals; credential values are not printed.')"
+          if ($LASTEXITCODE -ne 0) { throw "Historical batch interval plan failed preflight." }
+          python -m pytest -q tests/test_mt5_xauusd_historical_tick_probe.py tests/test_mt5_historical_batch_backfill.py
+          if ($LASTEXITCODE -ne 0) { throw "Historical backfill tests failed; no MT5 request will run." }
+
+      - name: Install and verify Exness-linked MT5 terminal
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installer = Join-Path $env:RUNNER_TEMP "exness-mt5-setup.exe"
+          $sourceUrl = "https://download.terminal.free/cdn/web/exness.technologies.ltd/mt5/exness5setup.exe"
+          Invoke-WebRequest -Uri $sourceUrl -OutFile $installer
+          if ((Get-Item $installer).Length -lt 1000000) { throw "Installer download is incomplete." }
+          $signature = Get-AuthenticodeSignature -LiteralPath $installer
+          $subject = if ($signature.SignerCertificate) { [string]$signature.SignerCertificate.Subject } else { "" }
+          $thumbprint = if ($signature.SignerCertificate) { [string]$signature.SignerCertificate.Thumbprint } else { "" }
+          $ekuExtension = if ($signature.SignerCertificate) { $signature.SignerCertificate.Extensions | Where-Object { $_.Oid.Value -eq "2.5.29.37" } | Select-Object -First 1 } else { $null }
+          $codeSigning = $false
+          if ($ekuExtension) {
+            $eku = [System.Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension]::new($ekuExtension, $false)
+            $codeSigning = @($eku.EnhancedKeyUsages | Where-Object { $_.Value -eq "1.3.6.1.5.5.7.3.3" }).Count -gt 0
+          }
+          if ([string]$signature.Status -ne "Valid") { throw "Installer Authenticode validation failed." }
+          if ($subject -notmatch "^CN=MetaQuotes Ltd\.,\s*O=MetaQuotes Ltd\.") { throw "Installer publisher is not MetaQuotes Ltd." }
+          if (!$codeSigning -or !$thumbprint) { throw "Installer lacks Code Signing identity." }
+          "MT5_INSTALLER_SIGNER_THUMBPRINT=$thumbprint" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Authenticode valid; publisher MetaQuotes Ltd.; signer fingerprint recorded."
+          $setup = Start-Process -FilePath $installer -ArgumentList @("/auto", '/path:"C:\MT5"') -PassThru
+          $terminal = "C:\MT5\terminal64.exe"
+          $deadline = (Get-Date).AddMinutes(3)
+          while ((Get-Date) -lt $deadline -and !(Test-Path $terminal)) { Start-Sleep -Seconds 5 }
+          if (!(Test-Path $terminal)) { throw "MT5 installation incomplete." }
+          New-Item -ItemType Directory -Force -Path "C:\MT5\config" | Out-Null
+          @"
+          [Experts]
+          Enabled=0
+          AllowLiveTrading=0
+          AllowDllImport=0
+          "@ | Set-Content "C:\MT5\config\common.ini" -Encoding Unicode
+          "MT5_TERMINAL=$terminal" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Install pinned MetaTrader5 integration
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          python -m pip install --disable-pip-version-check "MetaTrader5==5.0.6231"
+          python -c "import MetaTrader5 as mt5; assert mt5.__version__ == '5.0.6231'"
+          if ($LASTEXITCODE -ne 0) { throw "Pinned MetaTrader5 package verification failed." }
+
+      - name: Retrieve preregistered historical intervals (read-only)
+        shell: pwsh
+        env:
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
+          INTERVALS_JSON: ${{ inputs.intervals_json }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          python -m tools.mt5_historical_batch_backfill --intervals-json "$env:INTERVALS_JSON" --output-dir historical-batch
+          if ($LASTEXITCODE -ne 0) { throw "Historical batch backfill failed." }
+
+      - name: Stop temporary terminal
+        if: always()
+        shell: pwsh
+        run: |
+          Get-Process -Name terminal64 -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+      - name: Upload historical batch evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veltrix-xauusd-historical-batch-${{ github.run_number }}
+          path: historical-batch/
+          if-no-files-found: warn
+          retention-days: 30
