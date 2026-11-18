@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools.mt5_python_readonly_diagnostic import (
     CANONICAL_SYMBOLS, DEMO_TRADE_MODE, DiagnosticConfig, DiagnosticFailure,
-    run_diagnostic, validate_account, validate_quote, discover_symbol,
+    run_diagnostic, validate_account, validate_quote, discover_symbol, connect_expected_account,
 )
 
 SCRIPT = ROOT / "tools" / "mt5_python_readonly_diagnostic.py"
@@ -31,13 +31,22 @@ class FakeMT5:
         self.clock, self.trade_mode, self.connected, self.trade_allowed = clock, trade_mode, connected, trade_allowed
         self.shutdown_called = False
         self.initialize_args = None
+        self.login_args = None
+        self.current_login = 12345678
+        self.login_succeeds = True
     def initialize(self, *args, **kwargs):
         self.initialize_args = (args, kwargs)
         return True
     def terminal_info(self):
         return SimpleNamespace(connected=self.connected, trade_allowed=self.trade_allowed, dlls_allowed=False)
     def account_info(self):
-        return SimpleNamespace(login=12345678, server="Exness-MT5Trial", trade_mode=self.trade_mode, company="Exness")
+        return SimpleNamespace(login=self.current_login, server="Exness-MT5Trial", trade_mode=self.trade_mode, company="Exness")
+    def login(self, login, *, password, server, timeout):
+        self.login_args = (login, password, server, timeout)
+        if self.login_succeeds and server == "Exness-MT5Trial":
+            self.current_login = login
+            return True
+        return False
     def symbols_get(self):
         return [
             SimpleNamespace(name="XAUUSDm", currency_base="XAU", currency_profit="USD"),
@@ -76,6 +85,27 @@ def test_account_guard_fails_closed(trade_mode, connected, trade_allowed, messag
     api = FakeMT5(FakeClock(), trade_mode=trade_mode, connected=connected, trade_allowed=trade_allowed)
     with pytest.raises(DiagnosticFailure, match=message):
         validate_account(api, 12345678, "Exness-MT5Trial")
+
+
+
+def test_explicit_login_corrects_preexisting_wrong_terminal_session():
+    api = FakeMT5(FakeClock())
+    api.current_login = 87654321
+    result = connect_expected_account(api, 12345678, "demo-password", "Exness-MT5Trial")
+    assert api.login_args == (12345678, "demo-password", "Exness-MT5Trial", 120_000)
+    assert result["login_match"] is True and result["server_match"] is True
+
+
+def test_explicit_login_failure_is_fail_closed_and_masks_account_ids():
+    api = FakeMT5(FakeClock())
+    api.current_login = 87654321
+    api.login_succeeds = False
+    with pytest.raises(DiagnosticFailure) as exc:
+        connect_expected_account(api, 12345678, "demo-password", "Exness-MT5Trial")
+    message = str(exc.value)
+    assert "explicit MT5 login failed" in message
+    assert "5678" in message and "4321" in message
+    assert "12345678" not in message and "87654321" not in message
 
 
 def test_quote_guard_checks_freshness_and_spread():

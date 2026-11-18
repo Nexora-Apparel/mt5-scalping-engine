@@ -25,7 +25,7 @@ if str(ROOT) not in sys.path:
 
 from tools.mt5_python_readonly_diagnostic import (
     CANONICAL_SYMBOLS, DEMO_TRADE_MODE, DiagnosticFailure,
-    discover_symbol, validate_account, validate_quote,
+    connect_expected_account, discover_symbol, validate_account, validate_quote,
 )
 
 HEADER = [
@@ -237,8 +237,8 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
     if minutes != 30:
         raise DiagnosticFailure("only the bounded 30-minute collection is enabled")
     session_id = os.environ.get("VELTRIX_SESSION_ID", "")
-    if session_id not in {"validation_01", "validation_02", "validation_03", "validation_04"}:
-        raise DiagnosticFailure("VELTRIX_SESSION_ID must be one of the four preregistered validation IDs")
+    if session_id not in {f"validation_{i:02d}" for i in (1, 3, *range(4, 14))}:
+        raise DiagnosticFailure("VELTRIX_SESSION_ID must be one of the preregistered validation IDs validation_01 or validation_03 through validation_13")
     login = int(os.environ.get("MT5_LOGIN", "0"))
     password = os.environ.get("MT5_PASSWORD", "")
     server = os.environ.get("MT5_SERVER", "")
@@ -250,7 +250,7 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
         raise DiagnosticFailure(f"MT5 initialize failed; last_error={mt5.last_error()}")
 
     try:
-        identity = validate_account(mt5, login, server)
+        identity = connect_expected_account(mt5, login, password, server)
         if identity["trade_mode"] != DEMO_TRADE_MODE:
             raise DiagnosticFailure("account is not DEMO")
         symbols = {name: discover_symbol(mt5, name) for name in CANONICAL_SYMBOLS}
@@ -269,6 +269,7 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
                 "trade_contract_size": float(getattr(info, "trade_contract_size", 0.0) or 0.0),
             }
         spread_samples = {name: [] for name in CANONICAL_SYMBOLS}
+        quote_sample_rows: list[dict[str, Any]] = []
         source_id = "exness-demo-" + re.sub(r"[^A-Za-z0-9_-]", "-", server)[:70]
         wait_for_fresh_quotes(
             mt5, symbols, login, server, monotonic=monotonic, sleep=sleep, now=now
@@ -290,6 +291,19 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
             for canonical in CANONICAL_SYMBOLS:
                 quote = validate_quote(mt5, symbols[canonical], current_ms, 15_000, 1_000, canonical)
                 spread_samples[canonical].append(quote["spread_points"])
+                quote_sample_rows.append({
+                    "schema_version": "1",
+                    "canonical_symbol": canonical,
+                    "broker_symbol": symbols[canonical],
+                    "observed_at_utc": utc_iso(current_ms),
+                    "quote_time_msc": quote["time_msc"],
+                    "quote_time_utc": utc_iso(quote["time_msc"]),
+                    "bid": quote["bid"],
+                    "ask": quote["ask"],
+                    "point": instrument_specs[canonical]["point"],
+                    "spread_points": quote["spread_points"],
+                    "quote_age_ms": quote["age_ms"],
+                })
                 cursors[canonical] = _collect_symbol_ticks(
                     mt5, canonical, symbols[canonical], source_id,
                     cursors[canonical], records, start_time_msc,
@@ -313,6 +327,19 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
             os.fsync(handle.fileno())
 
         audit = audit_ticks(csv_path)
+        quote_csv_path = output_dir / "quote_validation_samples.csv"
+        quote_header = [
+            "schema_version", "canonical_symbol", "broker_symbol",
+            "observed_at_utc", "quote_time_msc", "quote_time_utc",
+            "bid", "ask", "point", "spread_points", "quote_age_ms",
+        ]
+        with quote_csv_path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=quote_header, lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(quote_sample_rows)
+            handle.flush()
+            os.fsync(handle.fileno())
+        quote_csv_bytes = quote_csv_path.read_bytes()
         manifest = {
             **audit,
             "session_id": session_id,
@@ -322,6 +349,13 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
             "duration_clock": "monotonic",
             "requested_duration_minutes": minutes,
             "quote_validation_cycles": quote_samples,
+            "quote_validation_dataset": {
+                "filename": quote_csv_path.name,
+                "records": len(quote_sample_rows),
+                "bytes": len(quote_csv_bytes),
+                "sha256": hashlib.sha256(quote_csv_bytes).hexdigest(),
+                "sampling_method": "periodic mt5.symbol_info_tick snapshots; one row per collector quote-validation cycle and canonical symbol",
+            },
             "account_mode": "DEMO",
             "server": server,
             "symbols": symbols,

@@ -1,0 +1,61 @@
+{
+  "status": "PASS",
+  "research_only": true,
+  "report_schema": "VELTRIX_XAUUSD_MARKET_SESSION_COVERAGE_V1",
+  "classifier_version": "1.0.0",
+  "generated_at_utc": "2026-11-16T19:26:54.558683Z",
+  "source": {
+    "session_id": "validation_04",
+    "source_artifact_id": "14203352046",
+    "workflow_run_id": "43814840356",
+    "canonical_symbol": "XAUUSD",
+    "collection_started_utc": "2026-11-16T06:10:18.572279Z",
+    "collection_ended_utc": "2026-11-16T06:40:20.586814Z",
+    "duration_seconds": 1802,
+    "csv_sha256": "bec62f7a2521ecd9e9587a0a9292cdd0fa60aa7c4b24cdd423908e0cc464f589",
+    "tick_count": 11537
+  },
+  "session_coverage": {
+    "asian": {
+      "window_intersection_seconds": 1802.015,
+      "window_intersections_utc": [
+        {
+          "start": "2026-11-16T06:10:18.572279Z",
+          "end": "2026-11-16T06:40:20.586814Z"
+        }
+      ],
+      "tick_count": 11537,
+      "first_tick_utc": "2026-11-16T06:10:18.678Z",
+      "last_tick_utc": "2026-11-16T06:40:18.931Z"
+    },
+    "london": {
+      "window_intersection_seconds": 0,
+      "window_intersections_utc": [],
+      "tick_count": 0,
+      "first_tick_utc": null,
+      "last_tick_utc": null
+    },
+    "new_york": {
+      "window_intersection_seconds": 0,
+      "window_intersections_utc": [],
+      "tick_count": 0,
+      "first_tick_utc": null,
+      "last_tick_utc": null
+    },
+    "london_new_york_overlap": {
+      "window_intersection_seconds": 0,
+      "window_intersections_utc": [],
+      "tick_count": 0,
+      "first_tick_utc": null,
+      "last_tick_utc": null
+    }
+  },
+  "methodology": "Independent reclassification of every raw tick using IANA Asia/Tokyo 09:00-18:00, Europe/London 08:00-17:00, America/New_York 08:00-17:00 local windows; start-inclusive/end-exclusive. The London-New York overlap is the UTC intersection of the London and New York intervals.",
+  "limitations": [
+    "Supplemental descriptive evidence only; not a Phase 8 intake gate.",
+    "Session windows are research proxies, not exchange guarantees or uniform-liquidity claims.",
+    "Tick counts are quote observations, not traded volume or execution fills.",
+    "The original CSV and manifest remain unchanged.",
+    "System timezone database release was not exposed by the independent analysis runtime."
+  ]
+}
