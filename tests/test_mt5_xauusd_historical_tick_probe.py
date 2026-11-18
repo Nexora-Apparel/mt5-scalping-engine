@@ -30,7 +30,7 @@ class FakeHistoricalMT5:
         return (500, 5432, "2026.11.18")
 
     def terminal_info(self):
-        return SimpleNamespace(build=5432)
+        return SimpleNamespace(build=5432, dlls_allowed=False)
 
     def __init__(self, batches=None):
         self.batches = batches or []
@@ -46,7 +46,9 @@ class FakeHistoricalMT5:
         return symbol == "XAUUSDm" and enabled
 
     def symbol_info(self, symbol):
-        return SimpleNamespace(point=0.01) if symbol == "XAUUSDm" else None
+        return SimpleNamespace(
+            point=0.01, currency_base="XAU", currency_profit="USD"
+        ) if symbol == "XAUUSDm" else None
 
     def copy_ticks_range(self, symbol, start, end, flags):
         assert symbol == "XAUUSDm" and flags == self.COPY_TICKS_ALL
@@ -158,6 +160,15 @@ def test_probe_retrieves_non_overlapping_chunks_and_writes_verified_csv(
     assert result["status"] == "PASS"
     assert result["account_mode"] == "DEMO"
     assert result["trading_enabled"] is False
+    assert result["dll_imports_enabled"] is False
+    assert result["instrument_specs"] == {
+        "XAUUSD": {
+            "broker_symbol": "XAUUSDm",
+            "currency_base": "XAU",
+            "currency_profit": "USD",
+            "point": 0.01,
+        }
+    }
     assert result["order_submission"] is False
     assert result["position_management"] is False
     assert result["chunks_requested"] == 3
@@ -193,6 +204,54 @@ def test_probe_retrieves_non_overlapping_chunks_and_writes_verified_csv(
     assert result["first_tick_utc"] == probe_module.utc_iso(stamps[0])
     assert result["last_tick_utc"] == probe_module.utc_iso(stamps[-1])
 
+
+
+@pytest.mark.parametrize("dlls_allowed", [True, None])
+def test_probe_fails_closed_unless_terminal_runtime_proves_dll_imports_disabled(
+    tmp_path, demo_guards, dlls_allowed
+):
+    start = datetime(2026, 11, 13, 9, tzinfo=timezone.utc)
+    api = FakeHistoricalMT5([[tick(ms(start))]])
+    api.terminal_info = lambda: (
+        SimpleNamespace(build=5432) if dlls_allowed is None
+        else SimpleNamespace(build=5432, dlls_allowed=dlls_allowed)
+    )
+
+    with pytest.raises(
+        probe_module.DiagnosticFailure,
+        match="does not prove DLL imports are disabled",
+    ):
+        probe_module.probe(api, start, start + timedelta(seconds=1), tmp_path)
+
+    assert api.shutdown_called
+    assert not api.calls
+    assert not (tmp_path / "manifest.json").exists()
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        SimpleNamespace(point=0.01, currency_base="USD", currency_profit="USD"),
+        SimpleNamespace(point=0.01, currency_base="XAU", currency_profit=None),
+        SimpleNamespace(point=0.0, currency_base="XAU", currency_profit="USD"),
+    ],
+)
+def test_probe_fails_closed_on_unverified_xauusd_contract_metadata(
+    tmp_path, demo_guards, metadata
+):
+    start = datetime(2026, 11, 13, 9, tzinfo=timezone.utc)
+    api = FakeHistoricalMT5([[tick(ms(start))]])
+    api.symbol_info = lambda symbol: metadata if symbol == "XAUUSDm" else None
+
+    with pytest.raises(
+        probe_module.DiagnosticFailure,
+        match="contract metadata is missing or does not verify XAU/USD",
+    ):
+        probe_module.probe(api, start, start + timedelta(seconds=1), tmp_path)
+
+    assert api.shutdown_called
+    assert not api.calls
+    assert not (tmp_path / "manifest.json").exists()
 
 def test_probe_preserves_and_diagnoses_nonstandard_tick_flag_bits(tmp_path, demo_guards):
     start = datetime(2026, 11, 13, 9, tzinfo=timezone.utc)
