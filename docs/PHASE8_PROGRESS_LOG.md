@@ -426,3 +426,16 @@ Never overwrite a failed result with a later success. Record the later success a
 - Verified the preregistered four-date feasibility plan is present on main. Its data role is exploratory historical replay only; it is explicitly ineligible for V1 validation, sealed holdout, or candidate approval.
 - PR #61 remains open/draft/unmerged. PR #68 remains open/unmerged against PR #61. No historical batch has been dispatched; no credentials have been used by this workflow.
 - Manual blocker before any broker access: obtain the approved signer thumbprint from authenticated Exness support and add it to repository Actions secrets as EXNESS_MT5_SIGNER_THUMBPRINT. The workflow fails closed if this secret is absent or mismatched.
+
+
+
+## 2026-11-18 — Historical batch failure isolation implemented
+
+- **Triggering evidence:** Historical batch run [44288731924](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44288731924) completed security/setup gates but the first requested interval (2026-11-02 06:00–06:30 UTC) returned no historical ticks. The previous runner aborted immediately; later preregistered dates were not attempted.
+- **Change:** The batch runner now isolates each interval. It records PASS/FAIL, record count, and bounded error detail per interval, persists the aggregate manifest after every attempt, and continues to the next preregistered interval after an individual retrieval exception.
+- **Aggregate status:** PASS when all intervals succeed; PARTIAL when at least one succeeds and at least one fails; FAIL when none succeed. PARTIAL exits successfully only so GitHub Actions can upload the full diagnostic artifact; it is not classified as a data-coverage pass.
+- **Safety preserved:** Exact preregistered UTC bounds, 12-interval maximum, 31-minute per-interval cap, six-hour total cap, unique dates, Exness DEMO identity, XAUUSD-only scope, independent installer signer pin, read-only terminal configuration, provenance, per-dataset audit and SHA-256 remain required. No interval is widened, silently skipped, or re-labelled.
+- **Regression coverage:** Added a test proving that a failed first interval does not prevent the second interval from being attempted and that the PARTIAL manifest preserves both outcomes.
+- **Workflow:** Updated the default-dispatch workflow's immutable checkout pin to the new reviewed source commit `2b797d670998fadce237164c26ec25d2b2ba961a`. The workflow still requires the independent Exness-confirmed signer thumbprint secret.
+- **Result:** Implementation committed on branch `phase8-historical-batch-failure-isolation`; CI and live MT5 runtime are pending. This change resolves the batch-abort defect in code, but does not resolve broker-side historical coverage. The prior run remains a failed evidence record.
+- **Next:** Run full CI on the PR, merge only after tests pass, then re-run the exact four preregistered intervals. The new runner will attempt all four and produce a per-date diagnostic manifest even when some dates return no ticks.

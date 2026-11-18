@@ -61,3 +61,46 @@ def test_preregistered_feasibility_plan_is_bounded_and_not_holdout():
     assert len(intervals) == 4
     assert len({item["utc_date"] for item in intervals}) == 4
     assert sum(item["duration_milliseconds"] for item in intervals) == 7_200_000
+
+
+
+def test_batch_continues_after_one_interval_fails(monkeypatch, tmp_path):
+    from tools import mt5_historical_batch_backfill as batch
+
+    monkeypatch.setenv("VELTRIX_SOURCE_REF", "reviewed-test-ref")
+    monkeypatch.setenv("VELTRIX_SOURCE_COMMIT", "a" * 40)
+    monkeypatch.setenv("GITHUB_SHA", "b" * 40)
+    monkeypatch.setenv("MT5_INSTALLER_SIGNER_THUMBPRINT", "c" * 40)
+    calls = []
+
+    def fake_probe(_mt5, start, end, output_dir):
+        calls.append(output_dir.name)
+        if output_dir.name == "day_12":
+            raise DiagnosticFailure("no historical ticks returned for requested interval")
+        return {
+            "status": "PASS",
+            "records": 17,
+            "first_tick_utc": "2026-10-14T10:00:00.000Z",
+            "last_tick_utc": "2026-10-14T10:30:00.000Z",
+            "broker_symbol": "XAUUSDm",
+            "account_mode": "DEMO",
+            "sha256": "d" * 64,
+            "dataset_audit": {"status": "PASS"},
+        }
+
+    monkeypatch.setattr(batch, "probe", fake_probe)
+    intervals = validate_interval_plan(json.dumps([_interval(12), _interval(14)]))
+    result = batch.run_batch(object(), intervals, tmp_path)
+
+    assert calls == ["day_12", "day_14"]
+    assert result["status"] == "PARTIAL"
+    assert result["attempted_count"] == 2
+    assert result["successful_count"] == 1
+    assert result["failed_count"] == 1
+    assert result["intervals"][0]["error"].endswith("no historical ticks returned for requested interval")
+    assert result["intervals"][1]["records"] == 17
+    manifest_text = (tmp_path / "batch_manifest.json").read_text(encoding="utf-8")
+    assert manifest_text.endswith("\n")
+    saved = json.loads(manifest_text)
+    assert saved["status"] == "PARTIAL"
+    assert saved["attempted_count"] == 2
