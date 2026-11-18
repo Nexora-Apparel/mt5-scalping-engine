@@ -302,5 +302,5 @@ Never overwrite a failed result with a later success. Record the later success a
 - **File:** `tests/test_phase8_collection_orchestration.py`.
 - **Coverage added:** Assert all twelve eligible validation IDs are present in the manual collection workflow; assert checkout credentials are not persisted; parse all eight v2 calendar rows and require the complete `validation_06`–`validation_13` set, eight unique dates, weekdays only, matching weekday labels, and exactly 30-minute target windows.
 - **Commits:** `6ba45f77fa661fc1ad72a124ab27bcc2265da7d4` (initial assertions), `b63c913ec4cafc5fb79238a4598fced7483e0a02` (regex parser correction).
-- **CI:** Awaiting confirmation for the latest test commit; the previous workflow-only hardening run #44215664854 passed.
+- **CI:** [Run #44215778260](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44215778260) passed all jobs, including compilation and the complete unit/fail-closed test step. The prior workflow-only hardening run #44215664854 also passed.
 - **Safety:** Test-only change; no collector or strategy behavior altered.
