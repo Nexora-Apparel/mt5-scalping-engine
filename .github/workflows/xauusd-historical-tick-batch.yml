@@ -64,12 +64,16 @@ jobs:
 
       - name: Install and verify Exness-linked MT5 terminal
         shell: pwsh
+        env:
+          EXNESS_EXPECTED_SIGNER_THUMBPRINT: ${{ secrets.EXNESS_MT5_SIGNER_THUMBPRINT }}
         run: |
           $ErrorActionPreference = "Stop"
           $installer = Join-Path $env:RUNNER_TEMP "exness-mt5-setup.exe"
           $sourceUrl = "https://download.terminal.free/cdn/web/exness.technologies.ltd/mt5/exness5setup.exe"
           Invoke-WebRequest -Uri $sourceUrl -OutFile $installer
           if ((Get-Item $installer).Length -lt 1000000) { throw "Installer download is incomplete." }
+          if (!$env:EXNESS_EXPECTED_SIGNER_THUMBPRINT -or $env:EXNESS_EXPECTED_SIGNER_THUMBPRINT -notmatch "^[A-Fa-f0-9]{40}$") { throw "Missing independently confirmed EXNESS_MT5_SIGNER_THUMBPRINT secret; refusing installer execution." }
+          $expectedThumbprint = $env:EXNESS_EXPECTED_SIGNER_THUMBPRINT.ToUpperInvariant()
           $signature = Get-AuthenticodeSignature -LiteralPath $installer
           $subject = if ($signature.SignerCertificate) { [string]$signature.SignerCertificate.Subject } else { "" }
           $thumbprint = if ($signature.SignerCertificate) { [string]$signature.SignerCertificate.Thumbprint } else { "" }
@@ -82,6 +86,7 @@ jobs:
           if ([string]$signature.Status -ne "Valid") { throw "Installer Authenticode validation failed." }
           if ($subject -notmatch "^CN=MetaQuotes Ltd\.,\s*O=MetaQuotes Ltd\.") { throw "Installer publisher is not MetaQuotes Ltd." }
           if (!$codeSigning -or !$thumbprint) { throw "Installer lacks Code Signing identity." }
+          if ($thumbprint.ToUpperInvariant() -ne $expectedThumbprint) { throw "Installer signer thumbprint does not match the independently confirmed Exness fingerprint." }
           "MT5_INSTALLER_SIGNER_THUMBPRINT=$thumbprint" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "Authenticode valid; publisher MetaQuotes Ltd.; signer fingerprint recorded."
           $setup = Start-Process -FilePath $installer -ArgumentList @("/auto", '/path:"C:\MT5"') -PassThru
