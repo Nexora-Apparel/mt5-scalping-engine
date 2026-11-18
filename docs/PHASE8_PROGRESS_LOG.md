@@ -314,3 +314,12 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Why this matters:** The final PR #61 branch now carries the same source-ref, source-commit, signer-thumbprint export, and checkout-token handling as PR #67. This prevents the older file from being reintroduced by a later merge of PR #61.
 - **CI:** Awaiting verification for the reconciled branch head.
 - **Safety:** No merge performed. The workflow remains manual-dispatch, authenticated DEMO, XAUUSD-only, bounded and read-only.
+
+
+### 2026-11-18 — Cross-PR provenance regression guard
+
+- **File:** `tests/test_phase8_collection_orchestration.py`.
+- **Change:** Added explicit assertions that the PR #61 historical workflow retains checkout credential suppression, `VELTRIX_SOURCE_COMMIT`, `VELTRIX_SOURCE_REF`, and the verified installer signer thumbprint export.
+- **Reason:** PR #61 originally added the dispatcher before PR #67 hardened it. This test prevents the two PR branches from silently diverging and protects against a later merge restoring the older workflow.
+- **Commit:** `6c8cd5f39549eb8e503f8934b64cd1ad2edb7f3c`.
+- **CI:** Awaiting run result.
