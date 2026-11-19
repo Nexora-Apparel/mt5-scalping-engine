@@ -1,6 +1,10 @@
 name: VELTRIX legacy historical XAUUSD quote mechanics replay
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/xauusd-legacy-quote-mechanics-replay.yml"
   workflow_dispatch:
     inputs:
       v1_artifact_id:
@@ -36,8 +40,8 @@ jobs:
       - name: Download original immutable V1 and V2 artifacts
         env:
           GH_TOKEN: ${{ github.token }}
-          V1_ARTIFACT_ID: ${{ inputs.v1_artifact_id }}
-          V2_ARTIFACT_ID: ${{ inputs.v2_artifact_id }}
+          V1_ARTIFACT_ID: ${{ inputs.v1_artifact_id || '14420498746' }}
+          V2_ARTIFACT_ID: ${{ inputs.v2_artifact_id || '14422070722' }}
         shell: bash
         run: |
           set -euo pipefail
