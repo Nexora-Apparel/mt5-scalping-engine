@@ -554,3 +554,6 @@ Never overwrite a failed result with a later success. Record the later success a
 
 
 - **Execution trigger refinement:** The legacy replay workflow is configured to run automatically when its reviewed workflow file lands on `main`, while retaining manual dispatch with overridable artifact IDs. This avoids requiring a separate manual dispatch for the five known artifacts.
+
+
+- **Legacy adapter hardening:** Before running against the original artifacts, tightened the adapter to require the original source name, source/dispatcher commit hashes, installer signer fingerprint, timezone-aware requested interval bounds, exact row broker-symbol match, and every tick within the original inclusive interval. Added fail-closed regression tests for broker-symbol and interval mismatches.
