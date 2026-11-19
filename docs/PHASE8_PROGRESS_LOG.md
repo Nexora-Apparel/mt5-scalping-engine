@@ -551,3 +551,6 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Replacement evidence:** Inspected the first preregistered validation artifact [14029149674](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/43408593546/artifacts/14029149674): manifest identifies `validation_01`, canonical symbol XAUUSD, broker symbol XAUUSDm, status PASS, 3,857 rows; independently inspected CSV rows and confirmed all 3,857 rows are XAUUSD.
 - **Fix prepared:** Updated the profile workflow bootstrap source to run `43408593546`, artifact `veltrix-exness-demo-ticks-10`. The profiler's XAUUSD-only guard remains unchanged; no XAGUSD is silently accepted or relabelled.
 - **Next:** PR #74 CI will validate the workflow/profile changes. After merge, the main push bootstrap should re-run against the verified XAUUSD dataset.
+
+
+- **Execution trigger refinement:** The legacy replay workflow is configured to run automatically when its reviewed workflow file lands on `main`, while retaining manual dispatch with overridable artifact IDs. This avoids requiring a separate manual dispatch for the five known artifacts.
