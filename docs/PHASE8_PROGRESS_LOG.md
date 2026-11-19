@@ -543,3 +543,11 @@ Never overwrite a failed result with a later success. Record the later success a
 - **New workflow prepared:** `.github/workflows/xauusd-legacy-quote-mechanics-replay.yml` downloads the original V1/V2 artifacts by immutable artifact IDs, replays exactly the five successful interval CSVs, verifies source hashes and safety flags, and uploads reports. It does not connect to MT5 or collect new data.
 - **Journal continuity:** This file remains the canonical dated Phase 8 journal; each implementation, evidence item, blocker and next step is being recorded here.
 - **Next:** Merge the workflow PR and dispatch it against V1 artifact `14420498746` and V2 artifact `14422070722`. If all five report hashes match their original manifests, the historical quote-only replay integration blocker is resolved for descriptive mechanics. Candidate evaluation remains separately blocked by missing runtime DLL attestation and contract currency metadata.
+
+
+### 2026-11-19 — Unrelated default profile workflow bootstrap mismatch diagnosed and corrected
+
+- **Failure:** Main push profile run [44607597202](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44607597202) failed because the workflow's bootstrap source run `43194341816` / artifact `veltrix-exness-demo-ticks-3` contains XAGUSD-only rows. The profiler is intentionally XAUUSD-only and correctly rejected line 2. This was not a failure of the legacy historical replay implementation.
+- **Replacement evidence:** Inspected the first preregistered validation artifact [14029149674](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/43408593546/artifacts/14029149674): manifest identifies `validation_01`, canonical symbol XAUUSD, broker symbol XAUUSDm, status PASS, 3,857 rows; independently inspected CSV rows and confirmed all 3,857 rows are XAUUSD.
+- **Fix prepared:** Updated the profile workflow bootstrap source to run `43408593546`, artifact `veltrix-exness-demo-ticks-10`. The profiler's XAUUSD-only guard remains unchanged; no XAGUSD is silently accepted or relabelled.
+- **Next:** PR #74 CI will validate the workflow/profile changes. After merge, the main push bootstrap should re-run against the verified XAUUSD dataset.
