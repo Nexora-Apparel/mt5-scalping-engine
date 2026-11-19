@@ -1,0 +1,115 @@
+name: VELTRIX legacy historical XAUUSD quote mechanics replay
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/xauusd-legacy-quote-mechanics-replay.yml"
+  workflow_dispatch:
+    inputs:
+      v1_artifact_id:
+        description: "Original V1 historical batch artifact ID"
+        required: true
+        default: "14420498746"
+        type: string
+      v2_artifact_id:
+        description: "Original V2 historical batch artifact ID"
+        required: true
+        default: "14422070722"
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  replay-legacy-historical-quotes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out reviewed replay code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download original immutable V1 and V2 artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V1_ARTIFACT_ID: ${{ inputs.v1_artifact_id || '14420498746' }}
+          V2_ARTIFACT_ID: ${{ inputs.v2_artifact_id || '14422070722' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p replay-input/v1 replay-input/v2 replay-output
+          for item in "v1:$V1_ARTIFACT_ID" "v2:$V2_ARTIFACT_ID"; do
+            name="${item%%:*}"
+            artifact_id="${item#*:}"
+            if ! [[ "$artifact_id" =~ ^[0-9]+$ ]]; then
+              echo "Invalid artifact ID for $name" >&2
+              exit 1
+            fi
+            curl --fail --silent --show-error --location \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/$artifact_id/zip" \
+              -o "replay-input/$name.zip"
+            unzip -q "replay-input/$name.zip" -d "replay-input/$name"
+          done
+
+      - name: Replay each successful historical quote stream
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=0
+          while IFS= read -r manifest; do
+            [[ -n "$manifest" ]] || continue
+            directory="$(dirname "$manifest")"
+            csv="$directory/xauusd_historical_ticks.csv"
+            [[ -f "$csv" ]] || { echo "Missing CSV beside $manifest" >&2; exit 1; }
+            output="replay-output/$(basename "$directory").json"
+            echo "Replaying $directory"
+            python -m tools.mt5_xauusd_historical_quote_replay \
+              --csv "$csv" --manifest "$manifest" --output "$output"
+            count=$((count + 1))
+          done < <(find replay-input/v1 replay-input/v2 -type f -name manifest.json ! -name batch_manifest.json | sort)
+          [[ "$count" -eq 5 ]] || { echo "Expected exactly five successful historical interval manifests; found $count" >&2; exit 1; }
+          echo "REPLAYED_INTERVAL_COUNT=$count" >> "$GITHUB_ENV"
+
+      - name: Verify replay summaries preserve source hashes and safety limits
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          reports = sorted(Path("replay-output").glob("*.json"))
+          assert len(reports) == 5, f"expected five reports, got {len(reports)}"
+          for path in reports:
+              report = json.loads(path.read_text(encoding="utf-8"))
+              assert report["status"] == "PASS_WITH_PROVENANCE_LIMITATIONS", path
+              assert report["records_replayed"] == report["source_records"], path
+              assert len(report["source_sha256"]) == 64, path
+              assert report["signal_generation"] is False, path
+              assert report["candidate_scoring"] is False, path
+              assert report["actual_fill_claimed"] is False, path
+              assert report["currency_conversion_permitted"] is False, path
+              assert report["holdout_eligible"] is False, path
+              print(f"{path.name}: {report['records_replayed']} quotes, sha256={report['source_sha256']}")
+          print(f"PASS: {len(reports)} legacy quote streams replayed without strategy evaluation")
+          PY
+
+      - name: Upload reproducible legacy quote mechanics reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veltrix-legacy-historical-quote-mechanics-replay
+          path: |
+            replay-output/
+            replay-input/v1/batch_manifest.json
+            replay-input/v2/batch_manifest.json
+          if-no-files-found: error
+          retention-days: 90

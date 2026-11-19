@@ -57,9 +57,11 @@ jobs:
             run_id="$EVENT_RUN_ID"
             artifact_name="veltrix-exness-demo-ticks-$EVENT_RUN_NUMBER"
           else
-            # Bootstrap profile for the first validated 30-minute dataset.
-            run_id="43194341816"
-            artifact_name="veltrix-exness-demo-ticks-3"
+            # Bootstrap with the first preregistered XAUUSD validation dataset.
+            # The previous bootstrap artifact was XAGUSD and is incompatible with
+            # this intentionally XAUUSD-only profiler.
+            run_id="43408593546"
+            artifact_name="veltrix-exness-demo-ticks-10"
           fi
           [[ "$run_id" =~ ^[0-9]+$ ]] || { echo "Invalid source run ID"; exit 2; }
           [[ -n "$artifact_name" ]] || { echo "Artifact name is missing"; exit 2; }
