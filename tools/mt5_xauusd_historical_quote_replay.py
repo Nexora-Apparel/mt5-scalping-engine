@@ -22,8 +22,8 @@ def main() -> int:
         )
         result = replay_historical_quote_mechanics(ticks, profile)
     except (ReplayError, OSError, ValueError) as exc:
-        parser.exit(2, f"MECHANICS REPLAY FAIL: {exc}\\n")
-    rendered = json.dumps(result, indent=2, sort_keys=True) + "\\n"
+        parser.exit(2, f"MECHANICS REPLAY FAIL: {exc}\n")
+    rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:
         args.output.write_text(rendered, encoding="utf-8")
     print(rendered, end="")
