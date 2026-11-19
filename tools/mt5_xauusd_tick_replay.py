@@ -44,8 +44,13 @@ def validate_ticks(ticks: list[QuoteTick]) -> None:
             raise ReplayError(f"tick {index} has an invalid bid/ask quote")
 
 
-def load_verified_ticks(csv_path: str | Path, manifest_path: str | Path) -> tuple[list[QuoteTick], dict[str, Any]]:
-    profile = profile_dataset(csv_path, manifest_path)
+def load_verified_ticks(
+    csv_path: str | Path, manifest_path: str | Path, *,
+    allow_legacy_historical: bool = False,
+) -> tuple[list[QuoteTick], dict[str, Any]]:
+    profile = profile_dataset(
+        csv_path, manifest_path, allow_legacy_historical=allow_legacy_historical
+    )
     ticks: list[QuoteTick] = []
     try:
         with Path(csv_path).open("r", encoding="utf-8-sig", newline="") as handle:
@@ -179,6 +184,76 @@ def evaluate_event(
         "net_after_commission": None,
     }
 
+
+
+
+def replay_historical_quote_mechanics(
+    ticks: list[QuoteTick], source_profile: dict[str, Any]
+) -> dict[str, Any]:
+    """Replay quote-state updates only; never create signals or candidate outcomes."""
+    validate_ticks(ticks)
+    if source_profile.get("profile_type") != "OFFLINE_DESCRIPTIVE_ONLY":
+        raise ReplayError("source profile is not an offline descriptive profile")
+    if source_profile.get("provenance_status") != "LEGACY_PARTIAL_RUNTIME_SECURITY_AND_CONTRACT_METADATA":
+        raise ReplayError("mechanics-only legacy replay requires explicit partial-provenance profile")
+    point = source_profile.get("point_size")
+    if isinstance(point, bool) or not isinstance(point, (int, float)) or not math.isfinite(point) or point <= 0:
+        raise ReplayError("legacy source point size is invalid")
+    spreads = [(tick.ask - tick.bid) / point for tick in ticks]
+    gaps = [b.time_msc - a.time_msc for a, b in zip(ticks, ticks[1:])]
+    midpoint_start = (ticks[0].bid + ticks[0].ask) / 2
+    midpoint_end = (ticks[-1].bid + ticks[-1].ask) / 2
+    quote_changes = sum(
+        (a.bid, a.ask) != (b.bid, b.ask) for a, b in zip(ticks, ticks[1:])
+    )
+    ordered_spreads = sorted(spreads)
+
+    def quantile(fraction: float) -> float:
+        index = (len(ordered_spreads) - 1) * fraction
+        low, high = math.floor(index), math.ceil(index)
+        if low == high:
+            return ordered_spreads[low]
+        return ordered_spreads[low] + (ordered_spreads[high] - ordered_spreads[low]) * (index - low)
+
+    return {
+        "status": "PASS_WITH_PROVENANCE_LIMITATIONS",
+        "replay_schema": "VELTRIX_XAUUSD_HISTORICAL_QUOTE_MECHANICS_V1",
+        "research_only": True,
+        "source_sha256": source_profile.get("sha256"),
+        "source_records": len(ticks),
+        "records_replayed": len(ticks),
+        "source_span_start_msc": ticks[0].time_msc,
+        "source_span_end_msc": ticks[-1].time_msc,
+        "source_span_seconds": round((ticks[-1].time_msc - ticks[0].time_msc) / 1000, 3),
+        "quote_state_changes": quote_changes,
+        "max_intertick_gap_ms": max(gaps, default=0),
+        "gaps_over_1s": sum(gap > 1000 for gap in gaps),
+        "gaps_over_5s": sum(gap > 5000 for gap in gaps),
+        "spread_points": {
+            "minimum": round(min(spreads), 6),
+            "median": round(quantile(0.5), 6),
+            "p95": round(quantile(0.95), 6),
+            "maximum": round(max(spreads), 6),
+        },
+        "midpoint_change_price_units": round(midpoint_end - midpoint_start, 9),
+        "price_currency": None,
+        "currency_conversion_permitted": False,
+        "dll_imports_runtime_verified": False,
+        "contract_currency_metadata_verified": False,
+        "signal_generation": False,
+        "candidate_scoring": False,
+        "actual_fill_claimed": False,
+        "order_submission": False,
+        "position_management": False,
+        "holdout_eligible": False,
+        "limitations": [
+            "Quote-state mechanics only; no strategy signals, candidate outcomes or profitability scoring.",
+            "Legacy workflow logs prove AllowDllImport=0 was written, but do not prove MT5 runtime DLL-import state.",
+            "Point size and broker symbol were recorded; contract currency fields were not captured.",
+            "All price changes remain in raw broker quote price units; no account-currency PnL is computed.",
+            "Historical quotes are not actual fills; commission and slippage are not measured.",
+        ],
+    }
 
 def replay_events(
     ticks: list[QuoteTick],
