@@ -603,3 +603,17 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Result:** Implementation authored; CI and actual terminal verification **NOT RUN / NOT VERIFIED**. No claim that either field is now verified.
 - **Next action:** Review and run CI for this branch, merge only through the normal reviewed PR process, manually dispatch the diagnostics workflow, then inspect its artifact. Separately resume the five-window comparison when data analysis is available. Do not collect more historical ticks unless the comparison identifies a specific coverage gap.
 - **Research boundary:** Candidate evaluation, candidate tuning/ranking, holdout access, certification and trading remain blocked behind existing strict provenance and validation gates.
+
+
+### 2026-11-20 — Runtime metadata verifier merged and CI passed
+
+- **PR:** [#77](https://github.com/Nexora-Apparel/mt5-scalping-engine/pull/77), merged by squash.
+- **Merge commit:** \`7537ef37a0d0ae14b71ee71eb1df4ff140e6be40\`.
+- **CI:** [Project Tests run 44637681194](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44637681194) — SUCCESS; 285 tests passed in 2.33 seconds, Python compilation and Linux bootstrap shell syntax checks passed.
+- **Implementation:** Added \`tools/mt5_runtime_metadata_verification.py\`, focused fail-closed regression tests, and manual workflow \`.github/workflows/xauusd-runtime-metadata-verification.yml\`.
+- **What the diagnostic verifies:** Authenticated Exness DEMO identity; effective \`terminal_info().dlls_allowed == false\`; exact XAUUSD contract currencies \`XAU/USD\`; finite positive point size; broker symbol and terminal/integration versions.
+- **Non-collection boundary:** It makes no historical tick request, does not write orders or manage positions, and does not alter any old artifact. It produces a separate runtime metadata verification JSON artifact.
+- **Current status:** Code and CI gates PASS. The actual Windows MT5/Exness runtime workflow has **not yet been dispatched**, so the two metadata fields remain unverified until a passing terminal artifact exists. Workflow is now on \`main\`: [runtime metadata verification workflow](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/workflows/xauusd-runtime-metadata-verification.yml).
+- **Comparison status:** Five-window historical-versus-prospective quantitative comparison remains pending. No new historical collection has been initiated. Resume artifact inspection when data analysis is available; do not replace measured distributions with earlier summary statistics.
+- **Next action:** Dispatch the runtime metadata verification workflow once, inspect its uploaded artifact and job logs, then use the result only as a current runtime attestation. Keep the legacy historical manifests marked unverified. Complete the five-window profile comparison separately.
+- **Safety:** PR #61 and #68 remain unmerged. Candidate evaluation, tuning, holdout access, candidate approval, certification, production deployment and real-money trading remain blocked behind their existing gates.
