@@ -273,3 +273,12 @@ def test_future_mutations_do_not_change_breakout_compression_or_signal(registry)
         and event["signal_window_index"] == index
     ]
     assert actual == expected
+
+
+def test_mql5_candidate_window_builder_preserves_distinct_same_millisecond_quotes():
+    source = Path("MQL5/Include/Veltrix/CandidateWindowBuilder.mqh").read_text(encoding="utf-8")
+    # Equal timestamps are legal for distinct MT5 quote updates. The historical
+    # CSV feature builder processes every record, so the MQL5 adapter must too.
+    assert "if(tick.time_msc==m_last_tick_msc)" not in source
+    assert "Preserve distinct quote updates that share a millisecond timestamp" in source
+    assert "double lr=MathLog(mid/m_previous_mid);" in source
