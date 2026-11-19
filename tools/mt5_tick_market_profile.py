@@ -29,7 +29,10 @@ def percentile(values: list[float], fraction: float) -> float | None:
     return ordered[low] if low == high else ordered[low] + (ordered[high] - ordered[low]) * (index - low)
 
 
-def profile_dataset(csv_path: str | Path, manifest_path: str | Path) -> dict[str, Any]:
+def profile_dataset(
+    csv_path: str | Path, manifest_path: str | Path, *,
+    allow_legacy_historical: bool = False,
+) -> dict[str, Any]:
     csv_file, manifest_file = Path(csv_path), Path(manifest_path)
     if not csv_file.is_file() or not manifest_file.is_file():
         raise ProfileError("CSV dataset and manifest must both exist")
@@ -45,8 +48,27 @@ def profile_dataset(csv_path: str | Path, manifest_path: str | Path) -> dict[str
         raise ProfileError("collector manifest overall status is not PASS")
     if manifest.get("account_mode") != "DEMO":
         raise ProfileError("manifest account mode is not DEMO")
-    if manifest.get("trading_enabled") is not False or manifest.get("dll_imports_enabled") is not False:
-        raise ProfileError("manifest does not prove trading and DLL imports are disabled")
+    if manifest.get("trading_enabled") is not False:
+        raise ProfileError("manifest does not prove trading is disabled")
+    legacy_historical = (
+        allow_legacy_historical
+        and manifest.get("schema") == "VELTRIX_XAUUSD_HISTORICAL_TICK_PROBE_V2"
+    )
+    if not legacy_historical and manifest.get("dll_imports_enabled") is not False:
+        raise ProfileError("manifest does not prove DLL imports are disabled")
+    if legacy_historical:
+        if (
+            manifest.get("canonical_symbol") != "XAUUSD"
+            or not isinstance(manifest.get("broker_symbol"), str)
+            or not manifest.get("broker_symbol")
+        ):
+            raise ProfileError("legacy historical manifest lacks XAUUSD symbol provenance")
+        try:
+            legacy_point = float(manifest.get("instrument_point", 0))
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ProfileError("legacy historical point size is invalid") from exc
+        if not math.isfinite(legacy_point) or legacy_point <= 0:
+            raise ProfileError("legacy historical point size is invalid")
     streams: dict[str, list[tuple[int, float, float, float, float]]] = defaultdict(list)
     seen: set[tuple[Any, ...]] = set()
     try:
@@ -98,6 +120,11 @@ def profile_dataset(csv_path: str | Path, manifest_path: str | Path) -> dict[str
         pairs = [(bid, ask) for _, bid, ask, _, _ in ticks]
         changes = sum(a != b for a, b in zip(pairs, pairs[1:]))
         spec = manifest.get("instrument_specs", {}).get(symbol, {})
+        if legacy_historical:
+            spec = {
+                "point": legacy_point,
+                "broker_symbol": manifest.get("broker_symbol"),
+            }
         point = float(spec.get("point", 0))
         if not math.isfinite(point) or point <= 0:
             raise ProfileError(f"{symbol}: missing or invalid instrument point size")
@@ -131,12 +158,30 @@ def profile_dataset(csv_path: str | Path, manifest_path: str | Path) -> dict[str
     return {
         "status": "REVIEW" if overall_review else "PASS",
         "profile_type": "OFFLINE_DESCRIPTIVE_ONLY", "records": records, "sha256": digest,
-        "account_mode": "DEMO", "trading_enabled": False, "dll_imports_enabled": False,
+        "account_mode": "DEMO", "trading_enabled": False,
+        "dll_imports_enabled": manifest.get("dll_imports_enabled"),
+        "dll_imports_runtime_verified": not legacy_historical,
+        "instrument_metadata_status": (
+            "POINT_ONLY_CURRENCIES_UNVERIFIED" if legacy_historical else "VERIFIED"
+        ),
+        "point_size": legacy_point if legacy_historical else None,
+        "broker_symbol": manifest.get("broker_symbol") if legacy_historical else None,
+        "provenance_status": (
+            "LEGACY_PARTIAL_RUNTIME_SECURITY_AND_CONTRACT_METADATA"
+            if legacy_historical else "CURRENT_SCHEMA"
+        ),
         "symbols": output,
         "limitations": [
             "Descriptive XAUUSD tick profile only; not a trading signal or execution-readiness certification.",
             "Observed tick gaps can reflect market inactivity, broker feed behavior, or collection transport.",
             "No profitability, slippage, fill quality, or future quote availability is inferred.",
+            *(
+                [
+                    "Legacy capture did not record runtime DLL-import state; the workflow log only proves the disabled setting was written, not that MT5 reported it effective.",
+                    "Legacy capture records point size and broker symbol but not currency_base/currency_profit; no currency conversion or monetary PnL interpretation is permitted.",
+                    "Legacy profile is permitted only for offline quote mechanics; candidate evaluation remains blocked by strict replay provenance checks.",
+                ] if legacy_historical else []
+            ),
         ],
     }
 
