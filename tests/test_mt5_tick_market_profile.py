@@ -97,11 +97,8 @@ def test_legacy_historical_profile_rejects_broker_symbol_mismatch(tmp_path):
     base = 1_800_000_000_000
     rows = [row("XAUUSD", base)]
     c, m = legacy_fixture(tmp_path, rows)
-    with c.open("w", encoding="utf-8", newline="") as f:
-        rows[0]["broker_symbol"] = "XAUUSD"
-        w = csv.DictWriter(f, fieldnames=HEADER, lineterminator="\\n")
-        w.writeheader()
-        w.writerows(rows)
+    raw = c.read_text(encoding="utf-8")
+    c.write_text(raw.replace("XAUUSDm", "XAUUSD"), encoding="utf-8")
     data = json.loads(m.read_text())
     data["sha256"] = hashlib.sha256(c.read_bytes()).hexdigest()
     m.write_text(json.dumps(data), encoding="utf-8")
