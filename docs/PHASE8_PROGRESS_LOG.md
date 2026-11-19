@@ -642,3 +642,15 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Manual dispatch blocker:** The available GitHub integration does not expose a workflow_dispatch action. The workflow is manual-only; dispatch must be initiated from the GitHub Actions UI. This is not a code blocker.
 - **Next:** Run [XAUUSD runtime metadata verification](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/workflows/xauusd-runtime-metadata-verification.yml) on `main`; inspect job checkout SHA and uploaded artifact. After that, resume historical-versus-prospective quote profile comparison using the existing artifacts. No additional historical collection until a measured gap justifies it.
 - **Safety:** Workflow remains metadata-only and read-only. No ticks, orders or position operations. Legacy manifests remain unmodified and unverified for the metadata fields. Candidate/holdout/certification/trading gates remain closed.
+
+
+### 2026-11-20 — Dispatch-bound runtime metadata verification SUCCESS
+
+- **Run:** [44639446651](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44639446651), event `workflow_dispatch`, branch `main`, conclusion `success`.
+- **Dispatched/head commit:** `09d9f58d8b755dc38c6d944094852997fe66af17`.
+- **Job:** [135966384167](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44639446651/job/135966384167), `verify-runtime-metadata`, SUCCESS. All eight primary steps completed successfully, including checkout, focused tests, signed terminal installation, runtime metadata verification and artifact upload.
+- **Checkout integrity:** Main workflow contains `ref: ${{ github.sha }}` and run metadata identifies the dispatch head as `09d9f58d8b755dc38c6d944094852997fe66af17`. This binds the checkout to the dispatch head. Individual console log text was not independently retrieved in this audit, so no claim is made that a separate checkout SHA line was inspected.
+- **Artifact:** [14584443598](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44639446651/artifacts/14584443598), 587 bytes, SHA-256 `92a37f4691f3cd3889ee465e0d0ceeb524fa161f601cc9ce97a19588be9a44a0`, expires 2027-02-17.
+- **Verification scope:** Job success confirms the runtime metadata verifier completed and uploaded its report. Artifact payload has not yet been extracted/inspected; individual field values are not newly re-verified until report content is inspected.
+- **Next:** Inspect the JSON artifact, then resume direct historical-versus-prospective quote profile comparison using existing data. No additional historical collection until measured gaps justify it.
+- **Safety:** Metadata-only workflow: no tick request, order submission or position management. Historical legacy manifests remain unchanged. Candidate/holdout/certification/trading gates remain closed.
