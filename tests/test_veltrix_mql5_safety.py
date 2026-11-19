@@ -41,7 +41,8 @@ def test_veltrix_ea_uses_repository_relative_includes_and_timer():
     source = EA_SOURCE.read_text(encoding="utf-8")
     for include in ("MarketGuard.mqh", "RiskAllocator.mqh",
                     "PositionRegistry.mqh", "ExecutionGuard.mqh",
-                    "BrokerReconciler.mqh", "ExecutionCoordinator.mqh"):
+                    "BrokerReconciler.mqh", "ExecutionCoordinator.mqh",
+                    "OverallAccountLossGuard.mqh"):
         assert f'#include "..\\\\Include\\\\Veltrix\\\\{include}"' in source
     assert "StrategyResearch.mqh" in source
     assert "FeaturePipeline.mqh" in source
@@ -68,12 +69,12 @@ def test_risk_allocator_is_fail_closed_and_rounds_volume_down():
 
 def _reference_volume(equity, risk_pct, stop_distance, tick_size,
                       tick_value_loss, min_volume, max_volume, step,
-                      open_risk, portfolio_pct, open_positions, max_positions):
+                      open_risk, portfolio_pct, open_positions):
     numeric = (equity, risk_pct, stop_distance, tick_size, tick_value_loss,
                min_volume, max_volume, step, open_risk, portfolio_pct)
     if not all(math.isfinite(value) for value in numeric):
         return 0.0
-    if open_positions >= max_positions or min(equity, risk_pct, stop_distance,
+    if open_positions < 0 or min(equity, risk_pct, stop_distance,
             tick_size, tick_value_loss, min_volume, step, portfolio_pct) <= 0:
         return 0.0
     loss_per_lot = (stop_distance / tick_size) * tick_value_loss
@@ -88,11 +89,11 @@ def _reference_volume(equity, risk_pct, stop_distance, tick_size,
 
 def test_reference_risk_vectors_skip_under_minimum_and_respect_portfolio_cap():
     assert _reference_volume(10, 0.25, 2.0, 0.01, 1.0,
-                             0.01, 100.0, 0.01, 0.0, 1.0, 0, 3) == 0.0
+                             0.01, 100.0, 0.01, 0.0, 1.0, 0) == 0.0
     assert _reference_volume(1000, 1.0, 0.1, 0.01, 1.0,
-                             0.01, 100.0, 0.01, 0.0, 3.0, 0, 3) == 1.0
+                             0.01, 100.0, 0.01, 0.0, 3.0, 0) == 1.0
     assert _reference_volume(1000, 2.0, 0.1, 0.01, 1.0,
-                             0.01, 100.0, 0.01, 25.0, 3.0, 1, 3) == 0.5
+                             0.01, 100.0, 0.01, 25.0, 3.0, 17) == 0.5
 
 
 def test_reference_risk_vectors_reject_nan_and_infinity():
@@ -102,7 +103,7 @@ def test_reference_risk_vectors_reject_nan_and_infinity():
         for invalid in (math.nan, math.inf, -math.inf):
             values = baseline.copy()
             values[index] = invalid
-            assert _reference_volume(*values, 0, 3) == 0.0
+            assert _reference_volume(*values, 0) == 0.0
 
 
 def test_risk_allocator_checks_finite_inputs_and_derived_values():
@@ -497,8 +498,8 @@ def test_phase7_risk_controls_are_demo_xauusd_only_and_fail_closed():
         "ACCOUNT_TRADE_MODE_DEMO", "ACCOUNT_LOGIN", "ACCOUNT_SERVER",
         "risk_per_trade_percent>0.25",
         "max_portfolio_risk_percent>0.50",
-        "max_daily_loss_percent>1.00",
-        "config.max_positions!=1", "cooldown_seconds<30",
+        "max_daily_loss_percent>15.00",
+        "cooldown_seconds<0", "max_consecutive_losses<0",
         "max_consecutive_losses>3", "BeginServerDay",
         "EvaluateDailyLoss", "RecordVerifiedClose", "closing_deal_ticket",
         "VX_CLOSE_", "Duplicate verified closing deal ignored",
@@ -509,7 +510,7 @@ def test_phase7_risk_controls_are_demo_xauusd_only_and_fail_closed():
         "Only a verified XAUUSD contract is permitted",
         "Duplicate request identifier rejected",
         "Post-loss cooldown is active",
-        "daily loss lock is latched until the next verified server day",
+        "daily loss lock remains latched until audited owner reactivation",
     )
     for token in required:
         assert token.lower() in source.lower()
@@ -535,12 +536,13 @@ def test_phase7_daily_loss_lock_and_emergency_stop_are_distinct():
     assert "m_daily_loss_locked=false;" in source
     assert "m_emergency_stop=true;" in source
     day_reset = source.split("bool BeginServerDay", 1)[1].split("bool EvaluateDailyLoss", 1)[0]
-    assert "m_daily_loss_locked=false;" in day_reset
+    assert "m_daily_loss_locked=false;" not in day_reset
+    assert "owner-rearmed" in day_reset
     assert "m_emergency_stop=false;" not in day_reset
     assert "GlobalVariableCheck(keys[i])" in source
     assert "GlobalVariableSet(m_emergency_key,(m_emergency_stop ? 1.0 : 0.0))" in source
     assert "GlobalVariablesFlush();" in source
-    assert "A cooldown and emergency stop deliberately survive a day boundary." in source
+    assert "A daily-loss lock, cooldown, and emergency stop deliberately survive a day boundary." in source
     assert "no reset method" not in source.lower() or "LatchEmergencyStop" in source
 
 
@@ -550,12 +552,12 @@ def test_phase7_risk_policy_reference_boundaries():
     assert not (0.250001 <= 0.25)
     assert 0.50 <= 0.50
     assert not (0.500001 <= 0.50)
-    assert 1.00 <= 1.00
-    assert not (1.000001 <= 1.00)
+    assert 15.00 <= 15.00
+    assert not (15.000001 <= 15.00)
     day_start = 1000.0
-    daily_limit = 1.0
-    assert (day_start - 990.01) / day_start * 100 < daily_limit
-    assert (day_start - 990.0) / day_start * 100 >= daily_limit
+    daily_limit = 15.0
+    assert (day_start - 850.01) / day_start * 100 < daily_limit
+    assert (day_start - 850.0) / day_start * 100 >= daily_limit
 
 
 def test_phase7_sizing_and_intent_registration_recheck_live_account_and_daily_loss():
@@ -566,7 +568,8 @@ def test_phase7_sizing_and_intent_registration_recheck_live_account_and_daily_lo
     assert "EvaluateDailyLoss(source.equity,guard_reason)" in sizing
     assert "VerifyExactDemoAccount(reason)" in registration
     assert "EvaluateDailyLoss(current_equity,reason)" in registration
-    assert "active_positions>=m_config.max_positions" in registration
+    assert "active_positions>=m_config.max_positions" not in registration
+    assert "there is no count ceiling" in registration
     assert "m_journal.HasRequest(request_key)" in registration
     assert "m_journal.AppendRequest(request_key,now_msc,reason)" in registration
     close_record = source.split("bool RecordVerifiedClose", 1)[1].split("bool CalculateVolume", 1)[0]
@@ -595,6 +598,8 @@ def test_phase7_public_state_mutations_require_exact_connected_demo_identity():
     assert "VerifyExactDemoAccount(reason)" in loss
     assert "VerifyExactDemoAccount(reason)" in close
     assert "ACCOUNT_TRADE_MODE_DEMO" in source
+    assert 'AccountInfoString(ACCOUNT_CURRENCY)!="USD"' in source
+    assert "USD-denominated DEMO account" in source
     assert "TERMINAL_CONNECTED" in source
 
 
@@ -729,6 +734,29 @@ def test_phase7_journal_replays_permanent_emergency_and_daily_lock_events():
     assert "AppendDailyLock" in source
 
 
+def test_phase7_manual_daily_reactivation_is_owner_confirmed_and_journaled():
+    controls = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    journal = (ROOT / "MQL5" / "Include" / "Veltrix" / "RiskJournal.mqh").read_text(encoding="utf-8")
+    assert "RearmDailyLossLock" in controls
+    assert "operator_id" in controls
+    assert "VELTRIX OWNER CONFIRM DAILY REACTIVATION" in controls
+    assert "m_journal.AppendDailyRearm" in controls
+    assert "DailyRearmEquity" in controls
+    assert "Emergency stop remains independently latched" in controls
+    assert 'event_type=="DAILY_REARM"' in journal
+    assert "AppendDailyRearm" in journal
+    assert "HasDailyRearm" in journal
+    assert "DailyRearmOperatorId" in journal
+    assert "DailyRearmReason" in journal
+    assert "DailyRearmEvidenceReference" in journal
+    assert "ParseDailyRearmKey" in journal
+    assert "StringTrimLeft" in journal and "StringTrimRight" in journal
+    assert "ActiveDailyLockDay" in controls
+    assert "LatestDailyRearmEquity" in controls
+    assert "ActiveDailyLockCount" in journal
+    assert "RemoveValue(m_daily_lock_keys,day_key)" in journal
+
+
 def test_phase7_risk_controls_restore_journal_locks_and_persist_loss_locks():
     source = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
     assert "m_journal.HasEmergencyStop()" in source
@@ -812,3 +840,128 @@ def test_phase7_mql5_workflow_executes_terminal_runtime_scripts_without_broker_l
     assert "ShutdownTerminal=1" in source
     assert "veltrix_risk_controls_runtime_test.result" in source
     assert "veltrix_risk_journal_runtime_test.result" in source
+
+
+OVERALL_LOSS_GUARD_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "OverallAccountLossGuard.mqh"
+
+
+def test_overall_loss_guard_uses_immutable_verified_original_deposit_and_persistent_lock():
+    source = OVERALL_LOSS_GUARD_SOURCE.read_text(encoding="utf-8")
+    required = (
+        "original_deposit_verified", "verified_original_deposit",
+        "VX_ORIGDEP_", "VX_OVERALL_LOCK_", "VX_OVERALL_SUM_",
+        "StateChecksum", "GlobalVariablesFlush", "ACCOUNT_EQUITY",
+        "m_loss_limit_percent=50.0", "Rearm",
+        "immutable stored baseline", "Equity must recover above the 50% loss boundary",
+        "InitializeAudit", "AppendAudit", "REARM_INTENT", "REARM_COMMIT",
+        "VELTRIX OWNER CONFIRM REACTIVATION", "ACCOUNT_CURRENCY",
+        "USD-denominated DEMO account",
+    )
+    for token in required:
+        assert token in source
+    lowered = source.lower()
+    forbidden = ("ordersend(", "ordersendasync(", "ordercheck(",
+                 "ctrade", "trade_action_deal", "positionclose(",
+                 "positionmodify(")
+    assert not [token for token in forbidden if token in lowered]
+
+
+def test_overall_loss_guard_fails_closed_on_unverified_or_tampered_baseline():
+    source = OVERALL_LOSS_GUARD_SOURCE.read_text(encoding="utf-8")
+    assert "independently owner-verified original deposit are mandatory" in source
+    assert "Supplied original-deposit evidence conflicts with the immutable stored baseline" in source
+    assert "Overall-loss persistent state is partial" in source
+    assert "Overall-loss persistent checksum mismatch" in source
+    assert "m_original_deposit=stored_baseline" in source
+
+
+OVERALL_GUARD_SOURCE = ROOT / "MQL5" / "Include" / "Veltrix" / "OverallAccountLossGuard.mqh"
+OVERALL_GUARD_RUNTIME = ROOT / "MQL5" / "Scripts" / "OverallAccountLossGuardRuntimeTest.mq5"
+OVERALL_OWNER_REARM = ROOT / "MQL5" / "Scripts" / "OverallLossOwnerRearm.mq5"
+DAILY_OWNER_REARM = ROOT / "MQL5" / "Scripts" / "DailyLossOwnerRearm.mq5"
+MQL5_WORKFLOW = ROOT / ".github" / "workflows" / "mql5-compile.yml"
+
+
+def test_overall_loss_guard_runtime_covers_threshold_restart_tamper_and_rearm():
+    guard = OVERALL_GUARD_SOURCE.read_text(encoding="utf-8")
+    runtime = OVERALL_GUARD_RUNTIME.read_text(encoding="utf-8")
+    for token in (
+        "ACCOUNT_EQUITY", "m_original_deposit", "m_loss_limit_percent=50.0",
+        "VX_ORIGDEP_", "VX_OVERALL_LOCK_", "VX_OVERALL_SUM_",
+        "StateChecksum", "GlobalVariablesFlush", "EvaluateEquityValue",
+        "RearmEquityValue", "original_deposit_verified",
+    ):
+        assert token in guard
+    for token in (
+        "EvaluateEquitySnapshotForTest(5000.0",
+        "RearmEquitySnapshotForTest(\"TEST_OWNER\"",
+        "VELTRIX OWNER CONFIRM REACTIVATION",
+        "audit_file",
+        "conflicts with the immutable stored baseline",
+        "checksum mismatch", "persistent state is partial",
+        "restart replay", "GlobalVariableDel",
+    ):
+        assert token in runtime
+    lowered = guard.lower() + runtime.lower()
+    forbidden = (
+        "ordersend(", "ordersendasync(", "ordercheck(", "ctrade",
+        "trade_action_deal", "positionclose(", "positionmodify(",
+    )
+    assert not [token for token in forbidden if token in lowered]
+
+
+def test_overall_loss_reactivation_is_manual_owner_attributed_and_audited():
+    script = OVERALL_OWNER_REARM.read_text(encoding="utf-8")
+    guard = OVERALL_GUARD_SOURCE.read_text(encoding="utf-8")
+    for token in (
+        "InpExpectedDemoLogin", "InpExpectedDemoServer",
+        "InpOriginalDepositEvidenceReviewed", "InpOwnerOperatorId",
+        "InpReactivationReason", "InpConfirmationPhrase",
+        "ACCOUNT_TRADE_MODE_DEMO", "ACCOUNT_CURRENCY",
+        "guard.Rearm", "No order APIs",
+    ):
+        assert token in script
+    assert "trusted_owner_confirmed" not in guard
+    assert "VELTRIX_OVERALL_AUDIT_" in guard
+    assert "Overall-loss audit checksum" in guard
+    lowered = script.lower()
+    assert "ordersend(" not in lowered
+    assert "order_send(" not in lowered
+
+
+def test_daily_loss_reactivation_is_owner_attributed_and_manual_demo_only():
+    script = DAILY_OWNER_REARM.read_text(encoding="utf-8")
+    controls = RISK_CONTROLS_SOURCE.read_text(encoding="utf-8")
+    for token in (
+        "InpExpectedDemoLogin", "InpExpectedDemoServer",
+        "InpOriginalDepositEvidenceReviewed", "InpOwnerOperatorId",
+        "InpReactivationReason", "InpReactivationEvidenceReference",
+        "InpConfirmationPhrase", "ACCOUNT_TRADE_MODE_DEMO",
+        "ACCOUNT_CURRENCY", "controls.RearmDailyLossLock",
+        "VELTRIX OWNER CONFIRM DAILY REACTIVATION",
+    ):
+        assert token in script
+    assert "m_journal.AppendDailyRearm" in controls
+    assert "RearmDailyLossLockForTest" in controls
+    controls_runtime = (ROOT / "MQL5" / "Scripts" / "RiskControlsRuntimeTest.mq5").read_text(encoding="utf-8")
+    assert "#define VELTRIX_RISK_TEST" in controls_runtime
+    assert "RunDailyRearmControlTests" in controls_runtime
+    assert "RearmDailyLossLockForTest" in controls_runtime
+    assert "daily rearm state did not survive risk-control restart" in controls_runtime
+    assert "DailyRearmEvidenceReference" in (ROOT / "MQL5" / "Include" / "Veltrix" / "RiskJournal.mqh").read_text(encoding="utf-8")
+    lowered = script.lower()
+    forbidden = ("ordersend(", "ordersendasync(", "ordercheck(", "ctrade",
+                 "trade_action_deal", "positionclose(", "positionmodify(")
+    assert not [token for token in forbidden if token in lowered]
+
+
+def test_overall_loss_guard_runtime_is_wired_into_mql5_ci():
+    workflow = MQL5_WORKFLOW.read_text(encoding="utf-8")
+    assert "Compile overall account-loss guard runtime test script" in workflow
+    assert "OverallAccountLossGuardRuntimeTest.ex5" in workflow
+    assert 'Invoke-Mt5RuntimeScript "OverallAccountLossGuardRuntimeTest"' in workflow
+    assert "veltrix_overall_loss_guard_runtime_test.result" in workflow
+    assert "Compile manual overall-loss owner reactivation script" in workflow
+    assert "OverallLossOwnerRearm.ex5" in workflow
+    assert "Compile manual daily-loss owner reactivation script" in workflow
+    assert "DailyLossOwnerRearm.ex5" in workflow

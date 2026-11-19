@@ -219,7 +219,26 @@ public:
       m_records[index].state=VX_POSITION_CLOSED;
       m_records[index].last_reason=(reason=="" ?
          "Closing deal confirmed in broker history" : reason);
-      return true;
+      // The durable journal retains the history; remove the closed runtime
+      // record so an unlimited trade count does not grow the in-memory list.
+      return (PruneClosed()>0);
+   }
+
+   int PruneClosed(void)
+   {
+      int removed=0;
+      for(int i=ArraySize(m_records)-1;i>=0;i--)
+      {
+         if(m_records[i].state!=VX_POSITION_CLOSED)
+            continue;
+         int size=ArraySize(m_records);
+         for(int j=i;j<size-1;j++)
+            m_records[j]=m_records[j+1];
+         if(ArrayResize(m_records,size-1)!=size-1)
+            return removed;
+         removed++;
+      }
+      return removed;
    }
 
    bool GetAt(const int index,VxPositionRecord &record) const
