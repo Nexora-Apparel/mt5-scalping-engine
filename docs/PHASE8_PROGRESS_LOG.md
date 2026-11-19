@@ -630,3 +630,15 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Remediation branch:** `phase8-runtime-workflow-checkout-fix`. Change the checkout ref to `${{ github.sha }}`, binding the checked-out source to the exact workflow-dispatch commit. Re-run after merge to establish reproducible main-commit evidence.
 - **Historical artifact boundary:** This new runtime evidence does not rewrite or retroactively certify the five legacy historical manifests. Their original missing fields remain unverified for those old sessions.
 - **Next:** Review and merge the checkout pin correction; rerun the diagnostic from main; then resume quantitative historical-versus-prospective quote comparison. No new historical collection until comparison identifies a concrete coverage gap. Candidate evaluation, holdout, certification and trading remain gated.
+
+
+### 2026-11-20 — PR #78 merged; dispatch-bound checkout fix integrated
+
+- **PR:** [#78](https://github.com/Nexora-Apparel/mt5-scalping-engine/pull/78), squash-merged.
+- **Merge commit:** `551157c7b42a95b7682c4fc175e803797f577710`.
+- **Correction:** `.github/workflows/xauusd-runtime-metadata-verification.yml` now checks out `${{ github.sha }}`, so the job source is bound to the exact workflow dispatch commit instead of a fixed feature branch.
+- **Main verification:** fetched the workflow file from `main` and confirmed the corrected checkout expression is present.
+- **CI:** PR check run `44639081877` completed successfully (see PR checks). No workflow dispatch was observed for the merge commit at the time of this entry.
+- **Manual dispatch blocker:** The available GitHub integration does not expose a workflow_dispatch action. The workflow is manual-only; dispatch must be initiated from the GitHub Actions UI. This is not a code blocker.
+- **Next:** Run [XAUUSD runtime metadata verification](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/workflows/xauusd-runtime-metadata-verification.yml) on `main`; inspect job checkout SHA and uploaded artifact. After that, resume historical-versus-prospective quote profile comparison using the existing artifacts. No additional historical collection until a measured gap justifies it.
+- **Safety:** Workflow remains metadata-only and read-only. No ticks, orders or position operations. Legacy manifests remain unmodified and unverified for the metadata fields. Candidate/holdout/certification/trading gates remain closed.
