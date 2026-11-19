@@ -6,6 +6,7 @@ import csv
 import hashlib
 import json
 import math
+import re
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -61,8 +62,22 @@ def profile_dataset(
             manifest.get("canonical_symbol") != "XAUUSD"
             or not isinstance(manifest.get("broker_symbol"), str)
             or not manifest.get("broker_symbol")
+            or manifest.get("source") != "authenticated Exness MT5 DEMO terminal historical tick API"
+            or not manifest.get("source_ref")
+            or not re.fullmatch(r"[0-9a-f]{40}", str(manifest.get("source_commit", "")))
+            or not re.fullmatch(r"[0-9a-f]{40}", str(manifest.get("dispatcher_commit", "")))
+            or not re.fullmatch(r"[A-Fa-f0-9]{40}", str(manifest.get("installer_signer_thumbprint", "")))
         ):
-            raise ProfileError("legacy historical manifest lacks XAUUSD symbol provenance")
+            raise ProfileError("legacy historical manifest lacks required source/symbol provenance")
+        try:
+            start = datetime.fromisoformat(str(manifest["requested_start_utc"]).replace("Z", "+00:00"))
+            end = datetime.fromisoformat(str(manifest["requested_end_utc"]).replace("Z", "+00:00"))
+            if start.tzinfo is None or end.tzinfo is None or end < start:
+                raise ValueError("invalid interval bounds")
+            legacy_start_ms = int(start.astimezone(timezone.utc).timestamp() * 1000)
+            legacy_end_ms = int(end.astimezone(timezone.utc).timestamp() * 1000)
+        except (KeyError, TypeError, ValueError, OverflowError) as exc:
+            raise ProfileError("legacy historical manifest interval bounds are invalid") from exc
         try:
             legacy_point = float(manifest.get("instrument_point", 0))
         except (TypeError, ValueError, OverflowError) as exc:
@@ -84,6 +99,11 @@ def profile_dataset(
             raise ProfileError(f"line {line}: missing or extra field")
         if row["schema_version"] != "1" or row["canonical_symbol"] not in EXPECTED:
             raise ProfileError(f"line {line}: unsupported schema or instrument; XAUUSD only")
+        if legacy_historical and (
+            row["broker_symbol"] != manifest["broker_symbol"]
+            or not legacy_start_ms <= int(row["time_msc"]) <= legacy_end_ms
+        ):
+            raise ProfileError(f"line {line}: legacy source symbol or requested interval mismatch")
         try:
             stamp = int(row["time_msc"])
             bid, ask, last = float(row["bid"]), float(row["ask"]), float(row["last"])
