@@ -1,5 +1,5 @@
 name: VELTRIX Exness DEMO runtime metadata verification
-run-name: VELTRIX runtime metadata verification (\${{ github.run_number }})
+run-name: VELTRIX runtime metadata verification (${{ github.run_number }})
 
 on:
   workflow_dispatch:
@@ -31,9 +31,9 @@ jobs:
       - name: Validate inputs and focused tests
         shell: pwsh
         env:
-          MT5_LOGIN: \${{ secrets.MT5_LOGIN }}
-          MT5_PASSWORD: \${{ secrets.MT5_PASSWORD }}
-          MT5_SERVER: \${{ secrets.MT5_SERVER }}
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
         run: |
           $ErrorActionPreference = "Stop"
           if (!$env:MT5_LOGIN -or $env:MT5_LOGIN -notmatch '^\d+$') { throw "MT5_LOGIN is missing or invalid." }
@@ -46,7 +46,7 @@ jobs:
       - name: Install and verify Exness-linked MT5 terminal
         shell: pwsh
         env:
-          EXNESS_EXPECTED_SIGNER_THUMBPRINT: \${{ secrets.EXNESS_MT5_SIGNER_THUMBPRINT }}
+          EXNESS_EXPECTED_SIGNER_THUMBPRINT: ${{ secrets.EXNESS_MT5_SIGNER_THUMBPRINT }}
         run: |
           $ErrorActionPreference = "Stop"
           $installer = Join-Path $env:RUNNER_TEMP "exness-mt5-setup.exe"
@@ -86,9 +86,9 @@ jobs:
       - name: Verify effective runtime DLL state and XAUUSD contract (no tick request)
         shell: pwsh
         env:
-          MT5_LOGIN: \${{ secrets.MT5_LOGIN }}
-          MT5_PASSWORD: \${{ secrets.MT5_PASSWORD }}
-          MT5_SERVER: \${{ secrets.MT5_SERVER }}
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
           MT5_TERMINAL: C:\MT5\terminal64.exe
         run: |
           $ErrorActionPreference = "Stop"
