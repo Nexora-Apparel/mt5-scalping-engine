@@ -43,3 +43,44 @@ def test_rejects_failed_manifest(tmp_path):
 def test_rejects_duplicate_ticks(tmp_path):
     r=row("XAUUSD",1_800_000_000_000);c,m=fixture(tmp_path,[r,r])
     with pytest.raises(ProfileError,match="duplicate"): profile_dataset(c,m)
+
+
+def legacy_fixture(tmp_path, rows):
+    c, m = fixture(tmp_path, rows)
+    data = {
+        "schema": "VELTRIX_XAUUSD_HISTORICAL_TICK_PROBE_V2",
+        "status": "PASS",
+        "account_mode": "DEMO",
+        "trading_enabled": False,
+        "canonical_symbol": "XAUUSD",
+        "broker_symbol": "XAUUSDm",
+        "instrument_point": 0.001,
+        "records": len(rows),
+        "sha256": hashlib.sha256(c.read_bytes()).hexdigest(),
+    }
+    m.write_text(json.dumps(data), encoding="utf-8")
+    return c, m
+
+
+def test_legacy_historical_profile_requires_explicit_opt_in_and_marks_missing_provenance(tmp_path):
+    base = 1_800_000_000_000
+    c, m = legacy_fixture(tmp_path, [row("XAUUSD", base), row("XAUUSD", base + 1000)])
+    with pytest.raises(ProfileError, match="DLL imports"):
+        profile_dataset(c, m)
+    result = profile_dataset(c, m, allow_legacy_historical=True)
+    assert result["status"] == "PASS"
+    assert result["dll_imports_enabled"] is None
+    assert result["dll_imports_runtime_verified"] is False
+    assert result["instrument_metadata_status"] == "POINT_ONLY_CURRENCIES_UNVERIFIED"
+    assert result["point_size"] == 0.001
+    assert result["provenance_status"] == "LEGACY_PARTIAL_RUNTIME_SECURITY_AND_CONTRACT_METADATA"
+
+
+def test_legacy_historical_profile_rejects_invalid_point_size(tmp_path):
+    base = 1_800_000_000_000
+    c, m = legacy_fixture(tmp_path, [row("XAUUSD", base)])
+    data = json.loads(m.read_text())
+    data["instrument_point"] = 0
+    m.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ProfileError, match="point size"):
+        profile_dataset(c, m, allow_legacy_historical=True)
