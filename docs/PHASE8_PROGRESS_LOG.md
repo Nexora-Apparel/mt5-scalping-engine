@@ -617,3 +617,16 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Comparison status:** Five-window historical-versus-prospective quantitative comparison remains pending. No new historical collection has been initiated. Resume artifact inspection when data analysis is available; do not replace measured distributions with earlier summary statistics.
 - **Next action:** Dispatch the runtime metadata verification workflow once, inspect its uploaded artifact and job logs, then use the result only as a current runtime attestation. Keep the legacy historical manifests marked unverified. Complete the five-window profile comparison separately.
 - **Safety:** PR #61 and #68 remain unmerged. Candidate evaluation, tuning, holdout access, candidate approval, certification, production deployment and real-money trading remain blocked behind their existing gates.
+
+
+### 2026-11-20 — Live runtime metadata PASS; workflow checkout integrity correction
+
+- **Workflow run:** [44638594379](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44638594379), completed SUCCESS on `main`, head commit `1b1465fd8a5f6c8d08c94507febc1a5efbded5e2`.
+- **Job:** [135963474889](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44638594379/job/135963474889), all steps completed successfully; 34 focused tests passed.
+- **Observed runtime result:** `status=PASS`; authenticated Exness DEMO; broker symbol `XAUUSDm`; `currency_base=XAU`; `currency_profit=USD`; point `0.001`; effective `terminal_info().dlls_allowed=false`; terminal build 6327; MetaTrader5 Python integration 5.0.6231.
+- **Safety evidence:** `ticks_requested=false`, `trading_enabled=false`, `order_submission=false`, `position_management=false`, `credentials_recorded=false`. No tick retrieval or trading action occurred.
+- **Artifact:** [14585610829](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44638594379/artifacts/14585610829), SHA-256 `10c81a9483381ce57d20080080d5d6bdcc72abed388fa1dbf60bd55b200155e1`.
+- **Integrity defect found during log audit:** Although the workflow run head was `main`, its checkout step explicitly used `ref: phase8-runtime-metadata-verification` and checked out commit `37817fb04805f6bb6b5089242501cb9f8f33048f`. Thus the live runtime observation is valid for the executed diagnostic code, but the run did not test the exact source revision selected by the workflow dispatch.
+- **Remediation branch:** `phase8-runtime-workflow-checkout-fix`. Change the checkout ref to `${{ github.sha }}`, binding the checked-out source to the exact workflow-dispatch commit. Re-run after merge to establish reproducible main-commit evidence.
+- **Historical artifact boundary:** This new runtime evidence does not rewrite or retroactively certify the five legacy historical manifests. Their original missing fields remain unverified for those old sessions.
+- **Next:** Review and merge the checkout pin correction; rerun the diagnostic from main; then resume quantitative historical-versus-prospective quote comparison. No new historical collection until comparison identifies a concrete coverage gap. Candidate evaluation, holdout, certification and trading remain gated.
