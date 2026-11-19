@@ -534,3 +534,12 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Quote-only replay:** Added deterministic offline quote-state mechanics replay for this partial-provenance path. It reports tick replay counts, quote state changes, intertick gaps, spread points and midpoint movement in raw price units. It cannot generate signals, score candidates, calculate currency PnL, claim fills, or become holdout data. Existing candidate replay still requires the strict current manifest contract.
 - **Journal:** `docs/PHASE8_PROGRESS_LOG.md` remains the canonical dated project journal; no duplicate journal was created.
 - **Next:** Run CI; then execute the quote-only mechanics replay against the five original V1/V2 CSV/manifest pairs without modifying the source artifacts. Preserve all hashes and per-interval provenance. No new historical sampling is needed for this step.
+
+
+### 2026-11-19 — Legacy replay implementation merged; artifact execution workflow prepared
+
+- **Implementation PR:** [#73](https://github.com/Nexora-Apparel/mt5-scalping-engine/pull/73), merged after all checks passed. Merge commit: `90ea627b02af2e73899e224a477fa2fd1e3fffb7`.
+- **Validation:** Project Tests [run 44607453844](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44607453844) passed: 276 tests. Existing historical-replay smoke [run 44607453875](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44607453875) passed; candidate-generation smoke [run 44607453771](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44607453771) passed. These two existing smoke workflows used certified prospective sessions, not the five legacy historical windows.
+- **New workflow prepared:** `.github/workflows/xauusd-legacy-quote-mechanics-replay.yml` downloads the original V1/V2 artifacts by immutable artifact IDs, replays exactly the five successful interval CSVs, verifies source hashes and safety flags, and uploads reports. It does not connect to MT5 or collect new data.
+- **Journal continuity:** This file remains the canonical dated Phase 8 journal; each implementation, evidence item, blocker and next step is being recorded here.
+- **Next:** Merge the workflow PR and dispatch it against V1 artifact `14420498746` and V2 artifact `14422070722`. If all five report hashes match their original manifests, the historical quote-only replay integration blocker is resolved for descriptive mechanics. Candidate evaluation remains separately blocked by missing runtime DLL attestation and contract currency metadata.
