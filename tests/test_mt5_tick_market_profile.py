@@ -114,6 +114,7 @@ def test_legacy_historical_profile_rejects_ticks_outside_manifest_interval(tmp_p
     c, m = legacy_fixture(tmp_path, [row("XAUUSD", base)])
     data = json.loads(m.read_text())
     data["requested_start_utc"] = datetime.fromtimestamp((base + 1) / 1000, timezone.utc).isoformat()
+    data["requested_end_utc"] = datetime.fromtimestamp((base + 1000) / 1000, timezone.utc).isoformat()
     m.write_text(json.dumps(data), encoding="utf-8")
     with pytest.raises(ProfileError, match="symbol or requested interval mismatch"):
         profile_dataset(c, m, allow_legacy_historical=True)
