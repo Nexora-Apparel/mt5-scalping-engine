@@ -86,7 +86,7 @@ def verify(mt5: Any, terminal: str, login: int, password: str, server: str) -> d
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=Path("runtime-metadata/verification.json"))
-    parser.add_argument("--terminal", default=os.environ.get("MT5_TERMINAL", r"C:\\MT5\\terminal64.exe"))
+    parser.add_argument("--terminal", default=os.environ.get("MT5_TERMINAL", r"C:\MT5\terminal64.exe"))
     args = parser.parse_args()
     try:
         import MetaTrader5 as mt5
@@ -95,7 +95,7 @@ def main() -> int:
             os.environ["MT5_PASSWORD"], os.environ["MT5_SERVER"],
         )
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\\n", encoding="utf-8")
+        args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0
     except (DiagnosticFailure, KeyError, ValueError, OSError, RuntimeError) as exc:
