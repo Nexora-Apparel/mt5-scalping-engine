@@ -8,6 +8,7 @@ from tools.mt5_xauusd_tick_replay import (
     ReplayError,
     evaluate_event,
     replay_events,
+    replay_historical_quote_mechanics,
     validate_ticks,
 )
 
@@ -128,3 +129,28 @@ def test_replay_rejects_non_demo_or_enabled_trading(registry):
     }
     with pytest.raises(ReplayError, match="DEMO"):
         replay_events(quotes(), [event()], manifest, registry)
+
+
+def test_legacy_mechanics_replay_never_scores_candidates_or_claims_currency(registry):
+    del registry
+    profile = {
+        "profile_type": "OFFLINE_DESCRIPTIVE_ONLY",
+        "provenance_status": "LEGACY_PARTIAL_RUNTIME_SECURITY_AND_CONTRACT_METADATA",
+        "sha256": "a" * 64,
+        "point_size": 0.001,
+    }
+    result = replay_historical_quote_mechanics(quotes(), profile)
+    assert result["status"] == "PASS_WITH_PROVENANCE_LIMITATIONS"
+    assert result["records_replayed"] == len(quotes())
+    assert result["signal_generation"] is False
+    assert result["candidate_scoring"] is False
+    assert result["actual_fill_claimed"] is False
+    assert result["dll_imports_runtime_verified"] is False
+    assert result["contract_currency_metadata_verified"] is False
+    assert result["price_currency"] is None
+    assert result["holdout_eligible"] is False
+
+
+def test_legacy_mechanics_replay_rejects_unverified_or_wrong_profile():
+    with pytest.raises(ReplayError, match="partial-provenance"):
+        replay_historical_quote_mechanics(quotes(), {"profile_type": "OFFLINE_DESCRIPTIVE_ONLY"})
