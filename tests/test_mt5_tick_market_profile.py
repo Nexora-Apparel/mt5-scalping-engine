@@ -93,6 +93,7 @@ def test_legacy_historical_profile_rejects_invalid_point_size(tmp_path):
         profile_dataset(c, m, allow_legacy_historical=True)
 
 
+# Regression coverage: reject any legacy artifact whose provenance boundary is altered.
 def test_legacy_historical_profile_rejects_broker_symbol_mismatch(tmp_path):
     base = 1_800_000_000_000
     rows = [row("XAUUSD", base)]
