@@ -566,3 +566,21 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Validation history:** The initial PR #73 baseline passed 276 tests. The first added negative-test run failed on those fixture issues; corrected tests are included in this final integration branch and require a fresh full Project Tests result before merge.
 - **Separate profile workflow fix:** The XAUUSD-only profiler's bootstrap now points to verified XAUUSD validation_01 artifact 14029149674 (run 43408593546), not the old XAGUSD-only artifact 13934849710.
 - **Execution plan:** On merge, the manual/automatic artifact replay workflow downloads only original V1/V2 artifacts and runs quote-state mechanics across the five successful intervals. It must preserve all source hashes and report partial provenance explicitly.
+
+
+### 2026-11-19 — Five legacy historical windows successfully replayed (quote mechanics only)
+
+- **Integration PR:** [#76](https://github.com/Nexora-Apparel/mt5-scalping-engine/pull/76), merged. Main commit: `bc8611fcafd974fb8fa3af5f3bc5504000aa6f84`.
+- **Main CI:** [Project Tests run 44609806084](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44609806084) SUCCESS — 278 passed.
+- **Profile bootstrap correction:** [Run 44609806144](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44609806144) SUCCESS using verified XAUUSD validation_01 artifact `14029149674`; the former XAGUSD-only bootstrap mismatch is resolved without relaxing the XAUUSD-only profiler.
+- **Historical replay:** [Run 44609806069](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44609806069) SUCCESS. Original V1 artifact `14420498746` and V2 artifact `14422070722` downloaded unchanged. Exactly five successful interval datasets were profiled and replayed. All five reports returned `PASS_WITH_PROVENANCE_LIMITATIONS`; every output source hash and record count matched its original manifest.
+- **Replay report artifact:** [Artifact 14571079127](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44609806069/artifacts/14571079127), ZIP SHA-256 `34b6c19618e5983609c6409a5b6542b42c0c4a21c8c016482203d90470e941a8`; contains five per-interval JSON reports and both original batch manifests.
+- **Per-window results:**
+  - `hist_20261106_overlap`: 26,083 quotes; 1,799.541 s; 26,082 bid/ask state changes; max gap 1,724 ms; zero gaps >5 s; median/p95 spread 240 points, max 260; midpoint change +17.011 raw price units.
+  - `hist_20261110_new_york`: 4,836 quotes; 1,799.803 s; 4,835 state changes; max gap 2,232 ms; zero gaps >5 s; median/p95 spread 240 points, max 260; midpoint change -2.037 raw price units.
+  - `hist2_20261109_asia`: 5,819 quotes; 1,799.775 s; 5,818 state changes; max gap 2,290 ms; zero gaps >5 s; median/p95 spread 240 points, max 260; midpoint change -9.953 raw price units.
+  - `hist2_20261111_overlap`: 11,037 quotes; 1,799.482 s; 11,036 state changes; max gap 2,135 ms; zero gaps >5 s; median/p95 spread 240 points, max 260; midpoint change -15.268 raw price units.
+  - `hist2_20261112_new_york`: 4,426 quotes; 1,799.368 s; 4,425 state changes; max gap 2,220 ms; zero gaps >5 s; median/p95 spread 240 points, max 240; midpoint change +0.870 raw price units.
+- **Aggregate:** 52,201 historical quotes across 150 minutes and five distinct UTC dates. No source CSV or original manifest was rewritten. No gaps >5 seconds in any of the five replayed windows.
+- **Scope boundary:** This resolves the ingestion and deterministic quote-state mechanics replay blocker for the five existing historical windows. The reports explicitly retain `dll_imports_runtime_verified=false` and `contract_currency_metadata_verified=false`; raw price units only. No currency PnL, signals, candidate scoring, actual fills, holdout eligibility, profitability or strategy certification is inferred. The existing strict candidate replay path remains fail-closed.
+- **Next:** Use the replay reports to audit mechanics and compare historical quote behavior with separate prospective sessions. Do not collect more historical records until that analysis identifies a specific coverage gap. Candidate evaluation requires separately sourced and verified contract/runtime metadata and remains a different gate.
