@@ -550,7 +550,7 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Failure:** Main push profile run [44607597202](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44607597202) failed because the workflow's bootstrap source run `43194341816` / artifact `veltrix-exness-demo-ticks-3` contains XAGUSD-only rows. The profiler is intentionally XAUUSD-only and correctly rejected line 2. This was not a failure of the legacy historical replay implementation.
 - **Replacement evidence:** Inspected the first preregistered validation artifact [14029149674](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/43408593546/artifacts/14029149674): manifest identifies `validation_01`, canonical symbol XAUUSD, broker symbol XAUUSDm, status PASS, 3,857 rows; independently inspected CSV rows and confirmed all 3,857 rows are XAUUSD.
 - **Fix prepared:** Updated the profile workflow bootstrap source to run `43408593546`, artifact `veltrix-exness-demo-ticks-10`. The profiler's XAUUSD-only guard remains unchanged; no XAGUSD is silently accepted or relabelled.
-- **Next:** PR #74 CI will validate the workflow/profile changes. After merge, the main push bootstrap should re-run against the verified XAUUSD dataset.
+- **Disposition:** Superseded by PR #76, merged on 2026-11-19. The corrected XAUUSD bootstrap subsequently passed in run [44609806144](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44609806144).
 
 
 - **Execution trigger refinement:** The legacy replay workflow is configured to run automatically when its reviewed workflow file lands on `main`, while retaining manual dispatch with overridable artifact IDs. This avoids requiring a separate manual dispatch for the five known artifacts.
@@ -565,7 +565,7 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Regression correction:** The first hardened negative-test attempt exposed fixture problems (CSV line terminator and reversed test interval), not a production parser defect. The fixtures were simplified to mutate the source CSV without rewriting its header and to use a valid interval that excludes the test tick.
 - **Validation history:** The initial PR #73 baseline passed 276 tests. The first added negative-test run failed on those fixture issues; corrected tests are included in this final integration branch and require a fresh full Project Tests result before merge.
 - **Separate profile workflow fix:** The XAUUSD-only profiler's bootstrap now points to verified XAUUSD validation_01 artifact 14029149674 (run 43408593546), not the old XAGUSD-only artifact 13934849710.
-- **Execution plan:** On merge, the manual/automatic artifact replay workflow downloads only original V1/V2 artifacts and runs quote-state mechanics across the five successful intervals. It must preserve all source hashes and report partial provenance explicitly.
+- **Disposition:** Completed after PR #76 merged. Run [44609806069](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/runs/44609806069) replayed the five original V1/V2 intervals, preserved source hashes, and reported the provenance limitations explicitly.
 
 
 ### 2026-11-19 — Five legacy historical windows successfully replayed (quote mechanics only)
