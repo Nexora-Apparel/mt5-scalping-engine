@@ -40,7 +40,7 @@ jobs:
           if (!$env:MT5_PASSWORD -or !$env:MT5_SERVER) { throw "MT5 credentials are incomplete." }
           python -m pip install --disable-pip-version-check -r requirements.txt
           if ($LASTEXITCODE -ne 0) { throw "Dependency installation failed." }
-          python -m pytest -q tests/test_mt5_xauusd_historical_tick_probe.py
+          python -m pytest -q tests/test_mt5_xauusd_historical_tick_probe.py tests/test_mt5_runtime_metadata_verification.py
           if ($LASTEXITCODE -ne 0) { throw "Preflight tests failed; terminal verification will not run." }
 
       - name: Install and verify Exness-linked MT5 terminal
