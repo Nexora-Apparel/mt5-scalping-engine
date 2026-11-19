@@ -1,0 +1,105 @@
+name: VELTRIX Exness DEMO runtime metadata verification
+run-name: VELTRIX runtime metadata verification (${{ github.run_number }})
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: veltrix-mt5-runtime-metadata-verification
+  cancel-in-progress: false
+
+jobs:
+  verify-runtime-metadata:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out verifier
+        uses: actions/checkout@v4
+        with:
+          ref: phase8-runtime-metadata-verification
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: "x64"
+
+      - name: Validate inputs and focused tests
+        shell: pwsh
+        env:
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (!$env:MT5_LOGIN -or $env:MT5_LOGIN -notmatch '^\d+$') { throw "MT5_LOGIN is missing or invalid." }
+          if (!$env:MT5_PASSWORD -or !$env:MT5_SERVER) { throw "MT5 credentials are incomplete." }
+          python -m pip install --disable-pip-version-check -r requirements.txt
+          if ($LASTEXITCODE -ne 0) { throw "Dependency installation failed." }
+          python -m pytest -q tests/test_mt5_xauusd_historical_tick_probe.py tests/test_mt5_runtime_metadata_verification.py
+          if ($LASTEXITCODE -ne 0) { throw "Preflight tests failed; terminal verification will not run." }
+
+      - name: Install and verify Exness-linked MT5 terminal
+        shell: pwsh
+        env:
+          EXNESS_EXPECTED_SIGNER_THUMBPRINT: ${{ secrets.EXNESS_MT5_SIGNER_THUMBPRINT }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installer = Join-Path $env:RUNNER_TEMP "exness-mt5-setup.exe"
+          Invoke-WebRequest -Uri "https://download.terminal.free/cdn/web/exness.technologies.ltd/mt5/exness5setup.exe" -OutFile $installer
+          if ((Get-Item $installer).Length -lt 1000000) { throw "Installer download is incomplete." }
+          if (!$env:EXNESS_EXPECTED_SIGNER_THUMBPRINT -or $env:EXNESS_EXPECTED_SIGNER_THUMBPRINT -notmatch "^[A-Fa-f0-9]{40}$") { throw "Missing independently confirmed signer pin." }
+          $signature = Get-AuthenticodeSignature -LiteralPath $installer
+          $subject = if ($signature.SignerCertificate) { [string]$signature.SignerCertificate.Subject } else { "" }
+          $thumbprint = if ($signature.SignerCertificate) { [string]$signature.SignerCertificate.Thumbprint } else { "" }
+          $ekuExtension = if ($signature.SignerCertificate) { $signature.SignerCertificate.Extensions | Where-Object { $_.Oid.Value -eq "2.5.29.37" } | Select-Object -First 1 } else { $null }
+          $codeSigning = $false
+          if ($ekuExtension) {
+            $eku = [System.Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension]::new($ekuExtension, $false)
+            $codeSigning = @($eku.EnhancedKeyUsages | Where-Object { $_.Value -eq "1.3.6.1.5.5.7.3.3" }).Count -gt 0
+          }
+          if ([string]$signature.Status -ne "Valid" -or $subject -notmatch "^CN=MetaQuotes Ltd\.,\s*O=MetaQuotes Ltd\." -or !$codeSigning) { throw "Installer Authenticode/publisher/EKU verification failed." }
+          if ($thumbprint.ToUpperInvariant() -ne $env:EXNESS_EXPECTED_SIGNER_THUMBPRINT.ToUpperInvariant()) { throw "Installer signer pin mismatch." }
+          Start-Process -FilePath $installer -ArgumentList @("/auto", '/path:"C:\MT5"') -Wait
+          $terminal = "C:\MT5\terminal64.exe"
+          if (!(Test-Path $terminal)) { throw "MT5 installation incomplete." }
+          New-Item -ItemType Directory -Force -Path "C:\MT5\config" | Out-Null
+          @"
+          [Experts]
+          Enabled=0
+          AllowLiveTrading=0
+          AllowDllImport=0
+          "@ | Set-Content "C:\MT5\config\common.ini" -Encoding Unicode
+          "MT5_TERMINAL=$terminal" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Install pinned MetaTrader5 integration
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          python -m pip install --disable-pip-version-check "MetaTrader5==5.0.6231"
+          if ($LASTEXITCODE -ne 0) { throw "MetaTrader5 integration installation failed." }
+
+      - name: Verify effective runtime DLL state and XAUUSD contract (no tick request)
+        shell: pwsh
+        env:
+          MT5_LOGIN: ${{ secrets.MT5_LOGIN }}
+          MT5_PASSWORD: ${{ secrets.MT5_PASSWORD }}
+          MT5_SERVER: ${{ secrets.MT5_SERVER }}
+          MT5_TERMINAL: C:\MT5\terminal64.exe
+        run: |
+          $ErrorActionPreference = "Stop"
+          python -m tools.mt5_runtime_metadata_verification --output runtime-metadata/verification.json
+          if ($LASTEXITCODE -ne 0) { throw "Runtime metadata verification failed." }
+
+      - name: Upload runtime verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veltrix-mt5-runtime-metadata-verification
+          path: runtime-metadata/
+          if-no-files-found: error
+          retention-days: 90

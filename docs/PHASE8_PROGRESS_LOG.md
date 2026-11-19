@@ -584,3 +584,22 @@ Never overwrite a failed result with a later success. Record the later success a
 - **Aggregate:** 52,201 historical quotes across 150 minutes and five distinct UTC dates. No source CSV or original manifest was rewritten. No gaps >5 seconds in any of the five replayed windows.
 - **Scope boundary:** This resolves the ingestion and deterministic quote-state mechanics replay blocker for the five existing historical windows. The reports explicitly retain `dll_imports_runtime_verified=false` and `contract_currency_metadata_verified=false`; raw price units only. No currency PnL, signals, candidate scoring, actual fills, holdout eligibility, profitability or strategy certification is inferred. The existing strict candidate replay path remains fail-closed.
 - **Next:** Use the replay reports to audit mechanics and compare historical quote behavior with separate prospective sessions. Do not collect more historical records until that analysis identifies a specific coverage gap. Candidate evaluation requires separately sourced and verified contract/runtime metadata and remains a different gate.
+
+
+### 2026-11-20 — Runtime metadata verification path added; execution evidence pending
+
+- **Branch:** \`phase8-runtime-metadata-verification\`, based on current \`main\`.
+- **Files added:**
+  - \`tools/mt5_runtime_metadata_verification.py\`
+  - \`tests/test_mt5_runtime_metadata_verification.py\`
+  - \`.github/workflows/xauusd-runtime-metadata-verification.yml\`
+- **Purpose:** Resolve the two missing manifest fields through a separate authenticated Exness DEMO terminal diagnostic, without requesting ticks or changing the historical datasets.
+- **DLL gate:** The diagnostic reads effective \`terminal_info().dlls_allowed\` and passes only when it is explicitly \`False\`. Writing \`AllowDllImport=0\` to the terminal INI is not accepted as runtime proof.
+- **Contract gate:** The diagnostic resolves canonical XAUUSD to the broker symbol and requires exact \`currency_base=XAU\`, \`currency_profit=USD\`, and a finite positive point size.
+- **Safety:** Manual-dispatch workflow; authenticated DEMO identity required; XAUUSD only; trading disabled; no tick request, order submission, or position management; credentials are not written to the artifact. Installer Authenticode, publisher, Code Signing EKU and the existing pinned signer secret are checked.
+- **Regression tests authored:** Passing metadata path, DLL state true/missing rejection, incorrect/missing currencies rejection, and non-DEMO rejection. These tests have **not yet run** in CI.
+- **Historical artifacts:** No old V1/V2 manifest or CSV has been modified. The two fields remain unverified for those historical sessions; only a new runtime verification artifact can prove current terminal/symbol state.
+- **Comparison status:** The five-window historical-versus-prospective quantitative comparison is still pending. The six relevant artifacts were retrieved, but the current data-analysis capability limit prevented inspecting their ZIP contents and computing the comparison. Existing replay summaries remain descriptive only and cannot substitute for the comparison.
+- **Result:** Implementation authored; CI and actual terminal verification **NOT RUN / NOT VERIFIED**. No claim that either field is now verified.
+- **Next action:** Review and run CI for this branch, merge only through the normal reviewed PR process, manually dispatch the diagnostics workflow, then inspect its artifact. Separately resume the five-window comparison when data analysis is available. Do not collect more historical ticks unless the comparison identifies a specific coverage gap.
+- **Research boundary:** Candidate evaluation, candidate tuning/ranking, holdout access, certification and trading remain blocked behind existing strict provenance and validation gates.
