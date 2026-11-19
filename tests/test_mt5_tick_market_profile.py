@@ -93,15 +93,13 @@ def test_legacy_historical_profile_rejects_invalid_point_size(tmp_path):
         profile_dataset(c, m, allow_legacy_historical=True)
 
 
+# Regression coverage: reject any legacy artifact whose provenance boundary is altered.
 def test_legacy_historical_profile_rejects_broker_symbol_mismatch(tmp_path):
     base = 1_800_000_000_000
     rows = [row("XAUUSD", base)]
     c, m = legacy_fixture(tmp_path, rows)
-    with c.open("w", encoding="utf-8", newline="") as f:
-        rows[0]["broker_symbol"] = "XAUUSD"
-        w = csv.DictWriter(f, fieldnames=HEADER, lineterminator="\\n")
-        w.writeheader()
-        w.writerows(rows)
+    raw = c.read_text(encoding="utf-8")
+    c.write_text(raw.replace("XAUUSDm", "XAUUSD"), encoding="utf-8")
     data = json.loads(m.read_text())
     data["sha256"] = hashlib.sha256(c.read_bytes()).hexdigest()
     m.write_text(json.dumps(data), encoding="utf-8")
@@ -114,6 +112,7 @@ def test_legacy_historical_profile_rejects_ticks_outside_manifest_interval(tmp_p
     c, m = legacy_fixture(tmp_path, [row("XAUUSD", base)])
     data = json.loads(m.read_text())
     data["requested_start_utc"] = datetime.fromtimestamp((base + 1) / 1000, timezone.utc).isoformat()
+    data["requested_end_utc"] = datetime.fromtimestamp((base + 1000) / 1000, timezone.utc).isoformat()
     m.write_text(json.dumps(data), encoding="utf-8")
     with pytest.raises(ProfileError, match="symbol or requested interval mismatch"):
         profile_dataset(c, m, allow_legacy_historical=True)
