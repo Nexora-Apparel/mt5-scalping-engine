@@ -198,3 +198,31 @@
 - **Dispatch limitation:** Available connected GitHub actions support workflow/run inspection, artifact download, and repository file updates, but do not expose `workflow_dispatch`. No run has been started and no prospective data has been collected. Owner must manually dispatch [VELTRIX bounded Exness DEMO tick collection](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/workflows/veltrix-demo-tick-collection.yml) and select `validation_07` at 18:30 WAT on Nov 23. Do not launch at another time and claim it represents 17:30 UTC.
 - **Post-capture acceptance:** Verify job success and artifact integrity; confirm manifest `session_id=validation_07`, account mode DEMO, canonical XAUUSD, exact start/end window, monotonic duration >=1,800 seconds, trading/DLL false, CSV and quote-snapshot hashes/row counts, valid UTC timestamps and quotes, and terminal shutdown. After the prospective session has ended, dispatch the existing historical batch workflow for one exact matching interval, `ny_20261123_1730` from `2026-11-23T17:30:00.000Z` to `2026-11-23T18:00:00.000Z`, using the reviewed historical collector source and its normal DEMO/read-only gates. Then compare the prospective and historical quote-event multisets `(time_msc,bid,ask)` on the same UTC date and exact window; report historical-only and prospective-only events, timestamp/bid/ask exact-match rate, gap distributions, spread distributions and raw flags separately. Also position the matched date against the twelve-date historical distribution. Do not claim full-feed equivalence or actual fill equivalence. Compare raw flags separately and never normalize the historical 0x80 bit.
 - **Boundary:** This capture does not authorize candidate scoring, holdout access, candidate freeze/approval, certification, order submission, position management, or live trading. Preserve all source artifacts and hashes. No further historical backfill is currently justified.
+
+
+### 2026-11-20 — Additional historical backfill plan (12 earlier New York sessions)
+
+- **Purpose:** Expand historical XAUUSD DEMO tick coverage immediately, independently of the prospective `validation_07` session planned for 2026-11-23. This is a historical backfill, not prospective capture and not a strategy-performance claim.
+- **Window:** 17:30:00–18:00:00 UTC on 12 earlier weekdays: 2026-10-16, 2026-10-19, 2026-10-20, 2026-10-21, 2026-10-22, 2026-10-23, 2026-10-26, 2026-10-27, 2026-10-28, 2026-10-29, 2026-10-30, and 2026-11-02. These dates do not overlap the existing 12-date November 3–19 New York sample.
+- **Requested volume:** 12 distinct 30-minute intervals = 360 minutes, within the reviewed batch runner's 12-interval / six-hour limits. Historical availability is not guaranteed until the broker query completes.
+- **Dispatch input (copy exactly into the workflow's `intervals_json` field):**
+```json
+[
+  {"id":"ny_20261016_1730","from_utc":"2026-10-16T17:30:00.000Z","to_utc":"2026-10-16T18:00:00.000Z"},
+  {"id":"ny_20261019_1730","from_utc":"2026-10-19T17:30:00.000Z","to_utc":"2026-10-19T18:00:00.000Z"},
+  {"id":"ny_20261020_1730","from_utc":"2026-10-20T17:30:00.000Z","to_utc":"2026-10-20T18:00:00.000Z"},
+  {"id":"ny_20261021_1730","from_utc":"2026-10-21T17:30:00.000Z","to_utc":"2026-10-21T18:00:00.000Z"},
+  {"id":"ny_20261022_1730","from_utc":"2026-10-22T17:30:00.000Z","to_utc":"2026-10-22T18:00:00.000Z"},
+  {"id":"ny_20261023_1730","from_utc":"2026-10-23T17:30:00.000Z","to_utc":"2026-10-23T18:00:00.000Z"},
+  {"id":"ny_20261026_1730","from_utc":"2026-10-26T17:30:00.000Z","to_utc":"2026-10-26T18:00:00.000Z"},
+  {"id":"ny_20261027_1730","from_utc":"2026-10-27T17:30:00.000Z","to_utc":"2026-10-27T18:00:00.000Z"},
+  {"id":"ny_20261028_1730","from_utc":"2026-10-28T17:30:00.000Z","to_utc":"2026-10-28T18:00:00.000Z"},
+  {"id":"ny_20261029_1730","from_utc":"2026-10-29T17:30:00.000Z","to_utc":"2026-10-29T18:00:00.000Z"},
+  {"id":"ny_20261030_1730","from_utc":"2026-10-30T17:30:00.000Z","to_utc":"2026-10-30T18:00:00.000Z"},
+  {"id":"ny_20261102_1730","from_utc":"2026-11-02T17:30:00.000Z","to_utc":"2026-11-02T18:00:00.000Z"}
+]
+```
+- **Workflow:** [VELTRIX Exness DEMO historical XAUUSD batch backfill](https://github.com/Nexora-Apparel/mt5-scalping-engine/actions/workflows/xauusd-historical-tick-batch.yml). The reviewed workflow checks out source commit `1b8b6bf518a0bc997611183f0120295b82588a5e`, validates the interval plan and tests before MT5 retrieval, requires the pinned installer signer, authenticates DEMO credentials, restricts to historical tick retrieval, disables trading/DLL imports, and stops the terminal in an always-run step.
+- **Dispatch constraint:** The connected GitHub actions available in this session expose run/artifact inspection and repository file operations, but no workflow-dispatch write action. No run has been started. A repository owner must paste the JSON above into the manual workflow dispatch form and start it. Do not report collection as started or completed before a run ID and artifact exist.
+- **After dispatch:** Verify run/job success, exact interval IDs and timestamps, artifact ZIP digest, every CSV hash/row count, account DEMO provenance, canonical XAUUSD / broker XAUUSDm, timestamp and quote validity, gap/spread/raw-flag distributions, read-only flags, and terminal shutdown. Preserve originals. Add only verified results to this log.
+- **Safety:** Historical collection only; no orders, position management, candidate scoring, holdout access, candidate freeze/approval, certification, or live trading. This batch supplements development research and does not count as prospective validation.
