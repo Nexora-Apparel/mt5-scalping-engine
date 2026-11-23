@@ -328,10 +328,11 @@ def assess_session_catalog(
     intervals: list[tuple[datetime, datetime, str, str]] = []
     for sid in sorted(expected_ids):
         item = supplied[sid]
-        profile = profile_dataset(item["csv"], item["manifest"])
+        manifest = json.loads(item["manifest"].read_text(encoding="utf-8"))
+        historical_source = manifest.get("schema") == "VELTRIX_XAUUSD_HISTORICAL_TICK_PROBE_V2"
+        profile = profile_dataset(item["csv"], item["manifest"], allow_legacy_historical=historical_source)
         if profile.get("status") != "PASS":
             raise WalkForwardError(f"{sid}: dataset profile is not PASS")
-        manifest = json.loads(item["manifest"].read_text(encoding="utf-8"))
         if sid not in development and manifest.get("session_id") != sid:
             raise WalkForwardError(f"{sid}: validation manifest session_id does not match the preregistered ID")
         if sid in development:
@@ -355,8 +356,20 @@ def assess_session_catalog(
         start = _utc(manifest.get("collection_started_utc"), f"{sid}.collection_started_utc")
         end = _utc(manifest.get("collection_ended_utc"), f"{sid}.collection_ended_utc")
         duration = manifest.get("duration_seconds")
-        if end <= start or manifest.get("duration_clock") != "monotonic" or isinstance(duration, bool) or not isinstance(duration, (int, float)) or not math.isfinite(duration):
-            raise WalkForwardError(f"{sid}: invalid collection interval or monotonic duration")
+        duration_clock = manifest.get("duration_clock")
+        if duration_clock == "historical_interval":
+            requested_start = _utc(manifest.get("requested_start_utc"), f"{sid}.requested_start_utc")
+            requested_end = _utc(manifest.get("requested_end_utc"), f"{sid}.requested_end_utc")
+            if (
+                manifest.get("schema") != "VELTRIX_XAUUSD_HISTORICAL_TICK_PROBE_V2"
+                or start != requested_start or end != requested_end
+                or manifest.get("historical_validation_attestation", {}).get("not_prospective_capture") is not True
+            ):
+                raise WalkForwardError(f"{sid}: historical interval attestation does not match source bounds")
+        elif duration_clock != "monotonic":
+            raise WalkForwardError(f"{sid}: unsupported session duration clock")
+        if end <= start or isinstance(duration, bool) or not isinstance(duration, (int, float)) or not math.isfinite(duration):
+            raise WalkForwardError(f"{sid}: invalid collection interval or duration")
         if duration < plan["collection_requirements"]["minimum_session_duration_seconds"]:
             raise WalkForwardError(f"{sid}: session is shorter than the preregistered minimum")
         role = "development" if sid in development else ("validation" if sid in validation_ids else "final_holdout")
@@ -521,9 +534,11 @@ def evaluate_partition(ready: dict[str, Any], registry: dict[str, Any]) -> dict[
     candidate_results: dict[tuple[str, str, int], dict[str, list[dict[str, Any]]]] = {}
     benchmark_results: dict[tuple[str, int], dict[str, list[dict[str, Any]]]] = {}
     for session in ready["evaluation_sessions"]:
-        features = build_features(session["csv"], session["manifest"], window_seconds=5)
+        manifest = json.loads(session["manifest"].read_text(encoding="utf-8"))
+        historical_source = manifest.get("schema") == "VELTRIX_XAUUSD_HISTORICAL_TICK_PROBE_V2"
+        features = build_features(session["csv"], session["manifest"], window_seconds=5, allow_legacy_historical=historical_source)
         candidate = generate_candidate_events(features, registry)
-        ticks, profile = load_verified_ticks(session["csv"], session["manifest"])
+        ticks, profile = load_verified_ticks(session["csv"], session["manifest"], allow_legacy_historical=historical_source)
         manifest = json.loads(session["manifest"].read_text(encoding="utf-8"))
         events = candidate["events"]
         if ready["stage"] == "holdout":
