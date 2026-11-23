@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from tools.mt5_tick_market_profile import profile_dataset
+from tools.prepare_xauusd_walk_forward_catalog import validate_session_map, download_session_artifacts
 
 PINNED_SOURCE_COMMIT = "1b8b6bf518a0bc997611183f0120295b82588a5e"
 EXPECTED_RUN_ID = 44654151366
@@ -101,7 +102,16 @@ def prepare(mapping: list[dict[str, Any]], *, repo: str, workspace: Path) -> dic
     if batch.get("source_commit") != PINNED_SOURCE_COMMIT:
         raise HistoricalIntakeError("historical retrieval source commit differs from reviewed pinned source")
     interval_index = {item.get("id"): item for item in batch.get("intervals", [])}
-    catalog_items = []
+    plan = json.loads((workspace / "research" / "xauusd_walk_forward_plan_v1.json").read_text(encoding="utf-8"))
+    development_map = {"sessions": [
+        {"session_id": "session8", "run_id": 43333365050},
+        {"session_id": "session9", "run_id": 43338046880},
+    ]}
+    normalized_development = validate_session_map(development_map, plan, stage="validation")
+    development_result = download_session_artifacts(
+        normalized_development, plan, repo=repo, workspace=workspace
+    )
+    catalog_items = list(development_result["catalog"]["sessions"])
     session_root = workspace / "research" / "xauusd_sessions"
     session_root.mkdir(parents=True, exist_ok=True)
     dates = set()
