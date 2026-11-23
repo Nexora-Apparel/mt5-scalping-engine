@@ -64,3 +64,12 @@ The spread is 0.240 XAUUSD price units for almost every tick. The feed also cont
 The registry marks Exness commission as UNVERIFIED_REQUIRED_INPUT. Final holdout remains sealed and net-performance claims remain disabled until the applicable DEMO commission schedule or statement is independently sourced.
 
 **Phase 8 is not complete.** No candidate is approved. Phase 9 DEMO forward validation and Phase 10 release hardening remain gated.
+
+
+## Historical validation intake
+
+The frozen strategy registry and walk-forward plan predate the Nov 16–19, 2026 historical sessions. A separate eligibility audit records that these dates were previously used only for aggregate absolute-midpoint movement diagnostics, not candidate signal generation, candidate outcomes, benchmark comparisons, or parameter ranking. The registry file history shows no post-freeze candidate-definition update. These sessions are therefore proposed as disclosed, descriptively inspected but candidate-unscored validation data—not as untouched holdout.
+
+The manual workflow `.github/workflows/xauusd-historical-validation-intake.yml` and intake helper `tools/prepare_xauusd_historical_validation_catalog.py` re-verify the existing historical batch artifact and map the exact Nov 16–19 17:30–18:00 UTC windows to the four preregistered validation IDs. Derived manifests retain the original source-manifest and CSV hashes and explicitly identify historical interval timing; they do not represent prospective collection. The frozen plan and candidate registry are not changed.
+
+Historical validation remains research-only. Commission is unverified, net-performance and candidate approval remain disabled, and final holdout remains sealed. See `docs/PHASE8_HISTORICAL_VALIDATION_ELIGIBILITY.md` for the full chronology, exposure, and intake contract.

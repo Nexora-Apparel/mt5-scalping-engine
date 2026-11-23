@@ -211,7 +211,7 @@ def test_validation_evaluator_aggregates_candidate_and_directional_benchmarks(tm
         manifests[sid] = manifest
         hashes[sid] = development.get(sid, f"{index + 1:064x}")
 
-    monkeypatch.setattr(wf, "profile_dataset", lambda csv, manifest: {
+    monkeypatch.setattr(wf, "profile_dataset", lambda csv, manifest, **kwargs: {
         "status": "PASS", "sha256": hashes[Path(manifest).stem], "records": 100
     })
     pinned_manifest_hashes = {

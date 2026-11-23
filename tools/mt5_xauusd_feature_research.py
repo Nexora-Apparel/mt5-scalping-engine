@@ -18,13 +18,13 @@ def _finite(value: str, field: str, line: int) -> float:
         raise ProfileError(f"line {line}: non-finite {field}")
     return parsed
 
-def build_features(csv_path: str | Path, manifest_path: str | Path, *, window_seconds: int = 5) -> dict[str, Any]:
+def build_features(csv_path: str | Path, manifest_path: str | Path, *, window_seconds: int = 5, allow_legacy_historical: bool = False) -> dict[str, Any]:
     """Return fixed-width, UTC-epoch-aligned feature windows."""
     if isinstance(window_seconds, bool) or not isinstance(window_seconds, int):
         raise ProfileError("window_seconds must be an integer")
     if not 1 <= window_seconds <= 300:
         raise ProfileError("window_seconds must be between 1 and 300")
-    profile = profile_dataset(csv_path, manifest_path)
+    profile = profile_dataset(csv_path, manifest_path, allow_legacy_historical=allow_legacy_historical)
     manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
     point = float(manifest["instrument_specs"]["XAUUSD"]["point"])
     window_ms = window_seconds * 1000
