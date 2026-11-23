@@ -21,6 +21,9 @@ from tools.prepare_xauusd_walk_forward_catalog import validate_session_map, down
 
 PINNED_SOURCE_COMMIT = "1b8b6bf518a0bc997611183f0120295b82588a5e"
 EXPECTED_RUN_ID = 44654151366
+EXPECTED_RUN_HEAD_SHA = "312178a9401d69322d031f26ea9296b457802337"
+EXPECTED_ARTIFACT_ID = 14592042454
+EXPECTED_ARTIFACT_DIGEST = "sha256:a3387bde442bc657ec9489c54c71853acdae4844bf1a25ce8fea5159f8bd2f75"
 EXPECTED_VALIDATION_IDS = ("validation_01", "validation_02", "validation_03", "validation_04")
 MINIMUM_START = datetime(2026, 11, 14, tzinfo=timezone.utc)
 
@@ -75,12 +78,17 @@ def validate_map(value: dict[str, Any]) -> list[dict[str, Any]]:
 
 def prepare(mapping: list[dict[str, Any]], *, repo: str, workspace: Path) -> dict[str, Any]:
     run = _gh_json([f"repos/{repo}/actions/runs/{EXPECTED_RUN_ID}"], workspace)
-    if run.get("status") != "completed" or run.get("conclusion") != "success":
-        raise HistoricalIntakeError("historical backfill workflow did not complete successfully")
+    if (
+        run.get("status") != "completed" or run.get("conclusion") != "success"
+        or run.get("head_sha") != EXPECTED_RUN_HEAD_SHA
+    ):
+        raise HistoricalIntakeError("historical backfill workflow status or dispatcher commit differs from the audited run")
     artifacts = _gh_json([f"repos/{repo}/actions/runs/{EXPECTED_RUN_ID}/artifacts"], workspace).get("artifacts", [])
     matches = [item for item in artifacts if item.get("name") == "veltrix-xauusd-historical-batch-5" and item.get("expired") is False]
     if len(matches) != 1:
         raise HistoricalIntakeError("expected exactly one unexpired audited historical batch artifact")
+    if matches[0].get("id") != EXPECTED_ARTIFACT_ID or matches[0].get("digest") != EXPECTED_ARTIFACT_DIGEST:
+        raise HistoricalIntakeError("historical batch artifact ID or SHA-256 differs from the independently recorded evidence")
     artifact_name = matches[0]["name"]
     download_root = workspace / "research" / "historical_validation_source"
     if download_root.exists():
@@ -136,8 +144,14 @@ def prepare(mapping: list[dict[str, Any]], *, repo: str, workspace: Path) -> dic
         digest = _sha256(csv_path)
         if source_manifest.get("schema") != "VELTRIX_XAUUSD_HISTORICAL_TICK_PROBE_V2":
             raise HistoricalIntakeError(f"{interval_id}: unsupported historical manifest schema")
-        if source_manifest.get("sha256") != digest or interval.get("dataset_sha256") != digest:
-            raise HistoricalIntakeError(f"{interval_id}: CSV hash does not match interval and source manifests")
+        if (
+            source_manifest.get("sha256") != digest
+            or interval.get("dataset_sha256") != digest
+            or interval.get("records") != source_manifest.get("records")
+            or source_manifest.get("requested_start_utc") != interval.get("from_utc")
+            or source_manifest.get("requested_end_utc") != interval.get("to_utc")
+        ):
+            raise HistoricalIntakeError(f"{interval_id}: CSV hash, record count, or exact interval bounds differ across manifests")
         if (
             source_manifest.get("status") != "PASS"
             or source_manifest.get("account_mode") != "DEMO"
@@ -148,6 +162,8 @@ def prepare(mapping: list[dict[str, Any]], *, repo: str, workspace: Path) -> dic
             or source_manifest.get("canonical_symbol") != "XAUUSD"
             or source_manifest.get("source") != "authenticated Exness MT5 DEMO terminal historical tick API"
             or source_manifest.get("source_commit") != PINNED_SOURCE_COMMIT
+            or source_manifest.get("source_ref") != "phase8-historical-batch-backfill"
+            or source_manifest.get("dispatcher_commit") != EXPECTED_RUN_HEAD_SHA
         ):
             raise HistoricalIntakeError(f"{interval_id}: source provenance or read-only DEMO controls failed")
         spec = source_manifest.get("instrument_specs", {}).get("XAUUSD", {})
