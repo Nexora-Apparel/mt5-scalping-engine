@@ -291,3 +291,14 @@
 
 
 - **PR implementation verification:** PR #79 CI at pre-hardening branch head `5fbd60968218f5a68ff44256f58141900a0ec253`: Python test suite PASS (288 tests), historical replay smoke PASS, and candidate-generation smoke PASS. The subsequent helper-only hardening commits `c53cf1bf64d00d42ff960afbfa738286768c197a` and `171e475ac6b4cd71008610987fce1163fbe7721d` pin the exact artifact ID/digest and normalize UTC offsets when comparing batch/source bounds. These latest changes still require a fresh CI run; no claim is made that the latest head has passed CI.
+
+
+### 2026-11-23 — Historical validation intake merged; validation dispatch prepared
+
+- **Merged PR:** [#79](https://github.com/Nexora-Apparel/mt5-scalping-engine/pull/79), squash merge commit `f4a069a1ef41ded36226949ff0926b8bc3fc866c`.
+- **Merged implementation:** Historical artifact intake, exact artifact/run/source pinning, four-session mapping, historical interval attestation, evaluator opt-in, tests, and manual workflow `.github/workflows/xauusd-historical-validation-intake.yml`.
+- **Latest pre-merge CI:** Commit `496f40d437898101006e89255fc88d024061c546`: project tests PASS (288 passed), historical replay smoke PASS, candidate-generation smoke PASS. This includes the final helper hardening and exact timestamp normalization.
+- **Validation map:** validation_01 → Nov 16; validation_02 → Nov 17; validation_03 → Nov 18; validation_04 → Nov 19; all 17:30–18:00 UTC, from audited historical batch run 44654151366 / artifact 14592042454.
+- **Frozen controls preserved:** plan v1 and strategy registry unchanged; commission unverified; net-performance and candidate approval disabled; holdout sealed; no order submission, position management, or live execution.
+- **Dispatch limitation:** Available GitHub connection supports repository writes and run/artifact reads, but no workflow-dispatch action. The historical validation intake workflow has not yet been dispatched. The repository owner must start the manual workflow using the prepared default input below; this action performs artifact intake and research evaluation only, never broker execution.
+- **Next:** Dispatch the historical validation intake workflow, inspect its uploaded report and sample-count gates, then obtain verified Exness DEMO commission evidence before any net-performance decision.
