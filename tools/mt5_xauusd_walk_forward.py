@@ -370,6 +370,8 @@ def assess_session_catalog(
             raise WalkForwardError(f"{sid}: unsupported session duration clock")
         if end <= start or isinstance(duration, bool) or not isinstance(duration, (int, float)) or not math.isfinite(duration):
             raise WalkForwardError(f"{sid}: invalid collection interval or duration")
+        if duration_clock == "historical_interval" and abs(duration - (end - start).total_seconds()) > 0.001:
+            raise WalkForwardError(f"{sid}: historical duration does not match exact requested interval")
         if duration < plan["collection_requirements"]["minimum_session_duration_seconds"]:
             raise WalkForwardError(f"{sid}: session is shorter than the preregistered minimum")
         role = "development" if sid in development else ("validation" if sid in validation_ids else "final_holdout")
