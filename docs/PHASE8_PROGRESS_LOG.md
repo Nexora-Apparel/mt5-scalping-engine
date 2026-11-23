@@ -290,7 +290,7 @@
 - **Next:** Run PR CI and the historical validation intake workflow. Review the generated report for sample counts and benchmark coverage; if minimum counts fail, do not tune against the same validation dates. Verify applicable Exness DEMO commission evidence before any net-performance gate can open.
 
 
-- **PR implementation verification:** PR #79 CI at pre-hardening branch head `5fbd60968218f5a68ff44256f58141900a0ec253`: Python test suite PASS (288 tests), historical replay smoke PASS, and candidate-generation smoke PASS. The subsequent helper-only hardening commits `c53cf1bf64d00d42ff960afbfa738286768c197a` and `171e475ac6b4cd71008610987fce1163fbe7721d` pin the exact artifact ID/digest and normalize UTC offsets when comparing batch/source bounds. These latest changes still require a fresh CI run; no claim is made that the latest head has passed CI.
+- **PR implementation verification:** PR #79 CI at pre-hardening branch head `5fbd60968218f5a68ff44256f58141900a0ec253`: Python test suite PASS (288 tests), historical replay smoke PASS, and candidate-generation smoke PASS. The subsequent helper-only hardening commits `c53cf1bf64d00d42ff960afbfa738286768c197a` and `171e475ac6b4cd71008610987fce1163fbe7721d` pin the exact artifact ID/digest and normalize UTC offsets when comparing batch/source bounds. A fresh CI run at the final PR head `496f40d437898101006e89255fc88d024061c546` subsequently passed.
 
 
 ### 2026-11-23 — Historical validation intake merged; validation dispatch prepared
