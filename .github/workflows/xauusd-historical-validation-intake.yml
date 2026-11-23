@@ -1,0 +1,79 @@
+name: VELTRIX Phase 8 historical XAUUSD validation intake
+run-name: VELTRIX historical XAUUSD validation intake
+
+on:
+  workflow_dispatch:
+    inputs:
+      session_map_json:
+        description: Historical batch run and interval IDs mapped to the four preregistered validation IDs
+        required: true
+        type: string
+        default: |
+          {"sessions":[{"session_id":"validation_01","run_id":44654151366,"interval_id":"ny_20261116_1730"},{"session_id":"validation_02","run_id":44654151366,"interval_id":"ny_20261117_1730"},{"session_id":"validation_03","run_id":44654151366,"interval_id":"ny_20261118_1730"},{"session_id":"validation_04","run_id":44654151366,"interval_id":"ny_20261119_1730"}]}
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: veltrix-xauusd-historical-validation-intake
+  cancel-in-progress: false
+
+jobs:
+  historical-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out reviewed repository source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install project dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Write historical session map
+        env:
+          SESSION_MAP_JSON: ${{ inputs.session_map_json }}
+        run: |
+          python - <<'PY'
+          import json, os
+          value = json.loads(os.environ["SESSION_MAP_JSON"])
+          with open("research/xauusd_historical_validation_session_map.json", "w", encoding="utf-8") as handle:
+              json.dump(value, handle, indent=2)
+          PY
+
+      - name: Download, audit, and map historical Exness DEMO sessions
+        run: |
+          python -m tools.prepare_xauusd_historical_validation_catalog \
+            --session-map research/xauusd_historical_validation_session_map.json \
+            --repo "$GITHUB_REPOSITORY"
+
+      - name: Run preregistered chronological validation evaluator
+        run: |
+          python -m tools.mt5_xauusd_walk_forward \
+            --catalog research/xauusd_walk_forward_catalog.json \
+            --stage validation \
+            --output research/xauusd_validation_report.json
+
+      - name: Publish historical validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veltrix-xauusd-historical-validation-report
+          path: |
+            research/xauusd_validation_report.json
+            research/xauusd_walk_forward_catalog.json
+            research/xauusd_historical_validation_session_map.json
+            research/xauusd_sessions/
+          if-no-files-found: warn
+          retention-days: 30
