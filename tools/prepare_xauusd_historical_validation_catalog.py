@@ -50,6 +50,16 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _parse_utc(value: Any) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise HistoricalIntakeError("manifest timestamp is not valid ISO-8601") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise HistoricalIntakeError("manifest timestamp must include a UTC offset")
+    return parsed.astimezone(timezone.utc)
+
+
 def validate_map(value: dict[str, Any]) -> list[dict[str, Any]]:
     sessions = value.get("sessions") if isinstance(value, dict) else None
     if not isinstance(sessions, list) or len(sessions) != 4:
@@ -148,8 +158,8 @@ def prepare(mapping: list[dict[str, Any]], *, repo: str, workspace: Path) -> dic
             source_manifest.get("sha256") != digest
             or interval.get("dataset_sha256") != digest
             or interval.get("records") != source_manifest.get("records")
-            or source_manifest.get("requested_start_utc") != interval.get("from_utc")
-            or source_manifest.get("requested_end_utc") != interval.get("to_utc")
+            or _parse_utc(source_manifest.get("requested_start_utc")) != start
+            or _parse_utc(source_manifest.get("requested_end_utc")) != end
         ):
             raise HistoricalIntakeError(f"{interval_id}: CSV hash, record count, or exact interval bounds differ across manifests")
         if (
