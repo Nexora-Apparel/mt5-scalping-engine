@@ -569,11 +569,6 @@ def evaluate_partition(ready: dict[str, Any], registry: dict[str, Any]) -> dict[
                     })
     evaluation_session_ids = [item["session_id"] for item in ready["evaluation_sessions"]]
     for item in configurations:
-        signature = json.dumps({
-            "candidate_id": item["candidate_id"],
-            "parameters": item["parameters"],
-            "horizon_seconds": item["horizon_seconds"],
-        }, sort_keys=True, separators=(",", ":"))
         candidate_results[(item["candidate_id"], json.dumps(item["parameters"], sort_keys=True, separators=(",", ":")),
                            int(item["horizon_seconds"]))] = {sid: [] for sid in evaluation_session_ids}
     for session in ready["evaluation_sessions"]:
@@ -602,9 +597,12 @@ def evaluate_partition(ready: dict[str, Any], registry: dict[str, Any]) -> dict[
             key = _group_key(event)
             candidate_results.setdefault(key, {}).setdefault(session["session_id"], []).append(outcome)
 
-        # Directional benchmarks use the same completed windows, quote convention,
+        # Directional benchmarks use the same complete windows, quote convention,
         # horizon, slippage grid, and one-position constraint as candidates.
+        partial_windows = set(features.get("partial_boundary_window_indices", []))
         for index, row in enumerate(features["features"][:-1]):
+            if index in partial_windows:
+                continue
             stamp = int(datetime.fromisoformat(row["window_start_utc"].replace("Z", "+00:00")).timestamp() * 1000) + 5000
             for horizon in registry["evaluation"]["holding_horizons_seconds"]:
                 for direction in ("long", "short"):
