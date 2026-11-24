@@ -82,7 +82,6 @@ def build_features(csv_path: str | Path, manifest_path: str | Path, *, window_se
     partial_boundary_indices: set[int] = set()
     if windows:
         first_bucket_start = min(buckets)
-        first_tick_msc = buckets[first_bucket_start][0][0]
         collection_start = manifest.get("collection_started_utc") or manifest.get("requested_start_utc")
         if collection_start:
             try:
