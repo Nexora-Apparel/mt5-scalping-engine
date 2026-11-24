@@ -75,3 +75,30 @@ def test_marks_first_bucket_partial_when_first_quote_arrives_after_interval_star
       make_row(base+5000,3000.100,3000.300)])
     result=build_features(csv_path,manifest_path,window_seconds=5)
     assert result["partial_boundary_window_indices"] == [0, 1]
+
+
+def test_first_bucket_is_complete_when_collection_started_at_bucket_boundary(tmp_path):
+    base=1_800_000_000_000
+    csv_path,manifest_path=write_dataset(tmp_path,[
+      make_row(base+153,3000.000,3000.200),
+      make_row(base+1000,3000.100,3000.300),
+      make_row(base+5000,3000.100,3000.300)])
+    manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["collection_started_utc"]=datetime.fromtimestamp(base/1000,timezone.utc).isoformat()
+    manifest_path.write_text(json.dumps(manifest),encoding="utf-8")
+    # Rebuild the manifest-bound CSV hash remains unchanged.
+    result=build_features(csv_path,manifest_path,window_seconds=5)
+    assert result["partial_boundary_window_indices"] == [1]
+
+
+def test_first_bucket_is_partial_when_collection_started_inside_bucket(tmp_path):
+    base=1_800_000_000_000
+    csv_path,manifest_path=write_dataset(tmp_path,[
+      make_row(base+200,3000.000,3000.200),
+      make_row(base+1000,3000.100,3000.300),
+      make_row(base+5000,3000.100,3000.300)])
+    manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["collection_started_utc"]=datetime.fromtimestamp((base+200)/1000,timezone.utc).isoformat()
+    manifest_path.write_text(json.dumps(manifest),encoding="utf-8")
+    result=build_features(csv_path,manifest_path,window_seconds=5)
+    assert result["partial_boundary_window_indices"] == [0, 1]
