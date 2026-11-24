@@ -31,6 +31,9 @@ def test_builds_causal_descriptive_windows(tmp_path):
       make_row(base,3000.000,3000.200),make_row(base+1000,3000.100,3000.300),
       make_row(base+2000,3000.200,3000.400),make_row(base+5000,3000.100,3000.300),
       make_row(base+6000,3000.000,3000.200)])
+    manifest=json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["collection_started_utc"]=datetime.fromtimestamp(base/1000,timezone.utc).isoformat()
+    manifest_path.write_text(json.dumps(manifest),encoding="utf-8")
     result=build_features(csv_path,manifest_path,window_seconds=5)
     assert result["status"]=="PASS" and result["research_only"] is True
     assert result["canonical_symbol"]=="XAUUSD" and result["source_records"]==5
