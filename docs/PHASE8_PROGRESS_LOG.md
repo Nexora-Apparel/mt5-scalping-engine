@@ -334,3 +334,13 @@
 - **Commit:** `e9a02186c4236ac20cee14814bb520f9c6da81f9`.
 - **Verification:** File readback confirms the corrected annotation. No PR-triggered workflow run was returned for this commit at the time of this entry; the earlier 292-test and smoke-test successes apply to the preceding tested code commit, not this latest commit.
 - **Boundary:** No evaluator rerun, validation-date reuse, holdout access, candidate approval, or order execution.
+
+
+### 2026-11-24 — Corrected first-bucket partial-window detection after boundary semantics review
+
+- **Finding:** The first-bucket detector previously treated a first quote arriving after the bucket's left edge as proof of a partial bucket even when the trusted manifest says collection began exactly at that left edge. Tick feeds are event-driven; absence of an event at the exact boundary does not prove collection was inactive.
+- **Correction:** First-bucket partial status now depends on the actual trusted collection/request start being later than the bucket boundary. If no trusted collection boundary exists, the first bucket remains conservatively partial. The final observed bucket remains partial because no later bucket proves completion.
+- **Regression tests:** Added tests distinguishing collection beginning exactly at the bucket boundary (first bucket complete despite first quote +153ms) from collection beginning 200ms inside the bucket (first bucket partial).
+- **Commits:** feature logic `3c64f45c2058fc27077dc834215e6eda7887208a`; tests `b48a3f2a07063c9eb8a4015193c7ffcf5778cd95`.
+- **Audit qualification:** The prior audit's statement that the five first-window momentum triggers necessarily violated the partial-window rule is not established by first-tick delay alone. The four historical manifests use requested interval boundaries; their exact trusted start fields must be checked against the first bucket before classifying those five trigger windows. The original audit/report remain immutable; this is a separately logged interpretation correction, not a retroactive report edit.
+- **Verification boundary:** No Phase 8 evaluator rerun or candidate-performance recalculation. Await CI for the updated PR #81 head. No holdout access, candidate approval, or order execution.
