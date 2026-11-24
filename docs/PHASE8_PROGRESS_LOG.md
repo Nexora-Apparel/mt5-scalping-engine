@@ -334,3 +334,13 @@
 - **Commit:** `e9a02186c4236ac20cee14814bb520f9c6da81f9`.
 - **Verification:** File readback confirms the corrected annotation. No PR-triggered workflow run was returned for this commit at the time of this entry; the earlier 292-test and smoke-test successes apply to the preceding tested code commit, not this latest commit.
 - **Boundary:** No evaluator rerun, validation-date reuse, holdout access, candidate approval, or order execution.
+
+
+### 2026-11-24 — Drafted separately versioned Phase 8 v2 preregistration amendment
+
+- **Branch:** `phase8/v2-preregistration-amendment-20261124`, created from PR #81 latest head `408b4de0927a14183078fdcec53dca081b2b603f`.
+- **Files:** `research/xauusd_walk_forward_plan_v2_amendment.json` and `docs/PHASE8_XAUUSD_WALK_FORWARD_V2_AMENDMENT.md`.
+- **Commits:** JSON `336eba4ac96f399ec4d72b9901f189d129d8d1bd`; protocol document `434e56d614ee9fd2adccfbe19d56730990a9012d`.
+- **Protocol decisions:** reserve fresh prospective IDs `v2_validation_01`–`v2_validation_04), one distinct UTC date per session; prohibit rescoring v1 validation IDs/artifact; define independent research lanes as candidate ID + complete parameter set + horizon; make explicit that horizon arms are counterfactual streams, not simultaneous executable positions; specify signal-time exclusion, unresolved-exit blocking, timeout accounting, full-window feature requirements, and freeze-before-collection.
+- **Gates:** This amendment is DRAFT and NOT FROZEN. It does not authorize collection. Catalog/intake/evaluator support for v2 IDs and tests are still required. Commission remains unverified; net-performance remains disabled; holdout remains sealed; candidate approval and order execution remain disabled.
+- **Next:** implement v2 ID support without allowing v1 validation reuse, add protocol regression tests, inspect CI, then freeze the exact plan and schedule only after the freeze commit precedes all collection starts.
