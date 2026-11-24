@@ -86,6 +86,9 @@ def build_features(csv_path: str | Path, manifest_path: str | Path, *, window_se
         "broker_symbol": manifest["instrument_specs"]["XAUUSD"].get("broker_symbol"),
         "source_sha256": profile["sha256"], "source_records": profile["records"],
         "window_seconds": window_seconds, "window_count": len(windows), "features": windows,
+        # The first bucket lacks a quote-state observation at the requested interval start;
+        # the last bucket has no later bucket proving its completion.
+        "partial_boundary_window_indices": sorted({0, len(windows) - 1}) if windows else [],
         "limitations": [
             "Descriptive features only; no entry/exit signals, labels, or trade recommendations.",
             "Tick-count intensity is not traded volume; zero volume fields remain unavailable.",
