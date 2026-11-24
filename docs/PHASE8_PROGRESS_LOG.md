@@ -325,3 +325,12 @@
 - **Latest CI at head `0a2a7e59bf9f69ad7c2a3cf1675571c74019c49c`:** Project tests run 45323867876 — **292 passed**; Phase 6 candidate-generation smoke run 45323867595 — SUCCESS; Phase 5 replay smoke run 45323867368 — SUCCESS. The Phase 5/6 smoke jobs used only the preregistered development Sessions 8 and 9; they did not rescore validation_01–04.
 - **Resolved intermediate CI:** earlier run 45323856234 at pre-test-update commit `d949c6025f56064a35a2c65e6200b6043eca44e0` failed one fixture assertion because its first quote was exactly at the bucket boundary (correctly not partial). The test was corrected to expect only the final bucket to be partial; the latest-head suite passes.
 - **Research boundary:** implementation/test validation only. Do not run the Phase 8 evaluator on the same four validation dates to claim corrected performance. Fresh prospective untouched sessions and a new versioned preregistration (including explicit per-horizon position-lane semantics) are required before any corrected performance evaluation. Holdout remains sealed; commission unverified; order execution disabled.
+
+
+### 2026-11-24 — Phase 8 correction branch type-contract cleanup
+
+- **PR:** [#81](https://github.com/Nexora-Apparel/mt5-scalping-engine/pull/81), branch `phase8/replay-corrections-v2-20261124`.
+- **Correction:** Updated `_validate_features` return annotation to include the fourth return value, `set[int]` of partial boundary-window indices. The implementation already returned this value; this was a typing-contract inconsistency, not a runtime behavior change.
+- **Commit:** `e9a02186c4236ac20cee14814bb520f9c6da81f9`.
+- **Verification:** File readback confirms the corrected annotation. No PR-triggered workflow run was returned for this commit at the time of this entry; the earlier 292-test and smoke-test successes apply to the preceding tested code commit, not this latest commit.
+- **Boundary:** No evaluator rerun, validation-date reuse, holdout access, candidate approval, or order execution.
