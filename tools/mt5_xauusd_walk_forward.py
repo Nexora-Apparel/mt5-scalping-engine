@@ -12,6 +12,7 @@ import math
 import random
 import statistics
 import subprocess
+from itertools import product
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -469,15 +470,27 @@ def _summarize_group(outcomes_by_session: dict[str, list[dict[str, Any]]], slipp
         accepted: list[dict[str, Any]] = []
         next_free = 0
         unresolved = False
+        session_skipped = 0
+        session_entry_timeouts = 0
+        session_exit_timeouts = 0
         for outcome in sorted(outcomes, key=lambda row: row["signal_window_end_msc"]):
             if unresolved:
                 total_skipped += 1
+                session_skipped += 1
+                continue
+            # A signal created while the previous position is still open is invalid even
+            # when its first post-signal quote arrives after that position's exit.
+            if outcome["signal_window_end_msc"] < next_free:
+                total_skipped += 1
+                session_skipped += 1
                 continue
             if outcome["status"] == "ENTRY_QUOTE_TIMEOUT":
                 total_timeouts += 1
+                session_entry_timeouts += 1
                 continue
             if outcome["status"] == "EXIT_QUOTE_TIMEOUT":
                 total_timeouts += 1
+                session_exit_timeouts += 1
                 if outcome.get("entry_time_msc"):
                     unresolved = True
                 continue
@@ -485,6 +498,7 @@ def _summarize_group(outcomes_by_session: dict[str, list[dict[str, Any]]], slipp
                 continue
             if outcome["entry_time_msc"] <= next_free:
                 total_skipped += 1
+                session_skipped += 1
                 continue
             next_free = outcome["exit_time_msc"]
             accepted.append(outcome)
@@ -504,8 +518,11 @@ def _summarize_group(outcomes_by_session: dict[str, list[dict[str, Any]]], slipp
                 "win_rate_before_commission": round(sum(value > 0 for value in returns) / len(returns), 8) if returns else None,
             }
         sessions[sid] = {
+            "generated_signals": len(outcomes),
             "available_outcomes_after_single_position_filter": len(accepted),
-            "skipped_overlapping_or_unresolved": sum(1 for _ in outcomes) - len(accepted) - sum(1 for x in outcomes if x["status"] == "ENTRY_QUOTE_TIMEOUT") - sum(1 for x in outcomes if x["status"] == "EXIT_QUOTE_TIMEOUT"),
+            "skipped_overlapping_or_unresolved": session_skipped,
+            "entry_quote_timeouts_attempted": session_entry_timeouts,
+            "exit_quote_timeouts_attempted": session_exit_timeouts,
             "cost_sensitivity": scenario,
         }
     aggregate = {}
@@ -528,13 +545,37 @@ def _summarize_group(outcomes_by_session: dict[str, list[dict[str, Any]]], slipp
         "total_skipped": total_skipped,
     }
 
-
 def evaluate_partition(ready: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any]:
     if ready.get("status") != "READY_FOR_RESEARCH_EVALUATION":
         return ready
     slippage_grid = registry["evaluation"]["additional_costs"]["slippage_sensitivity_points_per_side"]
     candidate_results: dict[tuple[str, str, int], dict[str, list[dict[str, Any]]]] = {}
     benchmark_results: dict[tuple[str, int], dict[str, list[dict[str, Any]]]] = {}
+    # Materialize the full preregistered grid so zero-signal configurations remain visible.
+    if ready["stage"] == "holdout":
+        configurations = ready["selected_candidate_configurations"]
+    else:
+        configurations = []
+        for candidate_spec in registry["candidates"]:
+            grid = candidate_spec["parameter_grid"]
+            keys = list(grid)
+            for values in product(*(grid[key] for key in keys)):
+                parameters = dict(zip(keys, values))
+                for horizon in registry["evaluation"]["holding_horizons_seconds"]:
+                    configurations.append({
+                        "candidate_id": candidate_spec["candidate_id"],
+                        "parameters": parameters,
+                        "horizon_seconds": horizon,
+                    })
+    evaluation_session_ids = [item["session_id"] for item in ready["evaluation_sessions"]]
+    for item in configurations:
+        signature = json.dumps({
+            "candidate_id": item["candidate_id"],
+            "parameters": item["parameters"],
+            "horizon_seconds": item["horizon_seconds"],
+        }, sort_keys=True, separators=(",", ":"))
+        candidate_results[(item["candidate_id"], json.dumps(item["parameters"], sort_keys=True, separators=(",", ":")),
+                           int(item["horizon_seconds"]))] = {sid: [] for sid in evaluation_session_ids}
     for session in ready["evaluation_sessions"]:
         manifest = json.loads(session["manifest"].read_text(encoding="utf-8"))
         historical_source = manifest.get("schema") == "VELTRIX_XAUUSD_HISTORICAL_TICK_PROBE_V2"
