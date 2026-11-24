@@ -109,3 +109,16 @@ Do not alter the original report, registry, plan, or validation artifact. A new 
 6. Clarify whether the one-position rule is per parameter+horizon simulation lane in a separately versioned plan amendment.
 
 Any corrected implementation must be evaluated only on fresh, prospectively collected, untouched sessions under a new versioned preregistration. Do not rescore these same four dates to claim corrected performance. Keep the existing holdout sealed. Commission must be independently verified before net-performance evaluation. Execution remains disabled.
+
+
+## 8. Dated addendum — first-window provenance correction (2026-11-24)
+
+The original Section 5 inference that a first tick arriving 30–153 ms after 17:30:00 UTC proves a partial first feature bucket is not supported. The original source manifests inside immutable validation artifact 14888181358 were downloaded and inspected directly. All four validation manifests record:
+
+- `collection_started_utc` exactly at the session boundary, 17:30:00+00:00;
+- `collection_ended_utc` exactly at 18:00:00+00:00;
+- `duration_seconds=1800.0`.
+
+The first tick arrival delay is therefore not evidence that collection began late. On the available trusted manifest timestamps, the first fixed-width bucket is temporally complete; the first observed quote need not occur at the exact bucket boundary. The five momentum triggers / 20 horizon event records identified in Section 5 must not be described as proven partial-window violations on this evidence.
+
+This corrects the interpretation only. The original report, raw CSVs, source manifests, and prior audit text remain immutable; no report was rerun or rewritten. PR #81's conservative boundary detector correctly relies on trusted collection-start provenance: an exact boundary start can make the first bucket complete, while missing or later start provenance requires conservative partial-window exclusion. The final bucket remains excluded. Fresh prospective V2 sessions remain required for corrected implementation evaluation; no V1 rescoring is permitted.
