@@ -344,3 +344,12 @@
 - **Commits:** feature logic `3c64f45c2058fc27077dc834215e6eda7887208a`; tests `b48a3f2a07063c9eb8a4015193c7ffcf5778cd95`.
 - **Audit qualification:** The prior audit's statement that the five first-window momentum triggers necessarily violated the partial-window rule is not established by first-tick delay alone. The four historical manifests use requested interval boundaries; their exact trusted start fields must be checked against the first bucket before classifying those five trigger windows. The original audit/report remain immutable; this is a separately logged interpretation correction, not a retroactive report edit.
 - **Verification boundary:** No Phase 8 evaluator rerun or candidate-performance recalculation. Await CI for the updated PR #81 head. No holdout access, candidate approval, or order execution.
+
+
+### 2026-11-24 — Boundary detector regression fixture corrected after CI failure
+
+- **CI run:** 45395397562 initially failed one feature test; 293 tests passed and one failed. The failure was a fixture-contract issue: the test expected the first bucket to be complete while omitting any trusted collection-start timestamp. Under the conservative rule, missing start provenance correctly marks the first bucket partial.
+- **Fix:** The fixture now explicitly records collection start at the bucket boundary, matching its intended complete-window scenario. The obsolete first-tick variable was removed from the detector.
+- **Commits:** test fixture `0b7ed4e43a97a72133ff3d47b9e08e51edaa6c31`; cleanup `7cd239723c048ebd0fe0ca2ce7f4a7d10658e03f`.
+- **Verification:** New CI is expected from the updated PR head; no pass is claimed yet. Historical replay smoke run 45395397315 passed. Candidate-generation smoke run 45395397440 was still in progress at last check.
+- **Boundary:** No Phase 8 validation evaluator rerun; no v1 validation date reuse; no holdout access; no candidate approval; no order execution.
