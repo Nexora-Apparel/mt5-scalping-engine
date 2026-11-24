@@ -35,6 +35,7 @@ def test_builds_causal_descriptive_windows(tmp_path):
     assert result["status"]=="PASS" and result["research_only"] is True
     assert result["canonical_symbol"]=="XAUUSD" and result["source_records"]==5
     assert result["window_count"]==2
+    assert result["partial_boundary_window_indices"] == [0, 1]
     first,second=result["features"]
     assert first["tick_count"]==3 and first["mid_open"]==3000.1 and first["mid_close"]==3000.3
     assert first["spread_points_median"]==200 and first["trend_efficiency"]==1
@@ -60,6 +61,7 @@ def test_single_tick_window_marks_unobserved_movement_metrics_null(tmp_path):
     csv_path,manifest_path=write_dataset(tmp_path,[make_row(base,3000.0,3000.2)])
     result=build_features(csv_path,manifest_path,window_seconds=5)
     feature=result["features"][0]
+    assert result["partial_boundary_window_indices"] == [0]
     assert feature["tick_count"]==1
     for field in ("ticks_per_second","return_bps","range_bps","realized_volatility_bps","trend_efficiency","mid_price_change_ratio"):
         assert feature[field] is None
