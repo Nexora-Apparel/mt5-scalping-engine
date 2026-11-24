@@ -79,6 +79,26 @@ def build_features(csv_path: str | Path, manifest_path: str | Path, *, window_se
             "gaps_over_1s": sum(gap > 1000 for gap in gaps),
             "mid_price_change_ratio": round(sum(a != b for a, b in zip(mids, mids[1:])) / (len(mids) - 1), 6) if has_movement_observations else None,
         })
+    partial_boundary_indices: set[int] = set()
+    if windows:
+        first_bucket_start = min(buckets)
+        first_tick_msc = buckets[first_bucket_start][0][0]
+        collection_start = manifest.get("collection_started_utc") or manifest.get("requested_start_utc")
+        if collection_start:
+            try:
+                parsed_start = datetime.fromisoformat(collection_start.replace("Z", "+00:00"))
+            except (AttributeError, TypeError, ValueError) as exc:
+                raise ProfileError("manifest collection start must be a valid ISO-8601 timestamp") from exc
+            if parsed_start.tzinfo is None or parsed_start.utcoffset() is None:
+                raise ProfileError("manifest collection start must include a UTC offset")
+            collection_start_msc = int(parsed_start.astimezone(timezone.utc).timestamp() * 1000)
+        else:
+            collection_start_msc = first_bucket_start
+        if first_bucket_start < collection_start_msc or first_tick_msc > max(first_bucket_start, collection_start_msc):
+            partial_boundary_indices.add(0)
+        # No later bucket exists to prove the final observed bucket is complete.
+        partial_boundary_indices.add(len(windows) - 1)
+
     return {
         "status": "PASS", "research_only": True,
         "feature_schema": "VELTRIX_XAUUSD_TICK_WINDOWS_V1",
@@ -86,9 +106,7 @@ def build_features(csv_path: str | Path, manifest_path: str | Path, *, window_se
         "broker_symbol": manifest["instrument_specs"]["XAUUSD"].get("broker_symbol"),
         "source_sha256": profile["sha256"], "source_records": profile["records"],
         "window_seconds": window_seconds, "window_count": len(windows), "features": windows,
-        # The first bucket lacks a quote-state observation at the requested interval start;
-        # the last bucket has no later bucket proving its completion.
-        "partial_boundary_window_indices": sorted({0, len(windows) - 1}) if windows else [],
+        "partial_boundary_window_indices": sorted(partial_boundary_indices),
         "limitations": [
             "Descriptive features only; no entry/exit signals, labels, or trade recommendations.",
             "Tick-count intensity is not traded volume; zero volume fields remain unavailable.",
