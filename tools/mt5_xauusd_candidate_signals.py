@@ -33,7 +33,7 @@ def _finite(value: Any, field: str, *, nullable: bool = False) -> float | None:
     return number
 
 
-def _validate_features(data: dict[str, Any]) -> tuple[list[dict[str, Any]], int, list[int]]:
+def _validate_features(data: dict[str, Any]) -> tuple[list[dict[str, Any]], int, list[int], set[int]]:
     if not isinstance(data, dict) or data.get("status") != "PASS" or data.get("research_only") is not True:
         raise CandidateError("feature input must be PASS and research_only")
     if data.get("feature_schema") != "VELTRIX_XAUUSD_TICK_WINDOWS_V1" or data.get("canonical_symbol") != "XAUUSD":
