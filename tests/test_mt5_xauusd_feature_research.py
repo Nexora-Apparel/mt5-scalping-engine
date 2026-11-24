@@ -35,7 +35,7 @@ def test_builds_causal_descriptive_windows(tmp_path):
     assert result["status"]=="PASS" and result["research_only"] is True
     assert result["canonical_symbol"]=="XAUUSD" and result["source_records"]==5
     assert result["window_count"]==2
-    assert result["partial_boundary_window_indices"] == [0, 1]
+    assert result["partial_boundary_window_indices"] == [1]
     first,second=result["features"]
     assert first["tick_count"]==3 and first["mid_open"]==3000.1 and first["mid_close"]==3000.3
     assert first["spread_points_median"]==200 and first["trend_efficiency"]==1
@@ -65,3 +65,13 @@ def test_single_tick_window_marks_unobserved_movement_metrics_null(tmp_path):
     assert feature["tick_count"]==1
     for field in ("ticks_per_second","return_bps","range_bps","realized_volatility_bps","trend_efficiency","mid_price_change_ratio"):
         assert feature[field] is None
+
+
+def test_marks_first_bucket_partial_when_first_quote_arrives_after_interval_start(tmp_path):
+    base=1_800_000_000_000
+    csv_path,manifest_path=write_dataset(tmp_path,[
+      make_row(base+200,3000.000,3000.200),
+      make_row(base+1000,3000.100,3000.300),
+      make_row(base+5000,3000.100,3000.300)])
+    result=build_features(csv_path,manifest_path,window_seconds=5)
+    assert result["partial_boundary_window_indices"] == [0, 1]
