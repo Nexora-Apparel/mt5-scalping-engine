@@ -94,7 +94,14 @@ def build_features(csv_path: str | Path, manifest_path: str | Path, *, window_se
             collection_start_msc = int(parsed_start.astimezone(timezone.utc).timestamp() * 1000)
         else:
             collection_start_msc = first_bucket_start
-        if first_bucket_start < collection_start_msc or first_tick_msc > max(first_bucket_start, collection_start_msc):
+        # A delayed first quote does not make a bucket partial when collection was
+        # active from the bucket boundary; quote arrival is event-driven. Only the
+        # actual collection/request boundary determines temporal coverage.
+        if first_bucket_start < collection_start_msc:
+            partial_boundary_indices.add(0)
+        elif not collection_start:
+            # Without a trusted collection boundary, conservatively mark the first
+            # observed bucket partial because its left-edge coverage is unknown.
             partial_boundary_indices.add(0)
         # No later bucket exists to prove the final observed bucket is complete.
         partial_boundary_indices.add(len(windows) - 1)
