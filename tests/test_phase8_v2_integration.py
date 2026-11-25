@@ -109,7 +109,7 @@ def test_frozen_v2_protocol_adapts_only_validation_ids_and_keeps_commission_lock
     amendment = json.loads((ROOT / "research/xauusd_walk_forward_plan_v2_amendment.json").read_text(encoding="utf-8"))
     amendment["status"] = "FROZEN_PREREGISTRATION_RESEARCH_ONLY"
     amendment["source_registry_sha256"] = registry_hash
-    amendment_path.write_text(json.dumps(amendment, indent=2) + "\\n", encoding="utf-8")
+    amendment_path.write_text(json.dumps(amendment, indent=2) + "\n", encoding="utf-8")
     schedule = [
         {"session_id": sid, "start_utc": f"2026-11-{25 + i:02d}T17:30:00Z",
          "end_utc": f"2026-11-{25 + i:02d}T18:00:00Z"}
