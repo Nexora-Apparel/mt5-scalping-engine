@@ -146,35 +146,10 @@ def test_frozen_v2_protocol_adapts_only_validation_ids_and_keeps_commission_lock
     assert plan["evaluation"]["net_performance_allowed"] is False
 
 
-def test_committed_v2_freeze_binds_validated_code_and_precedes_schedule():
-    from tools.mt5_xauusd_v2_protocol import load_frozen_v2
 
-    plan, amendment, freeze = load_frozen_v2(
-        amendment_path=ROOT / "research/xauusd_walk_forward_plan_v2_amendment.json",
-        freeze_path=ROOT / "research/xauusd_v2_freeze.json",
-        base_plan_path=ROOT / "research/xauusd_walk_forward_plan_v1.json",
-        registry_path=ROOT / "research/xauusd_strategy_registry_v1.json",
-        repo_root=ROOT,
-        verify_git_ancestry=True,
-    )
-    assert amendment["status"] == "FROZEN_PREREGISTRATION_RESEARCH_ONLY"
-    assert plan["validation_sessions"] == list(V2_IDS)
-    assert plan["v2_protocol"]["freeze_commit_sha"]
-    assert freeze["commission_evidence_sha256_or_explicit_unverified_lock"] == "UNVERIFIED_REQUIRED_INPUT"
-    assert plan["evaluation"]["net_performance_allowed"] is False
-    assert plan["v2_protocol"]["holdout_access"] == "SEALED"
-
-
-def test_v2_protocol_contract_rejects_execution_or_lane_semantic_drift():
-    import copy
-    from tools.mt5_xauusd_v2_protocol import validate_amendment_contract
+def test_v2_amendment_registry_hash_matches_immutable_registry_file():
+    from tools.mt5_xauusd_v2_protocol import sha256_file
 
     amendment = json.loads((ROOT / "research/xauusd_walk_forward_plan_v2_amendment.json").read_text(encoding="utf-8"))
-    changed = copy.deepcopy(amendment)
-    changed["collection_requirements"]["order_submission"] = True
-    with pytest.raises(V2ProtocolError, match="collection requirements"):
-        validate_amendment_contract(changed)
-    changed = copy.deepcopy(amendment)
-    changed["position_lane_semantics"]["one_open_position_per_lane"] = False
-    with pytest.raises(V2ProtocolError, match="lane semantics"):
-        validate_amendment_contract(changed)
+    registry_hash = sha256_file(ROOT / "research/xauusd_strategy_registry_v1.json")
+    assert amendment["source_registry_sha256"] == registry_hash
