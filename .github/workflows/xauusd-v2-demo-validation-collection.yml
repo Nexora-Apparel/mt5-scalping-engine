@@ -46,6 +46,15 @@ jobs:
           if (!$env:MT5_SERVER -or $env:MT5_SERVER -match '[\r\n=]') { throw "MT5_SERVER is missing or invalid." }
           Write-Host "Required credentials are present; values are not printed."
 
+      - name: Validate frozen V2 session and scheduled UTC slot
+        shell: pwsh
+        env:
+          VELTRIX_SESSION_ID: ${{ inputs.validation_session_id }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          python -m tools.validate_xauusd_v2_collection_dispatch --session-id $env:VELTRIX_SESSION_ID
+          if ($LASTEXITCODE -ne 0) { throw "V2 freeze or schedule preflight failed; MT5 will not start." }
+
       - name: Install official Exness MT5 terminal
         shell: pwsh
         run: |
