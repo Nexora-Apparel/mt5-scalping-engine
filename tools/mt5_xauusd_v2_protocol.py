@@ -38,6 +38,31 @@ def parse_utc(value: Any, field: str) -> datetime:
     return parsed.astimezone(timezone.utc)
 
 
+def _git_commit_time(commit_sha: str, repo_root: Path) -> datetime:
+    result = subprocess.run(
+        ["git", "show", "-s", "--format=%cI", commit_sha],
+        cwd=repo_root, capture_output=True, text=True, check=False,
+    )
+    if result.returncode or not result.stdout.strip():
+        raise V2ProtocolError("cannot verify the frozen implementation commit timestamp")
+    return parse_utc(result.stdout.strip(), "implementation commit timestamp")
+
+
+def _git_path_commit(path: Path, repo_root: Path) -> tuple[datetime, str]:
+    try:
+        relative = path.resolve().relative_to(repo_root.resolve())
+    except ValueError as exc:
+        raise V2ProtocolError("freeze and amendment files must be inside the checked-out repository") from exc
+    result = subprocess.run(
+        ["git", "log", "-1", "--format=%cI%x00%H", "--", str(relative)],
+        cwd=repo_root, capture_output=True, text=True, check=False,
+    )
+    if result.returncode or not result.stdout.strip() or "\\x00" not in result.stdout:
+        raise V2ProtocolError(f"{path.name} must be committed before collection")
+    timestamp, commit_sha = result.stdout.strip().split("\\x00", 1)
+    return parse_utc(timestamp, f"{path.name} commit timestamp"), commit_sha
+
+
 def load_frozen_v2(*, amendment_path: Path, freeze_path: Path, base_plan_path: Path,
                    registry_path: Path, repo_root: Path, verify_git_ancestry: bool = True):
     try:
@@ -101,6 +126,20 @@ def load_frozen_v2(*, amendment_path: Path, freeze_path: Path, base_plan_path: P
         schedule_by_id[sid] = {"start": start, "end": end}
     if set(schedule_by_id) != set(V2_IDS):
         raise V2ProtocolError("schedule must contain each V2 session exactly once")
+    freeze_commit_sha = None
+    if verify_git_ancestry:
+        implementation_time = _git_commit_time(implementation_sha, repo_root)
+        freeze_commit_time, freeze_commit_sha = _git_path_commit(freeze_path, repo_root)
+        amendment_commit_time, _ = _git_path_commit(amendment_path, repo_root)
+        earliest_collection = min(item["start"] for item in schedule_by_id.values())
+        if implementation_time > frozen_at:
+            raise V2ProtocolError("freeze timestamp predates the validated implementation commit")
+        if amendment_commit_time > freeze_commit_time:
+            raise V2ProtocolError("freeze record commit must follow the frozen amendment commit")
+        if frozen_at > freeze_commit_time:
+            raise V2ProtocolError("freeze timestamp is later than the committed freeze record")
+        if freeze_commit_time >= earliest_collection:
+            raise V2ProtocolError("freeze record commit must precede every scheduled collection")
     required = amendment.get("freeze_contract", {}).get("required_fields", [])
     if not all(field in freeze for field in required):
         raise V2ProtocolError("freeze record is missing one or more preregistered required fields")
@@ -116,6 +155,7 @@ def load_frozen_v2(*, amendment_path: Path, freeze_path: Path, base_plan_path: P
     plan["v2_protocol"] = {
         "amendment_sha256": hashlib.sha256(amendment_bytes).hexdigest(),
         "implementation_commit_sha": implementation_sha,
+        "freeze_commit_sha": freeze_commit_sha,
         "freeze_utc": frozen_at.isoformat(),
         "schedule": schedule_by_id,
         "holdout_access": "SEALED",
