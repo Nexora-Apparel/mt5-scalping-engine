@@ -353,3 +353,10 @@
 - **Commits:** test fixture `0b7ed4e43a97a72133ff3d47b9e08e51edaa6c31`; cleanup `7cd239723c048ebd0fe0ca2ce7f4a7d10658e03f`.
 - **Verification:** New CI is expected from the updated PR head; no pass is claimed yet. Historical replay smoke run 45395397315 passed. Candidate-generation smoke run 45395397440 was still in progress at last check.
 - **Boundary:** No Phase 8 validation evaluator rerun; no v1 validation date reuse; no holdout access; no candidate approval; no order execution.
+
+
+### 2026-11-24 — V2 protocol amendment branch rebased onto latest replay corrections
+
+- **Branch:** `phase8/v2-preregistration-amendment-rebased-20261124`, based on PR #81 head `6d72e6915d08d689c8d58d7bc46e8b81e884742a`.
+- **Reason:** Keep the protocol amendment dependent on the latest replay-correction branch state; the earlier PR #82 branch was based on an older PR #81 commit.
+- **Protocol status:** Draft only. V2 session IDs still require workflow, intake, evaluator, and regression-test support before freeze or collection.

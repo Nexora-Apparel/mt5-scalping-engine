@@ -1,0 +1,127 @@
+{
+  "plan_schema": "VELTRIX_XAUUSD_WALK_FORWARD_PLAN_V2_AMENDMENT",
+  "plan_version": 2,
+  "status": "DRAFT_PREREGISTRATION_NOT_FROZEN",
+  "supersedes_for_new_evaluations": "research/xauusd_walk_forward_plan_v1.json",
+  "preserves_original_plan": true,
+  "canonical_symbol": "XAUUSD",
+  "broker": "Exness",
+  "account_mode": "DEMO",
+  "implementation_version": "PHASE8_REPLAY_CORRECTIONS_V2",
+  "source_registry_sha256": "31b1471d1f5c28ff83dce08cf388a444a0886f4411e9d960b2a2ec212516d62d",
+  "original_validation_sessions_prohibited": [
+    "validation_01",
+    "validation_02",
+    "validation_03",
+    "validation_04"
+  ],
+  "original_validation_artifact_prohibited_for_rescoring": 14888181358,
+  "new_validation_sessions": [
+    {
+      "session_id": "v2_validation_01",
+      "distinct_date_required": true
+    },
+    {
+      "session_id": "v2_validation_02",
+      "distinct_date_required": true
+    },
+    {
+      "session_id": "v2_validation_03",
+      "distinct_date_required": true
+    },
+    {
+      "session_id": "v2_validation_04",
+      "distinct_date_required": true
+    }
+  ],
+  "collection_requirements": {
+    "minimum_session_duration_seconds": 1800,
+    "minimum_validation_sessions": 4,
+    "minimum_validation_distinct_dates": 4,
+    "minimum_outcomes_per_configuration_horizon": 100,
+    "collection_mode": "PROSPECTIVE_EXNESS_DEMO_READ_ONLY",
+    "canonical_symbol_only": "XAUUSD",
+    "trading_enabled": false,
+    "order_submission": false,
+    "position_management": false,
+    "dll_imports_enabled": false,
+    "no_cron_or_unattended_collection": true,
+    "first_and_last_partial_feature_windows_excluded": true,
+    "all_required_lookback_and_compression_windows_must_be_complete": true,
+    "no_cross_session_feature_history": true
+  },
+  "position_lane_semantics": {
+    "lane_key": [
+      "candidate_id",
+      "complete_parameter_set",
+      "horizon_seconds"
+    ],
+    "one_open_position_per_lane": true,
+    "horizon_arms_are_independent_counterfactual_research_streams": true,
+    "horizons_must_not_share_or_block_each_others_research_lane": true,
+    "signal_eligibility_rule": "signal_window_end_msc >= prior_accepted_exit_time_msc is required; a signal timestamp strictly earlier than the prior accepted exit is skipped even if its first eligible quote arrives later.",
+    "unresolved_exit_rule": "An exit quote timeout leaves the lane unresolved and blocks all later signals in that lane for the remainder of that session.",
+    "entry_timeout_rule": "An entry quote timeout does not open a position and does not block later signals.",
+    "reset_rule": "Each lane resets at each session boundary; no open position or feature history carries across sessions.",
+    "live_execution_warning": "Independent horizon lanes are analytical counterfactuals, not simultaneous executable positions. Any later execution design must enforce one account-level position across all enabled strategies and horizons."
+  },
+  "evaluation": {
+    "holding_horizons_seconds": [
+      5,
+      15,
+      30,
+      60
+    ],
+    "entry_quote": "First quote strictly after signal-window end; maximum delay 5000ms inclusive.",
+    "exit_quote": "First quote at or after entry time plus horizon; maximum delay 2000ms inclusive.",
+    "long_mark": "Ask entry / Bid exit",
+    "short_mark": "Bid entry / Ask exit",
+    "spread_treatment": "Executable-side crossing includes spread exactly once.",
+    "slippage_sensitivity_points_per_side": [
+      0,
+      1,
+      2,
+      5
+    ],
+    "commission_status": "UNVERIFIED_REQUIRED_INPUT",
+    "net_performance_allowed": false,
+    "sample_gate": "At least 100 accepted non-overlapping outcomes per configuration/horizon across at least four distinct prospective dates.",
+    "benchmark_set": [
+      "NO_TRADE",
+      "ALWAYS_LONG",
+      "ALWAYS_SHORT"
+    ],
+    "no_random_row_splits": true,
+    "no_forward_fill": true,
+    "no_parameter_tuning_on_holdout": true,
+    "holdout_access": "SEALED"
+  },
+  "freeze_contract": {
+    "required_before_any_new_collection": true,
+    "required_fields": [
+      "plan_sha256",
+      "implementation_commit_sha",
+      "registry_sha256",
+      "frozen_utc",
+      "collection_session_ids",
+      "collection_schedule_utc",
+      "commission_evidence_sha256_or_explicit_unverified_lock"
+    ],
+    "timestamp_rule": "The freeze commit timestamp must precede the earliest start of every v2 validation collection session.",
+    "no_retroactive_freeze": true
+  },
+  "gates": {
+    "phase8_validation": "NOT_AUTHORIZED_UNTIL_V2_PLAN_FROZEN_AND_NEW_SESSION_IDS_SUPPORTED_BY_INTAKE_AND_EVALUATOR",
+    "net_performance": "BLOCKED_UNTIL_INDEPENDENT_EXNESS_DEMO_COMMISSION_EVIDENCE",
+    "holdout": "SEALED; requires a later independently reviewed selection-freeze protocol and must not reuse v1 holdout artifacts",
+    "candidate_approval": "NOT_APPROVED",
+    "order_execution": "DISABLED",
+    "live_trading": "DISABLED"
+  },
+  "limitations": [
+    "The four v1 validation sessions were already evaluated and are prohibited from corrected-performance rescoring.",
+    "The original v1 report and artifacts remain immutable and retain their historical conclusions.",
+    "This v2 document is a draft amendment; it does not authorize data collection until frozen and until the workflow/catalog/evaluator accept the new v2 IDs.",
+    "Quote-crossed outcomes are not broker fills and cannot establish execution quality."
+  ]
+}
