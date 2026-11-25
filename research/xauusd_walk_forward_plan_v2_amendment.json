@@ -1,7 +1,7 @@
 {
   "plan_schema": "VELTRIX_XAUUSD_WALK_FORWARD_PLAN_V2_AMENDMENT",
   "plan_version": 2,
-  "status": "FROZEN_PREREGISTRATION_RESEARCH_ONLY",
+  "status": "DRAFT_PREREGISTRATION_NOT_FROZEN",
   "supersedes_for_new_evaluations": "research/xauusd_walk_forward_plan_v1.json",
   "preserves_original_plan": true,
   "canonical_symbol": "XAUUSD",
