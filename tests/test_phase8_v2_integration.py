@@ -17,6 +17,7 @@ def test_v2_collector_is_restricted_to_four_new_ids_and_explicitly_read_only():
     assert '"order_submission": False' in source
     assert '"position_management": False' in source
     assert '"execution_enabled": False' in source
+    assert '"source_commit_sha": source_commit_sha' in source
     assert "validation_01 or validation_03" not in source
 
 
@@ -33,6 +34,8 @@ def test_v2_collection_workflow_is_manual_and_uses_dispatch_commit():
     assert "AllowDllImport=0" in source
     assert "ordersend(" not in source.lower()
     assert "ordersendasync(" not in source.lower()
+    assert "VELTRIX_SOURCE_COMMIT_SHA: ${{ github.sha }}" in source
+    assert "fetch-depth: 0" in source
     assert "validate_xauusd_v2_collection_dispatch" in source
     assert source.index("Set up 64-bit Python") < source.index("Validate frozen V2 session")
 
@@ -44,6 +47,15 @@ def test_v2_intake_requires_exact_four_unique_session_and_run_ids():
         validate_v2_map({"sessions": [{"session_id": "validation_01", "run_id": 1}] * 4})
     with pytest.raises(ValueError, match="distinct positive workflow"):
         validate_v2_map({"sessions": [{"session_id": sid, "run_id": 77} for sid in V2_IDS]})
+
+
+def test_v2_intake_binds_artifact_to_manual_main_workflow_and_frozen_code():
+    source = (ROOT / "tools/prepare_xauusd_v2_validation_catalog.py").read_text(encoding="utf-8")
+    assert 'run.get("event") != "workflow_dispatch"' in source
+    assert 'run.get("path") != ".github/workflows/xauusd-v2-demo-validation-collection.yml"' in source
+    assert 'run.get("head_branch") != "main"' in source
+    assert 'source_commit != run.get("head_sha")' in source
+    assert '"--is-ancestor"' in source
 
 
 def test_v2_evaluator_requires_frozen_protocol_and_rejects_v1_ids():
