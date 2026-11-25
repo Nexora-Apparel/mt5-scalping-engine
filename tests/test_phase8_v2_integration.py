@@ -142,3 +142,22 @@ def test_v2_amendment_registry_hash_matches_immutable_registry_file():
     amendment = json.loads((ROOT / "research/xauusd_walk_forward_plan_v2_amendment.json").read_text(encoding="utf-8"))
     registry_hash = sha256_file(ROOT / "research/xauusd_strategy_registry_v1.json")
     assert amendment["source_registry_sha256"] == registry_hash
+
+
+def test_committed_v2_freeze_binds_validated_code_and_precedes_schedule():
+    from tools.mt5_xauusd_v2_protocol import load_frozen_v2
+
+    plan, amendment, freeze = load_frozen_v2(
+        amendment_path=ROOT / "research/xauusd_walk_forward_plan_v2_amendment.json",
+        freeze_path=ROOT / "research/xauusd_v2_freeze.json",
+        base_plan_path=ROOT / "research/xauusd_walk_forward_plan_v1.json",
+        registry_path=ROOT / "research/xauusd_strategy_registry_v1.json",
+        repo_root=ROOT,
+        verify_git_ancestry=True,
+    )
+    assert amendment["status"] == "FROZEN_PREREGISTRATION_RESEARCH_ONLY"
+    assert plan["validation_sessions"] == list(V2_IDS)
+    assert plan["v2_protocol"]["freeze_commit_sha"]
+    assert freeze["commission_evidence_sha256_or_explicit_unverified_lock"] == "UNVERIFIED_REQUIRED_INPUT"
+    assert plan["evaluation"]["net_performance_allowed"] is False
+    assert plan["v2_protocol"]["holdout_access"] == "SEALED"
