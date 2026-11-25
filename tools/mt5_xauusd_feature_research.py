@@ -79,6 +79,32 @@ def build_features(csv_path: str | Path, manifest_path: str | Path, *, window_se
             "gaps_over_1s": sum(gap > 1000 for gap in gaps),
             "mid_price_change_ratio": round(sum(a != b for a, b in zip(mids, mids[1:])) / (len(mids) - 1), 6) if has_movement_observations else None,
         })
+    partial_boundary_indices: set[int] = set()
+    if windows:
+        first_bucket_start = min(buckets)
+        collection_start = manifest.get("collection_started_utc") or manifest.get("requested_start_utc")
+        if collection_start:
+            try:
+                parsed_start = datetime.fromisoformat(collection_start.replace("Z", "+00:00"))
+            except (AttributeError, TypeError, ValueError) as exc:
+                raise ProfileError("manifest collection start must be a valid ISO-8601 timestamp") from exc
+            if parsed_start.tzinfo is None or parsed_start.utcoffset() is None:
+                raise ProfileError("manifest collection start must include a UTC offset")
+            collection_start_msc = int(parsed_start.astimezone(timezone.utc).timestamp() * 1000)
+        else:
+            collection_start_msc = first_bucket_start
+        # A delayed first quote does not make a bucket partial when collection was
+        # active from the bucket boundary; quote arrival is event-driven. Only the
+        # actual collection/request boundary determines temporal coverage.
+        if first_bucket_start < collection_start_msc:
+            partial_boundary_indices.add(0)
+        elif not collection_start:
+            # Without a trusted collection boundary, conservatively mark the first
+            # observed bucket partial because its left-edge coverage is unknown.
+            partial_boundary_indices.add(0)
+        # No later bucket exists to prove the final observed bucket is complete.
+        partial_boundary_indices.add(len(windows) - 1)
+
     return {
         "status": "PASS", "research_only": True,
         "feature_schema": "VELTRIX_XAUUSD_TICK_WINDOWS_V1",
@@ -86,6 +112,7 @@ def build_features(csv_path: str | Path, manifest_path: str | Path, *, window_se
         "broker_symbol": manifest["instrument_specs"]["XAUUSD"].get("broker_symbol"),
         "source_sha256": profile["sha256"], "source_records": profile["records"],
         "window_seconds": window_seconds, "window_count": len(windows), "features": windows,
+        "partial_boundary_window_indices": sorted(partial_boundary_indices),
         "limitations": [
             "Descriptive features only; no entry/exit signals, labels, or trade recommendations.",
             "Tick-count intensity is not traded volume; zero volume fields remain unavailable.",
