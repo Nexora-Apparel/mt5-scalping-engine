@@ -1,0 +1,77 @@
+name: VELTRIX Phase 8 V2 validation intake and evaluation
+run-name: VELTRIX V2 XAUUSD intake and gross validation evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      session_run_map_json:
+        description: JSON mapping the four frozen V2 session IDs to successful collection workflow run IDs
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: veltrix-xauusd-v2-validation-evaluation
+  cancel-in-progress: false
+
+jobs:
+  intake-and-evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out frozen protocol and implementation
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install project dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Write V2 session map
+        env:
+          SESSION_RUN_MAP_JSON: ${{ inputs.session_run_map_json }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          value = json.loads(os.environ["SESSION_RUN_MAP_JSON"])
+          with open("research/xauusd_v2_session_run_map.json", "w", encoding="utf-8") as f:
+              json.dump(value, f, indent=2)
+          PY
+
+      - name: Download and validate four fresh V2 DEMO sessions
+        run: |
+          python -m tools.prepare_xauusd_v2_validation_catalog \
+            --session-map research/xauusd_v2_session_run_map.json \
+            --repo "$GITHUB_REPOSITORY"
+
+      - name: Run frozen V2 gross quote-outcome evaluation
+        run: |
+          python -m tools.mt5_xauusd_v2_validation \
+            --catalog research/xauusd_walk_forward_catalog.json \
+            --output research/xauusd_v2_validation_report.json
+
+      - name: Publish V2 research evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veltrix-xauusd-v2-validation-evidence-${{ github.run_number }}
+          path: |
+            research/xauusd_v2_validation_report.json
+            research/xauusd_walk_forward_catalog.json
+            research/xauusd_sessions/
+          if-no-files-found: warn
+          retention-days: 30
