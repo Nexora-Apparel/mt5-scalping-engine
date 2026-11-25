@@ -239,6 +239,9 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
     session_id = os.environ.get("VELTRIX_SESSION_ID", "")
     if session_id not in {f"v2_validation_{i:02d}" for i in range(1, 5)}:
         raise DiagnosticFailure("VELTRIX_SESSION_ID must be one of v2_validation_01 through v2_validation_04")
+    source_commit_sha = os.environ.get("VELTRIX_SOURCE_COMMIT_SHA", "")
+    if not re.fullmatch(r"[0-9a-f]{40}", source_commit_sha):
+        raise DiagnosticFailure("VELTRIX_SOURCE_COMMIT_SHA must bind the exact 40-character dispatch commit")
     login = int(os.environ.get("MT5_LOGIN", "0"))
     password = os.environ.get("MT5_PASSWORD", "")
     server = os.environ.get("MT5_SERVER", "")
@@ -343,6 +346,7 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
         manifest = {
             **audit,
             "session_id": session_id,
+            "source_commit_sha": source_commit_sha,
             "collection_started_utc": started_utc.isoformat(),
             "collection_ended_utc": ended_utc.isoformat(),
             "duration_seconds": round(collection_elapsed_seconds, 3),
