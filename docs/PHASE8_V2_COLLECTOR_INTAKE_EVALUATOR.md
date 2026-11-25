@@ -1,6 +1,6 @@
 # Phase 8 V2 collector, intake, and evaluator integration
 
-Status: implementation branch pending CI; V2 preregistration remains draft and no collection is authorized yet.
+Status: V2 implementation passed full CI and the V2 preregistration is frozen on this branch. Collection still requires the reviewed PR to be merged and the four manual Actions dispatches.
 
 ## Dependency order
 
@@ -39,6 +39,26 @@ The V2 amendment must be changed from draft to `FROZEN_PREREGISTRATION_RESEARCH_
 - the explicit `UNVERIFIED_REQUIRED_INPUT` commission lock unless independently verified account-specific evidence is supplied.
 
 The implementation gate rejects a draft amendment, stale/mismatched hashes, non-ancestor implementation commit, duplicate dates, schedule entries before freeze, or a commission claim unsupported by this workflow. Collection dispatch additionally fails unless the selected ID is within its frozen +/-10-minute UTC slot.
+
+## Frozen V2 record
+
+The integration branch contains `research/xauusd_v2_freeze.json`:
+
+- Frozen UTC: `2026-11-25T17:22:09Z`
+- Amendment SHA-256: `b692746e3aedf819b7239da3c4f07ca8f8036fb1decf3c5e5c3bbac1b3f59d06`
+- Registry SHA-256: `31b1471d1f5c28ff83dce08cf388a444a0886f4411e9d960b2a2ec212516d62d`
+- CI-validated implementation commit: `d24a7dce0ca77e4fe462ef6aa91782027838f9f5`
+- Freeze record commit: `0f44ef8f5aac19728fb0a437f14d9193f4b65db4`
+- Commission lock: `UNVERIFIED_REQUIRED_INPUT`; gross-only analysis remains the limit.
+
+Frozen UTC collection windows (Nigeria WAT is UTC+1):
+
+| Session | Date | UTC | Nigeria WAT |
+|---|---|---|---|
+| v2_validation_01 | 26 Nov 2026 | 17:30–18:00 | 18:30–19:00 |
+| v2_validation_02 | 27 Nov 2026 | 17:30–18:00 | 18:30–19:00 |
+| v2_validation_03 | 30 Nov 2026 | 17:30–18:00 | 18:30–19:00 |
+| v2_validation_04 | 1 Dec 2026 | 17:30–18:00 | 18:30–19:00 |
 
 ## Remaining external operations
 
