@@ -134,6 +134,8 @@ def load_frozen_v2(*, amendment_path: Path, freeze_path: Path, base_plan_path: P
         earliest_collection = min(item["start"] for item in schedule_by_id.values())
         if implementation_time > frozen_at:
             raise V2ProtocolError("freeze timestamp predates the validated implementation commit")
+        if amendment_commit_time > frozen_at:
+            raise V2ProtocolError("freeze timestamp predates the committed frozen amendment")
         if amendment_commit_time > freeze_commit_time:
             raise V2ProtocolError("freeze record commit must follow the frozen amendment commit")
         if frozen_at > freeze_commit_time:
