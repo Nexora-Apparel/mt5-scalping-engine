@@ -106,20 +106,10 @@ def test_frozen_v2_protocol_adapts_only_validation_ids_and_keeps_commission_lock
         "evaluation": {},
     }
     base_path.write_text(json.dumps(base), encoding="utf-8")
-    amendment = {
-        "plan_schema": "VELTRIX_XAUUSD_WALK_FORWARD_PLAN_V2_AMENDMENT",
-        "status": "FROZEN_PREREGISTRATION_RESEARCH_ONLY",
-        "source_registry_sha256": registry_hash,
-        "new_validation_sessions": [
-            {"session_id": sid, "distinct_date_required": True} for sid in V2_IDS
-        ],
-        "freeze_contract": {"required_fields": [
-            "plan_sha256", "implementation_commit_sha", "registry_sha256", "frozen_utc",
-            "collection_session_ids", "collection_schedule_utc",
-            "commission_evidence_sha256_or_explicit_unverified_lock",
-        ]},
-    }
-    amendment_path.write_text(json.dumps(amendment, sort_keys=True), encoding="utf-8")
+    amendment = json.loads((ROOT / "research/xauusd_walk_forward_plan_v2_amendment.json").read_text(encoding="utf-8"))
+    amendment["status"] = "FROZEN_PREREGISTRATION_RESEARCH_ONLY"
+    amendment["source_registry_sha256"] = registry_hash
+    amendment_path.write_text(json.dumps(amendment, indent=2) + "\\n", encoding="utf-8")
     schedule = [
         {"session_id": sid, "start_utc": f"2026-11-{25 + i:02d}T17:30:00Z",
          "end_utc": f"2026-11-{25 + i:02d}T18:00:00Z"}
@@ -144,7 +134,6 @@ def test_frozen_v2_protocol_adapts_only_validation_ids_and_keeps_commission_lock
     assert plan["final_holdout_sessions"] == base["final_holdout_sessions"]
     assert plan["evaluation"]["commission_status"] == UNVERIFIED_LOCK
     assert plan["evaluation"]["net_performance_allowed"] is False
-
 
 
 def test_v2_amendment_registry_hash_matches_immutable_registry_file():
