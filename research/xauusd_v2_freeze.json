@@ -1,0 +1,41 @@
+{
+  "plan_sha256": "b692746e3aedf819b7239da3c4f07ca8f8036fb1decf3c5e5c3bbac1b3f59d06",
+  "implementation_commit_sha": "19282efc5dc48dd85423a412404c1670b241edc8",
+  "registry_sha256": "31b1471d1f5c28ff83dce08cf388a444a0886f4411e9d960b2a2ec212516d62d",
+  "frozen_utc": "2026-11-25T17:18:03Z",
+  "collection_session_ids": [
+    "v2_validation_01",
+    "v2_validation_02",
+    "v2_validation_03",
+    "v2_validation_04"
+  ],
+  "collection_schedule_utc": [
+    {
+      "session_id": "v2_validation_01",
+      "start_utc": "2026-11-26T17:30:00Z",
+      "end_utc": "2026-11-26T18:00:00Z"
+    },
+    {
+      "session_id": "v2_validation_02",
+      "start_utc": "2026-11-27T17:30:00Z",
+      "end_utc": "2026-11-27T18:00:00Z"
+    },
+    {
+      "session_id": "v2_validation_03",
+      "start_utc": "2026-11-30T17:30:00Z",
+      "end_utc": "2026-11-30T18:00:00Z"
+    },
+    {
+      "session_id": "v2_validation_04",
+      "start_utc": "2026-12-01T17:30:00Z",
+      "end_utc": "2026-12-01T18:00:00Z"
+    }
+  ],
+  "commission_evidence_sha256_or_explicit_unverified_lock": "UNVERIFIED_REQUIRED_INPUT",
+  "net_performance_allowed": false,
+  "holdout_access": "SEALED",
+  "candidate_approval": "NOT_APPROVED",
+  "order_submission": false,
+  "position_management": false,
+  "live_trading": false
+}
