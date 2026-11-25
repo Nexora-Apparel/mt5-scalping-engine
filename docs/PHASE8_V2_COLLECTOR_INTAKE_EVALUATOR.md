@@ -44,11 +44,11 @@ The implementation gate rejects a draft amendment, stale/mismatched hashes, non-
 
 The integration branch contains `research/xauusd_v2_freeze.json`:
 
-- Frozen UTC: `2026-11-25T17:22:09Z`
+- Frozen UTC: `2026-11-25T17:24:08Z`
 - Amendment SHA-256: `b692746e3aedf819b7239da3c4f07ca8f8036fb1decf3c5e5c3bbac1b3f59d06`
 - Registry SHA-256: `31b1471d1f5c28ff83dce08cf388a444a0886f4411e9d960b2a2ec212516d62d`
-- CI-validated implementation commit: `d24a7dce0ca77e4fe462ef6aa91782027838f9f5`
-- Freeze record commit: `0f44ef8f5aac19728fb0a437f14d9193f4b65db4`
+- CI-validated implementation commit: `6ceaddc4e67164adb070706739b94b4024e2fef5`
+- Freeze record commit: `b360cbfdc2aae18dc1c2a875b18e3bcd9971f854`
 - Commission lock: `UNVERIFIED_REQUIRED_INPUT`; gross-only analysis remains the limit.
 
 Frozen UTC collection windows (Nigeria WAT is UTC+1):
