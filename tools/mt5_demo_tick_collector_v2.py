@@ -370,6 +370,10 @@ def collect(mt5: Any, minutes: int, output_dir: Path, *,
             },
             "trading_enabled": False,
             "dll_imports_enabled": False,
+            "order_submission": False,
+            "position_management": False,
+            "execution_enabled": False,
+            "live_trading_enabled": False,
             "collection_method": "MetaQuotes copy_ticks_from / COPY_TICKS_ALL",
             "status": (
                 "PASS" if collection_elapsed_seconds >= requested_duration_seconds
