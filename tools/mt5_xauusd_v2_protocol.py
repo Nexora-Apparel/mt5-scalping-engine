@@ -26,15 +26,17 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def parse_utc(value: Any, field: str) -> datetime:
+def parse_utc(value: Any, field: str, *, require_utc: bool = True) -> datetime:
     if not isinstance(value, str):
-        raise V2ProtocolError(f"{field} must be an ISO-8601 UTC timestamp")
+        raise V2ProtocolError(f"{field} must be an ISO-8601 timezone-aware timestamp")
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError as exc:
-        raise V2ProtocolError(f"{field} must be an ISO-8601 UTC timestamp") from exc
-    if parsed.tzinfo is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
-        raise V2ProtocolError(f"{field} must include a UTC offset")
+        raise V2ProtocolError(f"{field} must be an ISO-8601 timezone-aware timestamp") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise V2ProtocolError(f"{field} must include a timezone offset")
+    if require_utc and parsed.utcoffset() != timezone.utc.utcoffset(parsed):
+        raise V2ProtocolError(f"{field} must use the UTC offset")
     return parsed.astimezone(timezone.utc)
 
 
@@ -45,7 +47,7 @@ def _git_commit_time(commit_sha: str, repo_root: Path) -> datetime:
     )
     if result.returncode or not result.stdout.strip():
         raise V2ProtocolError("cannot verify the frozen implementation commit timestamp")
-    return parse_utc(result.stdout.strip(), "implementation commit timestamp")
+    return parse_utc(result.stdout.strip(), "implementation commit timestamp", require_utc=False)
 
 
 def _git_path_commit(path: Path, repo_root: Path) -> tuple[datetime, str]:
@@ -60,7 +62,7 @@ def _git_path_commit(path: Path, repo_root: Path) -> tuple[datetime, str]:
     if result.returncode or not result.stdout.strip() or "\x00" not in result.stdout:
         raise V2ProtocolError(f"{path.name} must be committed before collection")
     timestamp, commit_sha = result.stdout.strip().split("\x00", 1)
-    return parse_utc(timestamp, f"{path.name} commit timestamp"), commit_sha
+    return parse_utc(timestamp, f"{path.name} commit timestamp", require_utc=False), commit_sha
 
 
 def validate_amendment_contract(amendment: dict[str, Any]) -> None:
