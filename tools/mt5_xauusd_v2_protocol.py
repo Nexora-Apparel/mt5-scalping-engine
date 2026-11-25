@@ -57,9 +57,9 @@ def _git_path_commit(path: Path, repo_root: Path) -> tuple[datetime, str]:
         ["git", "log", "-1", "--format=%cI%x00%H", "--", str(relative)],
         cwd=repo_root, capture_output=True, text=True, check=False,
     )
-    if result.returncode or not result.stdout.strip() or "\\x00" not in result.stdout:
+    if result.returncode or not result.stdout.strip() or "\x00" not in result.stdout:
         raise V2ProtocolError(f"{path.name} must be committed before collection")
-    timestamp, commit_sha = result.stdout.strip().split("\\x00", 1)
+    timestamp, commit_sha = result.stdout.strip().split("\x00", 1)
     return parse_utc(timestamp, f"{path.name} commit timestamp"), commit_sha
 
 
