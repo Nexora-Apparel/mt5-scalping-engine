@@ -33,7 +33,7 @@ def _finite(value: Any, field: str, *, nullable: bool = False) -> float | None:
     return number
 
 
-def _validate_features(data: dict[str, Any]) -> tuple[list[dict[str, Any]], int, list[int]]:
+def _validate_features(data: dict[str, Any]) -> tuple[list[dict[str, Any]], int, list[int], set[int]]:
     if not isinstance(data, dict) or data.get("status") != "PASS" or data.get("research_only") is not True:
         raise CandidateError("feature input must be PASS and research_only")
     if data.get("feature_schema") != "VELTRIX_XAUUSD_TICK_WINDOWS_V1" or data.get("canonical_symbol") != "XAUUSD":
@@ -83,7 +83,15 @@ def _validate_features(data: dict[str, Any]) -> tuple[list[dict[str, Any]], int,
             raise CandidateError(f"window {index} realized volatility cannot be negative")
     if total_ticks != source_records:
         raise CandidateError("feature tick counts do not reconcile to source_records")
-    return rows, width, window_starts_ms
+    partial = data.get("partial_boundary_window_indices")
+    if not isinstance(partial, list):
+        raise CandidateError("partial_boundary_window_indices must be an explicit list")
+    partial_indices = set()
+    for value in partial:
+        if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value < len(rows):
+            raise CandidateError("partial boundary window index is invalid")
+        partial_indices.add(value)
+    return rows, width, window_starts_ms, partial_indices
 
 
 def _contiguous_windows(stamps: list[int], start: int, end_exclusive: int, width: int) -> bool:
@@ -149,9 +157,9 @@ def _event(
 
 def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any]:
     registry_result = validate_registry(registry)
-    rows, width, window_starts_ms = _validate_features(features)
-    # The final observed bucket cannot be proven complete from a closed CSV: only a later bucket
-    # proves that the prior five-second interval has ended. Never signal on the last row.
+    rows, width, window_starts_ms, partial_indices = _validate_features(features)
+    # Never use boundary-partial buckets in a current signal or any required trailing history.
+    # The final bucket is independently excluded because no later bucket proves completion.
     completed_count = max(0, len(rows) - 1)
     events: list[dict[str, Any]] = []
     counts = {item["candidate_id"]: 0 for item in registry["candidates"]}
@@ -165,6 +173,8 @@ def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]
             for lookback, threshold in product(grid["lookback_seconds"], grid["standardized_impulse_threshold"]):
                 n = lookback // width
                 for index in range(n, completed_count):
+                    if any(index - n <= partial < index + 1 for partial in partial_indices):
+                        continue
                     if not _contiguous_windows(window_starts_ms, index - n, index + 1, width):
                         continue
                     scale = _volatility_scale(rows, index - n, index)
@@ -185,6 +195,8 @@ def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]
             for lookback, threshold in product(grid["lookback_seconds"], grid["standardized_displacement_threshold"]):
                 n = lookback // width
                 for index in range(n, completed_count):
+                    if any(index - n <= partial < index + 1 for partial in partial_indices):
+                        continue
                     if not _contiguous_windows(window_starts_ms, index - n, index + 1, width):
                         continue
                     scale = _volatility_scale(rows, index - n, index)
@@ -209,6 +221,8 @@ def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]
             ):
                 n = lookback // width
                 for index in range(60 + n, completed_count):
+                    if any(index - 60 - n <= partial < index + 1 for partial in partial_indices):
+                        continue
                     if not _contiguous_windows(window_starts_ms, index - 60 - n, index + 1, width):
                         continue
                     scale = _volatility_scale(rows, index - n, index)
@@ -264,7 +278,8 @@ def generate_candidate_events(features: dict[str, Any], registry: dict[str, Any]
         "source_records": features["source_records"],
         "window_seconds": width,
         "window_count": len(rows),
-        "completed_window_count": completed_count,
+        "completed_window_count": max(0, completed_count - len([i for i in partial_indices if i < completed_count])),
+        "partial_boundary_window_indices": sorted(partial_indices),
         "data_role": data_role,
         "final_holdout_eligible": False,
         "registry_sha256": registry_result["registry_sha256"],

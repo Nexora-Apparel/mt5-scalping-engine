@@ -315,3 +315,41 @@
 - **Costs and limitations:** Exness commission remains UNVERIFIED_REQUIRED_INPUT; all net_after_commission values are null. Outcomes are theoretical bid/ask quote marks, not broker fills; spread is included once and slippage is sensitivity analysis only. The historical validation dates had previously been used for descriptive midpoint-movement diagnostics, disclosed in the eligibility audit; they are candidate-unscored prior to this registered evaluation and must not be relabeled as untouched holdout.
 - **Decision:** The workflow/ingestion/evaluation pipeline completed successfully, but strategy validation did not pass. Do not tune against these same validation dates, open holdout, freeze/select a candidate, or enable demo/live order execution. Keep the original preregistered plan and registry unchanged.
 - **Next action:** Audit the evaluator's candidate-signal frequency and per-session outcome distribution against the registered signal definitions, then determine whether the sparse candidate outcomes are genuine strategy behavior or an implementation/measurement defect. Any correction must be separately versioned, tested, and evaluated on new untouched data; do not relax the 100-outcome gate or reinterpret existing results. Obtain independently verifiable Exness DEMO commission evidence before any net-performance evaluation. Holdout remains sealed.
+
+
+### 2026-11-24 — Separate Phase 8 replay-correction implementation and CI
+
+- **Draft PR:** [#81 — Phase 8: harden signal boundaries, replay filtering and reporting](https://github.com/Nexora-Apparel/mt5-scalping-engine/pull/81), branch `phase8/replay-corrections-v2-20261124`. This is separate from the immutable audit PR #80 and does not modify the frozen registry, plan, original validation artifact, or historical CSVs.
+- **Implementation changes:** feature builder explicitly marks partial boundary windows (first window only when the first quote/collection boundary proves it partial; last observed window always partial); candidate generation excludes partial windows from current/trailing inputs; directional benchmarks also exclude partial buckets; single-position filtering rejects a signal timestamp earlier than the prior accepted exit; per-session skip and attempted-timeout counts are accumulated inside the sequential filter; all 120 registered validation configuration/horizon rows are emitted, including zero-signal rows.
+- **Regression tests:** cover partial first-window handling, signal-time single-position rejection when the first quote arrives after the previous exit, unresolved exit timeout accounting, and zero-signal grid rows.
+- **Latest CI at head `0a2a7e59bf9f69ad7c2a3cf1675571c74019c49c`:** Project tests run 45323867876 — **292 passed**; Phase 6 candidate-generation smoke run 45323867595 — SUCCESS; Phase 5 replay smoke run 45323867368 — SUCCESS. The Phase 5/6 smoke jobs used only the preregistered development Sessions 8 and 9; they did not rescore validation_01–04.
+- **Resolved intermediate CI:** earlier run 45323856234 at pre-test-update commit `d949c6025f56064a35a2c65e6200b6043eca44e0` failed one fixture assertion because its first quote was exactly at the bucket boundary (correctly not partial). The test was corrected to expect only the final bucket to be partial; the latest-head suite passes.
+- **Research boundary:** implementation/test validation only. Do not run the Phase 8 evaluator on the same four validation dates to claim corrected performance. Fresh prospective untouched sessions and a new versioned preregistration (including explicit per-horizon position-lane semantics) are required before any corrected performance evaluation. Holdout remains sealed; commission unverified; order execution disabled.
+
+
+### 2026-11-24 — Phase 8 correction branch type-contract cleanup
+
+- **PR:** [#81](https://github.com/Nexora-Apparel/mt5-scalping-engine/pull/81), branch `phase8/replay-corrections-v2-20261124`.
+- **Correction:** Updated `_validate_features` return annotation to include the fourth return value, `set[int]` of partial boundary-window indices. The implementation already returned this value; this was a typing-contract inconsistency, not a runtime behavior change.
+- **Commit:** `e9a02186c4236ac20cee14814bb520f9c6da81f9`.
+- **Verification:** File readback confirms the corrected annotation. No PR-triggered workflow run was returned for this commit at the time of this entry; the earlier 292-test and smoke-test successes apply to the preceding tested code commit, not this latest commit.
+- **Boundary:** No evaluator rerun, validation-date reuse, holdout access, candidate approval, or order execution.
+
+
+### 2026-11-24 — Corrected first-bucket partial-window detection after boundary semantics review
+
+- **Finding:** The first-bucket detector previously treated a first quote arriving after the bucket's left edge as proof of a partial bucket even when the trusted manifest says collection began exactly at that left edge. Tick feeds are event-driven; absence of an event at the exact boundary does not prove collection was inactive.
+- **Correction:** First-bucket partial status now depends on the actual trusted collection/request start being later than the bucket boundary. If no trusted collection boundary exists, the first bucket remains conservatively partial. The final observed bucket remains partial because no later bucket proves completion.
+- **Regression tests:** Added tests distinguishing collection beginning exactly at the bucket boundary (first bucket complete despite first quote +153ms) from collection beginning 200ms inside the bucket (first bucket partial).
+- **Commits:** feature logic `3c64f45c2058fc27077dc834215e6eda7887208a`; tests `b48a3f2a07063c9eb8a4015193c7ffcf5778cd95`.
+- **Audit qualification:** The prior audit's statement that the five first-window momentum triggers necessarily violated the partial-window rule is not established by first-tick delay alone. The four historical manifests use requested interval boundaries; their exact trusted start fields must be checked against the first bucket before classifying those five trigger windows. The original audit/report remain immutable; this is a separately logged interpretation correction, not a retroactive report edit.
+- **Verification boundary:** No Phase 8 evaluator rerun or candidate-performance recalculation. Await CI for the updated PR #81 head. No holdout access, candidate approval, or order execution.
+
+
+### 2026-11-24 — Boundary detector regression fixture corrected after CI failure
+
+- **CI run:** 45395397562 initially failed one feature test; 293 tests passed and one failed. The failure was a fixture-contract issue: the test expected the first bucket to be complete while omitting any trusted collection-start timestamp. Under the conservative rule, missing start provenance correctly marks the first bucket partial.
+- **Fix:** The fixture now explicitly records collection start at the bucket boundary, matching its intended complete-window scenario. The obsolete first-tick variable was removed from the detector.
+- **Commits:** test fixture `0b7ed4e43a97a72133ff3d47b9e08e51edaa6c31`; cleanup `7cd239723c048ebd0fe0ca2ce7f4a7d10658e03f`.
+- **Verification:** New CI is expected from the updated PR head; no pass is claimed yet. Historical replay smoke run 45395397315 passed. Candidate-generation smoke run 45395397440 was still in progress at last check.
+- **Boundary:** No Phase 8 validation evaluator rerun; no v1 validation date reuse; no holdout access; no candidate approval; no order execution.
