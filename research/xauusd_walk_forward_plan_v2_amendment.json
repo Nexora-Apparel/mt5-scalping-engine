@@ -1,14 +1,14 @@
 {
   "plan_schema": "VELTRIX_XAUUSD_WALK_FORWARD_PLAN_V2_AMENDMENT",
   "plan_version": 2,
-  "status": "FROZEN_PREREGISTRATION_RESEARCH_ONLY",
+  "status": "DRAFT_PREREGISTRATION_NOT_FROZEN",
   "supersedes_for_new_evaluations": "research/xauusd_walk_forward_plan_v1.json",
   "preserves_original_plan": true,
   "canonical_symbol": "XAUUSD",
   "broker": "Exness",
   "account_mode": "DEMO",
   "implementation_version": "PHASE8_REPLAY_CORRECTIONS_V2",
-  "source_registry_sha256": "6feaef79f5c1481920b5c2519c72d3ade7aa29849ae9b7cf4fee4e410b024c59",
+  "source_registry_sha256": "31b1471d1f5c28ff83dce08cf388a444a0886f4411e9d960b2a2ec212516d62d",
   "original_validation_sessions_prohibited": [
     "validation_01",
     "validation_02",
