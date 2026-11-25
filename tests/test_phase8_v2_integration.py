@@ -161,3 +161,13 @@ def test_committed_v2_freeze_binds_validated_code_and_precedes_schedule():
     assert freeze["commission_evidence_sha256_or_explicit_unverified_lock"] == "UNVERIFIED_REQUIRED_INPUT"
     assert plan["evaluation"]["net_performance_allowed"] is False
     assert plan["v2_protocol"]["holdout_access"] == "SEALED"
+
+
+def test_git_commit_timestamps_normalize_to_utc_but_freeze_slots_require_utc():
+    from datetime import datetime, timezone
+    from tools.mt5_xauusd_v2_protocol import parse_utc
+
+    normalized = parse_utc("2026-11-25T18:21:09+01:00", "git timestamp", require_utc=False)
+    assert normalized == datetime(2026, 11, 25, 17, 21, 9, tzinfo=timezone.utc)
+    with pytest.raises(V2ProtocolError, match="UTC offset"):
+        parse_utc("2026-11-25T18:21:09+01:00", "freeze timestamp", require_utc=True)
