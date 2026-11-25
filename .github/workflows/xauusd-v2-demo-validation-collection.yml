@@ -160,6 +160,7 @@ jobs:
           MT5_SERVER: ${{ secrets.MT5_SERVER }}
           VELTRIX_SESSION_ID: ${{ inputs.validation_session_id }}
           VELTRIX_COLLECTION_PROTOCOL: V2
+          VELTRIX_SOURCE_COMMIT_SHA: ${{ github.sha }}
         run: |
           $ErrorActionPreference = "Stop"
           python tools/mt5_demo_tick_collector_v2.py --minutes 30 --output-dir session-artifacts
