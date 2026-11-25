@@ -63,6 +63,53 @@ def _git_path_commit(path: Path, repo_root: Path) -> tuple[datetime, str]:
     return parse_utc(timestamp, f"{path.name} commit timestamp"), commit_sha
 
 
+def validate_amendment_contract(amendment: dict[str, Any]) -> None:
+    requirements = amendment.get("collection_requirements", {})
+    expected_requirements = {
+        "minimum_session_duration_seconds": 1800,
+        "minimum_validation_sessions": 4,
+        "minimum_validation_distinct_dates": 4,
+        "minimum_outcomes_per_configuration_horizon": 100,
+        "collection_mode": "PROSPECTIVE_EXNESS_DEMO_READ_ONLY",
+        "canonical_symbol_only": "XAUUSD",
+        "trading_enabled": False,
+        "order_submission": False,
+        "position_management": False,
+        "dll_imports_enabled": False,
+        "no_cron_or_unattended_collection": True,
+        "first_and_last_partial_feature_windows_excluded": True,
+        "all_required_lookback_and_compression_windows_must_be_complete": True,
+        "no_cross_session_feature_history": True,
+    }
+    if any(requirements.get(key) != value for key, value in expected_requirements.items()):
+        raise V2ProtocolError("V2 collection requirements differ from the reviewed four-session read-only contract")
+    lane = amendment.get("position_lane_semantics", {})
+    if (
+        lane.get("lane_key") != ["candidate_id", "complete_parameter_set", "horizon_seconds"]
+        or lane.get("one_open_position_per_lane") is not True
+        or lane.get("horizon_arms_are_independent_counterfactual_research_streams") is not True
+        or lane.get("horizons_must_not_share_or_block_each_others_research_lane") is not True
+    ):
+        raise V2ProtocolError("V2 candidate/horizon lane semantics differ from the reviewed replay implementation")
+    evaluation = amendment.get("evaluation", {})
+    if (
+        evaluation.get("holding_horizons_seconds") != [5, 15, 30, 60]
+        or evaluation.get("slippage_sensitivity_points_per_side") != [0, 1, 2, 5]
+        or evaluation.get("commission_status") != UNVERIFIED_LOCK
+        or evaluation.get("net_performance_allowed") is not False
+        or evaluation.get("holdout_access") != "SEALED"
+    ):
+        raise V2ProtocolError("V2 evaluation cost, horizon, commission, or holdout gates changed")
+    gates = amendment.get("gates", {})
+    if (
+        gates.get("candidate_approval") != "NOT_APPROVED"
+        or gates.get("order_execution") != "DISABLED"
+        or gates.get("live_trading") != "DISABLED"
+        or not str(gates.get("holdout", "")).startswith("SEALED")
+    ):
+        raise V2ProtocolError("V2 candidate, execution, or holdout gate changed")
+
+
 def load_frozen_v2(*, amendment_path: Path, freeze_path: Path, base_plan_path: Path,
                    registry_path: Path, repo_root: Path, verify_git_ancestry: bool = True):
     try:
@@ -77,6 +124,7 @@ def load_frozen_v2(*, amendment_path: Path, freeze_path: Path, base_plan_path: P
         raise V2ProtocolError("unsupported V2 amendment schema")
     if amendment.get("status") != "FROZEN_PREREGISTRATION_RESEARCH_ONLY":
         raise V2ProtocolError("V2 amendment is not frozen; collection and evaluation remain blocked")
+    validate_amendment_contract(amendment)
     if base_plan.get("plan_schema") != "VELTRIX_XAUUSD_WALK_FORWARD_PLAN_V1":
         raise V2ProtocolError("the immutable V1 base plan is missing or unsupported")
     registry_hash = sha256_file(registry_path)
