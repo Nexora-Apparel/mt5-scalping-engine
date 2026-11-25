@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -32,14 +34,41 @@ def validate_v2_map(value: dict[str, Any]) -> list[dict[str, Any]]:
     return normalized
 
 
-def validate_schedule(catalog: dict[str, Any], workspace: Path, plan: dict[str, Any]) -> None:
+def validate_schedule(catalog: dict[str, Any], workspace: Path, plan: dict[str, Any], mapping: list[dict[str, Any]], repo: str) -> None:
     entries = {item["session_id"]: item for item in catalog.get("sessions", [])}
     if set(entries) != set(V2_IDS):
         raise ArtifactIntakeError("catalog must contain exactly the four V2 validation sessions")
     observed_dates = set()
+    run_by_sid = {item["session_id"]: item["run_id"] for item in mapping}
     for sid in V2_IDS:
         manifest_path = workspace / "research" / entries[sid]["manifest"]
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        run_result = subprocess.run(
+            ["gh", "api", f"repos/{repo}/actions/runs/{run_by_sid[sid]}"],
+            cwd=workspace, capture_output=True, text=True, check=False,
+        )
+        if run_result.returncode:
+            raise ArtifactIntakeError(f"{sid}: cannot verify the originating GitHub Actions run")
+        run = json.loads(run_result.stdout)
+        if (
+            run.get("status") != "completed" or run.get("conclusion") != "success"
+            or run.get("event") != "workflow_dispatch"
+            or run.get("path") != ".github/workflows/xauusd-v2-demo-validation-collection.yml"
+            or run.get("head_branch") != "main"
+        ):
+            raise ArtifactIntakeError(f"{sid}: artifact did not originate from the successful manual V2 workflow on main")
+        source_commit = manifest.get("source_commit_sha")
+        if not isinstance(source_commit, str) or not re.fullmatch(r"[0-9a-f]{40}", source_commit):
+            raise ArtifactIntakeError(f"{sid}: manifest lacks a valid source commit SHA")
+        if source_commit != run.get("head_sha"):
+            raise ArtifactIntakeError(f"{sid}: manifest source commit does not match the originating workflow run")
+        ancestor = subprocess.run(
+            ["git", "merge-base", "--is-ancestor",
+             plan["v2_protocol"]["implementation_commit_sha"], source_commit],
+            cwd=workspace, capture_output=True, text=True, check=False,
+        )
+        if ancestor.returncode:
+            raise ArtifactIntakeError(f"{sid}: collection source commit does not contain the frozen implementation")
         if manifest.get("session_id") != sid or manifest.get("account_mode") != "DEMO":
             raise ArtifactIntakeError(f"{sid}: manifest identity/account mode mismatch")
         if manifest.get("trading_enabled") is not False or manifest.get("dll_imports_enabled") is not False:
@@ -80,7 +109,7 @@ def main() -> int:
         )
         mapping = validate_v2_map(json.loads(args.session_map.read_text(encoding="utf-8")))
         result = download_session_artifacts(mapping, plan, repo=args.repo, workspace=workspace)
-        validate_schedule(result["catalog"], workspace, plan)
+        validate_schedule(result["catalog"], workspace, plan, mapping, args.repo)
     except (OSError, json.JSONDecodeError, ArtifactIntakeError, V2ProtocolError, KeyError, TypeError, ValueError) as exc:
         parser.exit(2, f"V2 ARTIFACT INTAKE BLOCKED: {exc}\\n")
     print(json.dumps({
