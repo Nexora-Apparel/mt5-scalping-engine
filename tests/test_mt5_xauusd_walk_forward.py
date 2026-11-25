@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from tools.mt5_xauusd_walk_forward import (
+    _summarize_group,
     WalkForwardError,
     _validate_selected_configurations,
     _validate_selection_against_validation_report,
@@ -265,8 +266,26 @@ def test_validation_evaluator_aggregates_candidate_and_directional_benchmarks(tm
     assert ready["status"] == "READY_FOR_RESEARCH_EVALUATION"
     report = wf.evaluate_partition(ready, REGISTRY)
     assert report["status"] == "RESEARCH_EVALUATION_COMPLETE"
-    assert len(report["candidate_results"]) == 1
-    candidate = report["candidate_results"][0]
+    assert len(report["candidate_results"]) == 120
+    candidate = next(
+        row for row in report["candidate_results"]
+        if row["candidate_id"] == "XAU_MOMENTUM_CONTINUATION_V1"
+        and row["parameters"] == {"lookback_seconds": 5, "standardized_impulse_threshold": 1.0}
+        and row["horizon_seconds"] == 5
+    )
+    zero_signal = next(
+        row for row in report["candidate_results"]
+        if row["candidate_id"] == "XAU_VOLATILITY_BREAKOUT_V1"
+        and row["parameters"] == {
+            "lookback_seconds": 60,
+            "breakout_distance_volatility_fraction": 1,
+            "compression_reference_percentile": 25,
+        }
+        and row["horizon_seconds"] == 5
+    )
+    assert zero_signal["aggregate_cost_sensitivity"]["0"]["outcomes"] == 0
+    assert zero_signal["sample_size_gate_passed"] is False
+    assert all(item["generated_signals"] == 0 for item in zero_signal["sessions"].values())
     assert candidate["aggregate_cost_sensitivity"]["0"]["outcomes"] == 4
     assert candidate["aggregate_cost_sensitivity"]["5"]["mean_return_before_commission_bps"] == 5.0
     assert len(report["benchmarks"]) == 8
@@ -333,3 +352,51 @@ def test_walk_forward_evaluator_requires_manifest_bound_validation_session_id():
     source = (ROOT / "tools/mt5_xauusd_walk_forward.py").read_text(encoding="utf-8")
     assert 'manifest.get("session_id") != sid' in source
     assert "validation manifest session_id does not match" in source
+
+
+def _outcome(signal_end, status, entry=None, exit_time=None, pnl=1.0):
+    item = {
+        "signal_window_end_msc": signal_end,
+        "status": status,
+    }
+    if entry is not None:
+        item["entry_time_msc"] = entry
+    if exit_time is not None:
+        item["exit_time_msc"] = exit_time
+    if status == "OUTCOME_AVAILABLE":
+        item["slippage_sensitivity"] = [
+            {"slippage_points_per_side": points, "return_before_commission_bps": pnl}
+            for points in [0, 1, 2, 5]
+        ]
+    return item
+
+
+def test_single_position_filter_rejects_signal_created_before_prior_exit_even_if_entry_quote_is_later():
+    result = _summarize_group({
+        "validation_01": [
+            _outcome(1000, "OUTCOME_AVAILABLE", entry=1001, exit_time=7000, pnl=1.0),
+            # Signal occurs while the first position is open; first quote is after its exit.
+            _outcome(6000, "OUTCOME_AVAILABLE", entry=7001, exit_time=12000, pnl=99.0),
+        ]
+    }, [0, 1, 2, 5])
+    session = result["sessions"]["validation_01"]
+    assert session["available_outcomes_after_single_position_filter"] == 1
+    assert session["skipped_overlapping_or_unresolved"] == 1
+    assert result["aggregate_cost_sensitivity"]["0"]["mean_return_before_commission_bps"] == 1.0
+
+
+def test_unresolved_exit_timeout_counts_later_precomputed_timeouts_as_skipped_not_attempted():
+    result = _summarize_group({
+        "validation_01": [
+            _outcome(1000, "EXIT_QUOTE_TIMEOUT", entry=1001),
+            # This timeout status was precomputed, but the sequential filter never attempts it.
+            _outcome(6000, "EXIT_QUOTE_TIMEOUT", entry=6001),
+            _outcome(12000, "OUTCOME_AVAILABLE", entry=12001, exit_time=17001, pnl=2.0),
+        ]
+    }, [0, 1, 2, 5])
+    session = result["sessions"]["validation_01"]
+    assert result["total_timeouts"] == 1
+    assert result["total_skipped"] == 2
+    assert session["exit_quote_timeouts_attempted"] == 1
+    assert session["skipped_overlapping_or_unresolved"] == 2
+    assert session["available_outcomes_after_single_position_filter"] == 0

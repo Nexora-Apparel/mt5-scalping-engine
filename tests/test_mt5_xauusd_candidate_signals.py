@@ -53,6 +53,7 @@ def make_features(count=100):
         "window_seconds": 5,
         "window_count": count,
         "features": rows,
+        "partial_boundary_window_indices": [],
     }
 
 
@@ -273,3 +274,19 @@ def test_future_mutations_do_not_change_breakout_compression_or_signal(registry)
         and event["signal_window_index"] == index
     ]
     assert actual == expected
+
+
+def test_partial_first_boundary_window_is_never_used_in_candidate_history(registry):
+    features = make_features()
+    features["partial_boundary_window_indices"] = [0]
+    features["features"][1]["mid_close"] = 100.2
+    features["features"][1]["mid_high"] = 100.201
+    features["features"][1]["mid_low"] = 100.199
+    result = generate_candidate_events(features, registry)
+    assert not [
+        event for event in result["events"]
+        if event["candidate_id"] == "XAU_MOMENTUM_CONTINUATION_V1"
+        and event["signal_window_index"] == 1
+        and event["parameters"]["lookback_seconds"] == 5
+    ]
+    assert result["partial_boundary_window_indices"] == [0]

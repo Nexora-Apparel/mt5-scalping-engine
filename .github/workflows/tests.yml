@@ -21,6 +21,8 @@ on:
       - ".github/workflows/veltrix-market-profile.yml"
       - ".github/workflows/veltrix-multi-session-certification.yml"
       - ".github/workflows/xauusd-historical-tick-probe.yml"
+      - ".github/workflows/xauusd-v2-demo-validation-collection.yml"
+      - ".github/workflows/xauusd-v2-validation-evaluation.yml"
   push:
     branches:
       - main
@@ -50,6 +52,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
