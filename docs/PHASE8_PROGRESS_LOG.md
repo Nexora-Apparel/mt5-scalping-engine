@@ -360,3 +360,18 @@
 - **Branch:** `phase8/v2-preregistration-amendment-rebased-20261124`, based on PR #81 head `6d72e6915d08d689c8d58d7bc46e8b81e884742a`.
 - **Reason:** Keep the protocol amendment dependent on the latest replay-correction branch state; the earlier PR #82 branch was based on an older PR #81 commit.
 - **Protocol status:** Draft only. V2 session IDs still require workflow, intake, evaluator, and regression-test support before freeze or collection.
+
+
+### 2026-11-25 — V2 collector, intake, evaluator, and manual workflow integration
+
+- **Branch:** `phase8/v2-collector-intake-evaluator-20261125`, created from PR #83 branch `phase8/v2-preregistration-amendment-rebased-20261124`; therefore PR #81 replay corrections and PR #83 amendment are ancestors of this integration.
+- **New V2-only collector:** `tools/mt5_demo_tick_collector_v2.py`. It accepts only `v2_validation_01`–`v2_validation_04`; manifest now explicitly records trading, DLL imports, order submission, position management, execution, and live trading as disabled.
+- **Freeze/schedule gate:** `tools/mt5_xauusd_v2_protocol.py` and `tools/validate_xauusd_v2_collection_dispatch.py` reject draft plans, mismatched amendment/registry hashes, invalid implementation ancestry, duplicate/incorrect session IDs, repeated UTC dates, schedules before freeze, and dispatch outside the frozen slot.
+- **Prospective intake:** `tools/prepare_xauusd_v2_validation_catalog.py` requires exactly four distinct workflow run IDs mapped to the four V2 IDs; it reuses the audited artifact integrity intake and enforces schedule, DEMO, XAUUSD-only, monotonic duration, and read-only attestations. V1 validation IDs are rejected.
+- **V2 evaluator:** `tools/mt5_xauusd_v2_validation.py` adapts the immutable V1 plan to V2 IDs only after freeze verification, requires all four V2 sessions, rejects V1 validation IDs, and keeps holdout sealed and net performance disabled.
+- **Manual workflows:** added `.github/workflows/xauusd-v2-demo-validation-collection.yml` and `.github/workflows/xauusd-v2-validation-evaluation.yml`. Collection checks out the dispatch commit with full history, uses the existing signed installer verification, is manual-only, and has no scheduled trigger. The evaluation workflow requires the four collection run IDs.
+- **Regression coverage:** added `tests/test_phase8_v2_integration.py`; updated `tests.yml` path filters so the new workflows invoke project CI on a PR to main.
+- **Documentation:** `docs/PHASE8_V2_COLLECTOR_INTAKE_EVALUATOR.md` records architecture, dependency order, freeze gate, manual operations, and external commission evidence requirement.
+- **Current implementation commits:** collector `d5a6d1d8b2f0a9bcddd5faff0363186df9d2dd61`; protocol `73332ee8465348136d2798d6a2db42b64d2558dc`; intake `bf4829c0798aa027dfdc78d33a0ffa2e300304ed`; evaluator `097f3ba0feccf51cd89f9f2a9907054628398d25`; collection workflow `ead83585dcdd6c9be1f6900cc774089c0253744d`; dispatch gate `2a3048f1079887cde35e3ef5075a885f1822b6ff`; evaluation workflow `424ec0e1b228fac63745f18c573fa68030db22ae`; tests `9de87c6e5ef4ebba71d91c0f65cbbbd8e67bf59e`; docs `f657c0befaa650e0d8637177ca61abfad2536102`.
+- **Not yet complete:** CI has not yet run on the integration head; V2 amendment remains draft; no freeze record has been created; no V2 collection has started. Commission remains unverified. The GitHub connection has no workflow-dispatch action, so manual collection/evaluation runs require the Actions UI after the reviewed stack is merged to the default branch.
+- **Safety:** no V1 rescoring, no holdout, no net P/L, no candidate approval, no order submission, no position management, no live trading.
